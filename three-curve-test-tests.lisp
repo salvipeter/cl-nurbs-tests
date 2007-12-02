@@ -5,39 +5,29 @@
 
 (three-curve-original *curve* 0.343434 0.656566 4 "results/original.rdn")
 
-(three-curve-test *curve* 0.343434 0.656566 4 "results/csak-sima-fit.rdn"
-		  :resolution 100
-		  :no-fairing t :simple-fitting t)
-
-(three-curve-test *curve* 0.343434 0.656566 4 "results/csak-szoritott-fit.rdn"
-		  :resolution 100
-		  :loose-tolerance 0.01 :tight-tolerance 0.001
-		  :number-of-held-points 5
-		  :no-fairing t :simple-fitting nil)
-
 (three-curve-test *curve* 0.343434 0.656566 4 "results/fair-szoritott-fit.rdn"
 		  :resolution 100 :iteration 100 :max-deviation 100
 		  :loose-tolerance 0.01 :tight-tolerance 0.001
 		  :number-of-held-points 5
 		  :no-fairing nil :simple-fitting nil)
 
+(three-curve-iterative-test *curve* 0.343434 0.656566 4
+			    "results/fair-cont-iter.rdn"
+			    :resolution 100 :target-iteration 100
+			    :simplex-iteration 15 :fairing-iteration 5)
+
 (defparameter *curve*
   (make-bspline-curve 3 '( 0 0 0 0 0.362383 0.489932 0.582052 0.721361 1 1 1 1 ) '( (0.206598 -1.35897) (0.712538 -0.884575) (1.60127 -0.659641) (2.65718 -0.513087) (3.31592 -0.444638) (4.24742 -0.699734) (4.80681 -1.44105) (4.72273 -1.96703) )))
 
 (three-curve-original *curve* 0.30303 0.828283 4 "results/original.rdn")
 
-(three-curve-test *curve* 0.30303 0.828283 4 "results/csak-sima-fit.rdn"
-		  :resolution 100
-		  :no-fairing t :simple-fitting t)
-
-(three-curve-test *curve* 0.30303 0.828283 4 "results/csak-szoritott-fit.rdn"
-		  :resolution 100
-		  :loose-tolerance 0.01 :tight-tolerance 0.001
-		  :number-of-held-points 5
-		  :no-fairing t :simple-fitting nil)
-
 (three-curve-test *curve* 0.30303 0.828283 4 "results/fair-szoritott-fit.rdn"
-		  :resolution 100 :iteration 300 :max-deviation 100
+		  :resolution 100 :iteration 100 :max-deviation 100
 		  :loose-tolerance 0.01 :tight-tolerance 0.001
 		  :number-of-held-points 5
 		  :no-fairing nil :simple-fitting nil)
+
+(three-curve-iterative-test *curve* 0.30303 0.828283 4
+			    "results/fair-cont-iter.rdn"
+			    :resolution 100 :target-iteration 100
+			    :simplex-iteration 15 :fairing-iteration 5)
