@@ -51,10 +51,7 @@
 	 (new-curve (copy-bspline-curve curve))
 	 (points (control-points new-curve)))
     (dotimes (i fairing-iteration)
-      (setf (elt points 1)
-	    (v+ start-point
-		(v* start-tangent
-		    (car (downhill-simplex:minimize
+      (let ((new-u (car (downhill-simplex:minimize
 			  (lambda (x)
 			    (let ((old (elt points 1)))
 			      (setf (elt points 1)
@@ -63,7 +60,9 @@
 				  (continuity-measure new-curve
 						      parameters curvatures)
 				(setf (elt points 1) old))))
-			  (list start-u) simplex-iteration)))))
+			  (list start-u) simplex-iteration))))
+	(setf start-u new-u
+	      (elt points 1) (v+ start-point (v* start-tangent new-u))))
       (iter (for j from 2 below (- n 2))
 	    (flet ((fairness-fn (point)
 		     (let ((old (elt points j)))
@@ -75,10 +74,7 @@
 	      (setf (elt points j)
 		    (downhill-simplex:minimize
 		     #'fairness-fn (elt points j) simplex-iteration))))
-      (setf (elt points (- n 2))
-	    (v+ end-point
-		(v* end-tangent
-		    (car (downhill-simplex:minimize
+      (let ((new-u (car (downhill-simplex:minimize
 			  (lambda (x)
 			    (let ((old (elt points (- n 2))))
 			      (setf (elt points (- n 2))
@@ -87,7 +83,9 @@
 				  (continuity-measure new-curve
 						      parameters curvatures)
 				(setf (elt points (- n 2)) old))))
-			  (list end-u) simplex-iteration))))))
+			  (list end-u) simplex-iteration))))
+	(setf end-u new-u
+	      (elt points (- n 2)) (v+ end-point (v* end-tangent new-u)))))
     new-curve))
 
 (defun split-to-three (curve u1 u2)
