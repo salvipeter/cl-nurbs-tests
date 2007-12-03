@@ -34,6 +34,8 @@
 
 (defparameter *xnode* (read-rbn "models/xnode.rbn"))
 
+(write-rdn *xnode* "results/original.rdn")
+
 (five-surface-iterative-test *xnode* "results/fair-cont-iter.rdn"
-			    :resolution 100 :target-iteration 100
-			    :simplex-iteration 5 :fairing-iteration 5)
+			     :resolution 15 :target-iteration 100
+			     :simplex-iteration 30 :fairing-iteration 10)
