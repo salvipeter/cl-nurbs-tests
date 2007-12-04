@@ -92,22 +92,18 @@
 	(dolist (array arrays) (foreign-free (third array)))))))
 
 (defun bsc-resembling-fit (curve points tolerance)
-  (let ((low (bsc-lower-parameter curve))
-	(high (bsc-upper-parameter curve)))
-    (bsc-fit-engine
-     (bsc-dimension curve) (degree curve)
-     (list (cons tolerance
-		 (uniform-parameter-points points
-					   (bsc-lower-parameter curve)
-					   (bsc-upper-parameter curve))))
-     :number-of-control-points (length (control-points curve))
-;;      :knot-vector (knot-vector curve)
-     :smoothness-functional :smf-none
-     :optimize-parameters nil
-     :start-point (elt points 0)
-     :end-point (elt points (1- (length points)))
-     :start-curvature (list (bsc-curvature curve low))
-     :end-curvature (list (bsc-curvature curve high)))))
+  (bsc-fit-engine
+   (bsc-dimension curve) (degree curve)
+   (list (cons tolerance
+	       (uniform-parameter-points points
+					 (bsc-lower-parameter curve)
+					 (bsc-upper-parameter curve))))
+   :number-of-control-points (length (control-points curve))
+   ;;      :knot-vector (knot-vector curve)
+   :smoothness-functional :smf-none
+   :optimize-parameters nil
+   :start-point (elt points 0)
+   :end-point (elt points (1- (length points)))))
 
 (defun suppressed-fit-middle-curve (split faired-points resolution
 				    number-of-held-points
