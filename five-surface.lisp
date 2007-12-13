@@ -261,7 +261,7 @@ The border points are not included."
 			   (iteration 100) (max-deviation 1000)
 			   (loose-tolerance 0.1) (tight-tolerance 0.001)
 			   (number-of-held-points 5)
-			   no-fairing simple-fitting)
+			   no-fairing simple-fitting no-cut)
   (let* ((res (xnode-resolution xnode resolution))
 	 (faired (if no-fairing
 		     (first (sample-surface (first xnode) (first res)))
@@ -272,7 +272,10 @@ The border points are not included."
 	       (suppressed-fit-xnode xnode faired res
 				     number-of-held-points
 				     loose-tolerance tight-tolerance)))
-	  (grid-cut (first xnode) suppressed (first res) tight-tolerance)))))
+	  (if no-cut
+	      suppressed
+	      (grid-cut (first xnode) suppressed (first res)
+			tight-tolerance))))))
 
 (defun five-surface-test (xnode filename &rest keys)
   (let ((faired (apply #'fair-and-fit-xnode xnode keys)))
