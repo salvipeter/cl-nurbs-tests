@@ -272,6 +272,7 @@ The border points are not included."
 	       (suppressed-fit-xnode xnode faired res
 				     number-of-held-points
 				     loose-tolerance tight-tolerance)))
+	  (assert suppressed nil "Suppressed fit failed")
 	  (if no-cut
 	      suppressed
 	      (grid-cut (first xnode) suppressed (first res)
