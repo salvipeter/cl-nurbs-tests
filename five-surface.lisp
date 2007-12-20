@@ -79,19 +79,35 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
 				     :start-curvature start-cv
 				     :end-curvature end-cv))))
 
+#+blind-mesh-blend
+(defun blend-meshes (res a b)
+  "TODO: The blending of the U and V meshes should be smarter."
+  (let ((result (make-array res)))
+    (dotimes (i (first res))
+      (dotimes (j (second res))
+	(setf (aref result i j)
+	      (affine-combine (elt (nth j a) i) 0.5 (elt (nth i b) j)))))
+    result))
+
+(defun blend-meshes (res a b)
+  (let ((midu (/ (first res) 2))
+	(midv (/ (second res) 2))
+	(result (make-array res)))
+    (dotimes (i (first res))
+      (dotimes (j (second res))
+	(let* ((ad (expt (- (abs (- midu i)) midu) 2))
+	       (bd (expt (- (abs (- midv j)) midv) 2))
+	       (ratio (if (= (+ ad bd) 0) 0.5 (/ ad (+ ad bd)))))
+	  (setf (aref result i j)
+		(affine-combine (elt (nth j a) i) ratio (elt (nth i b) j))))))
+    result))
+
 (defun fair-xnode (xnode resolution iteration max-deviation)
-  "TODO: The blending of the U and V meshes should be better."
   (let ((mesh-u (fair-xnode-in-one-direction xnode resolution iteration
 					     max-deviation :u-direction t))
 	(mesh-v (fair-xnode-in-one-direction xnode resolution iteration
-					     max-deviation :u-direction nil))
-	(result (make-array resolution)))
-    (dotimes (i (first resolution))
-      (dotimes (j (second resolution))
-	(setf (aref result i j) (affine-combine (elt (nth j mesh-u) i)
-						0.5
-						(elt (nth i mesh-v) j)))))
-    result))
+					     max-deviation :u-direction nil)))
+    (blend-meshes resolution mesh-u mesh-v)))
 
 (defun bss-fit-engine (degree point-group-list &key
 		       number-of-control-points-u number-of-control-points-v
