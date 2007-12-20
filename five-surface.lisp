@@ -148,14 +148,6 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
      :smoothness-functional :smf-none
      :optimize-parameters nil)))
 
-(defun write-2d-gnuplot-points (points filename)
-  (with-open-file (s filename :direction :output :if-exists :supersede)
-    (let ((n1 (array-dimension points 0))
-	  (n2 (array-dimension points 1)))
-      (dotimes (i n1)
-	(dotimes (j n2)
-	  (format s "~{~f~^ ~}~%" (aref points i j)))))))
-
 (defun uniform-parameter-points-2d-inner (points &optional
 					  (start-u 0.0) (end-u 1.0)
 					  (start-v 0.0) (end-v 1.0))
@@ -195,11 +187,11 @@ The border points are not included."
 	 (upoints (sample-surface (fifth xnode) (fifth resolution)
 				  :number-of-points-v (+ held-points 2)))
 	 (lengths (array-dimensions (control-net (first xnode)))))
-;;     (write-2d-gnuplot-points (first lpoints) "results/left.pts")
-;;     (write-2d-gnuplot-points (first rpoints) "results/right.pts")
-;;     (write-2d-gnuplot-points (first dpoints) "results/bottom.pts")
-;;     (write-2d-gnuplot-points (first upoints) "results/top.pts")
-;;     (write-2d-gnuplot-points faired-points "results/center.pts")
+;;     (write-points2-vtk (first lpoints) "results/left.vtk")
+;;     (write-points2-vtk (first rpoints) "results/right.vtk")
+;;     (write-points2-vtk (first dpoints) "results/bottom.vtk")
+;;     (write-points2-vtk (first upoints) "results/top.vtk")
+;;     (write-points2-vtk faired-points "results/center.vtk")
     (flet ((samples-to-parameter-points (sample dir)
 	     (let ((from (case dir
 			   (l (list (- (first lower) held-hi-u)
