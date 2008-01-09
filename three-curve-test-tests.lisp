@@ -45,3 +45,14 @@
 (five-surface-iterative-test *xnode* "results/fair-cont-iter.rdn"
 			     :resolution 15 :target-iteration 100
 			     :simplex-iteration 30 :fairing-iteration 10)
+
+#+emacs-lisp
+(defun copy-result-to-dense (&optional filename)
+  (interactive)
+  (let* ((dfile "/home/salvi/project/cl-nurbs/results/fair-szoritott-fit.rdn")
+	 (filename (or filename (read-file-name "File name: " nil dfile)))
+	 (ange-ftp-ftp-program-args
+	  (adjoin "-u" ange-ftp-ftp-program-args :test #'string=)))
+    (copy-file filename "/ftp:dense:/Rodin-1.0.3/bss/" t)))
+#+emacs-lisp
+(global-set-key [f6] #'copy-result-to-dense)
