@@ -148,7 +148,7 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
 	(sf-destroy sf)
 	(dolist (array arrays) (foreign-free (third array)))))))
 
-(defun bss-resembling-fit (surface points tolerance)
+(defun bss-resembling-fit (surface points tolerance &key knot-vector)
   (let ((low (bss-lower-parameter surface))
 	(high (bss-upper-parameter surface)))
     (bss-fit-engine
@@ -157,10 +157,12 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
 		 (uniform-parameter-points-2d points
 					      (first low) (first high)
 					      (second low) (second high))))
-     :number-of-control-points-u (array-dimension (control-net surface) 0)
-     :number-of-control-points-v (array-dimension (control-net surface) 1)
-     ;;    :knot-vector-u (first (knot-vectors surface))
-     ;;    :knot-vector-v (second (knot-vectors surface))
+     :number-of-control-points-u (unless knot-vector
+				   (array-dimension (control-net surface) 0))
+     :number-of-control-points-v (unless knot-vector
+				   (array-dimension (control-net surface) 1))
+     :knot-vector-u (and knot-vector (first (knot-vectors surface)))
+     :knot-vector-v (and knot-vector (second (knot-vectors surface)))
      :smoothness-functional :smf-none
      :optimize-parameters nil)))
 
@@ -263,7 +265,8 @@ The border points are not included."
 			  (/ (* (second len) j) (1- (second resolution)))))
 	      (setf (aref points i j)
 		    (just-a-surface-projection original faired u v)))
-	(finally (return (bss-resembling-fit original points tolerance)))))
+	(finally (return (bss-resembling-fit original points tolerance
+					     :knot-vector t)))))
 
 (defun fair-and-fit-xnode (xnode &key (resolution 300)
 			   (iteration 100) (max-deviation 1000)
@@ -275,7 +278,8 @@ The border points are not included."
 		     (first (sample-surface (first xnode) (first res)))
 		     (fair-xnode xnode (first res) iteration max-deviation))))
     (if simple-fitting
-	(bss-resembling-fit (first xnode) faired loose-tolerance)
+	(bss-resembling-fit (first xnode) faired loose-tolerance
+			    :knot-vector nil)
 	(let ((suppressed
 	       (suppressed-fit-xnode xnode faired res
 				     number-of-held-points
