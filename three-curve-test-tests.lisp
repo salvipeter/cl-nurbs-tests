@@ -40,12 +40,14 @@
 		   :resolution '(300 100) :iteration 100 :max-deviation 100
 		   :loose-tolerance 0.001 :tight-tolerance 0.0001
 		   :number-of-held-points 5
-		   :no-fairing nil :simple-fitting nil)
+		   :no-fairing nil :simple-fitting nil :no-cut nil)
 
 (five-surface-iterative-test *xnode* "results/fair-cont-iter.rdn"
 			     :resolution 15 :target-iteration 100
 			     :simplex-iteration 30 :fairing-iteration 10)
 
+#+emacs-lisp
+(require 'ange-ftp)
 #+emacs-lisp
 (defun copy-result-to-dense (&optional filename)
   (interactive)
