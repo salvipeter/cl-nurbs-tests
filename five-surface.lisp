@@ -253,7 +253,11 @@ The border points are not included."
 	(fp (bss-evaluate faired (list u v))))
     (v+ p (v* n (scalar-product (v- fp p) n)))))
 
-(defun grid-cut (original faired resolution tolerance)
+(defun just-an-evaluation (original faired u v)
+  (declare (ignore original))
+  (bss-evaluate faired (list u v)))
+
+(defun grid-cut (original faired resolution tolerance fn)
   (iter (with points = (make-array resolution))
 	(with low = (bss-lower-parameter original))
 	(with high = (bss-upper-parameter original))
@@ -263,8 +267,7 @@ The border points are not included."
 	(iter (for j from 0 below (second resolution))
 	      (for v = (+ (second low)
 			  (/ (* (second len) j) (1- (second resolution)))))
-	      (setf (aref points i j)
-		    (just-a-surface-projection original faired u v)))
+	      (setf (aref points i j) (funcall fn original faired u v)))
 	(finally (return (bss-resembling-fit original points tolerance
 					     :knot-vector t)))))
 
@@ -272,7 +275,7 @@ The border points are not included."
 			   (iteration 100) (max-deviation 1000)
 			   (loose-tolerance 0.1) (tight-tolerance 0.001)
 			   (number-of-held-points 5)
-			   no-fairing simple-fitting no-cut)
+			   no-fairing simple-fitting no-cut g1-zap)
   (let* ((res (xnode-resolution xnode resolution))
 	 (faired (if no-fairing
 		     (first (sample-surface (first xnode) (first res)))
@@ -287,8 +290,13 @@ The border points are not included."
 	  (assert suppressed nil "Suppressed fit failed")
 	  (if no-cut
 	      suppressed
-	      (grid-cut (first xnode) suppressed (first res)
-			tight-tolerance))))))
+	      (if g1-zap
+		  (apply #'ensure-g1-continuity
+			 (grid-cut (first xnode) suppressed (first res)
+				   tight-tolerance #'just-an-evaluation)
+			 (rest xnode))
+		  (grid-cut (first xnode) suppressed (first res)
+			    tight-tolerance #'just-a-surface-projection)))))))
 
 (defun five-surface-test (xnode filename &rest keys)
   (let ((faired (apply #'fair-and-fit-xnode xnode keys)))
