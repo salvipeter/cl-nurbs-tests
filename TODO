@@ -1,0 +1,21 @@
+			  -*- mode: org -*-
+
+* Suppressed fit
+** sarkokat kipotolni bilinear patchekkel
+- a ket szomszedos patch meghosszabitasabol mintavetelezunk es atlagoljuk
+** ebbol fajlokat generalni
+- uncut
+- cut-no-g1 (just zap)
+- cut (zap + g1)
+* G1 enforcing
+** twiseteket eloszor lefixalni
+*** a normal tranzverzalissal
+- a ket egyenes legkozelebbi reszenel az osszekoto szakasz felezopontja
+*** G1 = a feluletek erintosikjanak (normalisanak) a simasaga
+* Bugkereses
+- tipp: l/d, r/u van egyben, miert csak az egyik rossz?
+* Cut
+** masik modszer: knot vektor
+- a szoritott fitnek bovitett knot vektorokat adunk at
+- nem csinalunk parameterkorrekciot
+- algebrai vagas
