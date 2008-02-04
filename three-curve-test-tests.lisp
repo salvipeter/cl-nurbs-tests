@@ -40,7 +40,7 @@
 		   :resolution '(600 300) :iteration 100 :max-deviation 100
 		   :loose-tolerance 0.001 :tight-tolerance 0.0001
 		   :number-of-held-points 5
-		   :no-fairing nil :simple-fitting nil :no-cut nil :g1-zap t)
+		   :no-fairing nil :simple-fitting nil :cutting '(eval zap g1))
 
 (five-surface-iterative-test *xnode* "results/fair-cont-iter.rdn"
 			     :resolution 15 :target-iteration 100

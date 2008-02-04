@@ -275,7 +275,13 @@ The border points are not included."
 			   (iteration 100) (max-deviation 1000)
 			   (loose-tolerance 0.1) (tight-tolerance 0.001)
 			   (number-of-held-points 5)
-			   no-fairing simple-fitting no-cut g1-zap)
+			   no-fairing simple-fitting cutting)
+  "The key CUTTING is a list of symbols.
+   * NIL  : no cutting
+   * GRID : grid cut with the function JUST-A-PROJECTION
+   * EVAL : grid cut with the function JUST-AN-EVALUATION
+   * ZAP  : ensure G0 connectivity (usually used with EVAL)
+   * G1   : ensure G1 connectivity (usually used with ZAP)"
   (let* ((res (xnode-resolution xnode resolution))
 	 (faired (if no-fairing
 		     (first (sample-surface (first xnode) (first res)))
@@ -288,15 +294,23 @@ The border points are not included."
 				     number-of-held-points
 				     loose-tolerance tight-tolerance)))
 	  (assert suppressed nil "Suppressed fit failed")
-	  (if no-cut
-	      suppressed
-	      (if g1-zap
-		  (apply #'ensure-g1-continuity
-			 (grid-cut (first xnode) suppressed (first res)
-				   tight-tolerance #'just-an-evaluation)
-			 (rest xnode))
-		  (grid-cut (first xnode) suppressed (first res)
-			    tight-tolerance #'just-a-surface-projection)))))))
+	  (if cutting
+	      (let ((cut-sf (cond ((member 'eval cutting)
+				   (grid-cut (first xnode) suppressed
+					     (first res) tight-tolerance
+					     #'just-an-evaluation))
+				  ((member 'grid cutting)
+				   (grid-cut (first xnode) suppressed
+					     (first res) tight-tolerance
+					     #'just-a-surface-projection)))))
+		(let ((zap-sf
+		       (if (member 'zap cutting)
+			   (apply #'zap-to-surfaces cut-sf (rest xnode))
+			   cut-sf)))
+		  (if (member 'g1 cutting)
+		      (apply #'ensure-g1-continuity zap-sf (rest xnode))
+		      zap-sf)))
+	      suppressed)))))
 
 (defun five-surface-test (xnode filename &rest keys)
   (let ((faired (apply #'fair-and-fit-xnode xnode keys)))

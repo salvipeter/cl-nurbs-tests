@@ -126,10 +126,8 @@
     (setf result (flip-uv result))
     result))
 
-(defun ensure-g1-continuity (original lsurface rsurface dsurface usurface)
-  (let* ((surface (zap-to-surfaces original lsurface
-				   rsurface dsurface usurface))
-	 (nu (array-dimension (control-net surface) 0))
+(defun ensure-g1-continuity (surface lsurface rsurface dsurface usurface)
+  (let* ((nu (array-dimension (control-net surface) 0))
 	 (nv (array-dimension (control-net surface) 1))
 	 (cnet (control-net surface))
 	 (lnet (list (control-net lsurface) t t))
