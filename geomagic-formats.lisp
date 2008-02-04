@@ -1,7 +1,7 @@
 ;;; -*- mode: lisp; syntax: common-lisp -*-
 
 (require :ieee-floats)
-(in-package :cl-nurbs)
+(in-package :cl-nurbs-tests)
 
 (defun read-double (stream)
   (let ((result 0))

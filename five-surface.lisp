@@ -1,4 +1,6 @@
-(in-package :cl-nurbs)
+;; -*- mode: lisp; syntax: common-lisp -*-
+
+(in-package :cl-nurbs-tests)
 
 (defun xnode-resolution (xnode resolution)
   (let* ((res (if (listp resolution) resolution (list resolution resolution)))

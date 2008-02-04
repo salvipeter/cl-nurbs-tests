@@ -1,6 +1,6 @@
 ;; -*- mode: lisp; syntax: common-lisp -*-
 
-(in-package :cl-nurbs)
+(in-package :cl-nurbs-tests)
 
 (defun reparametrize-curve (curve min max)
   (let* ((old-min (bsc-lower-parameter curve))

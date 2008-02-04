@@ -1,4 +1,6 @@
-(in-package :cl-nurbs)
+;; -*- mode: lisp; syntax: common-lisp -*-
+
+(in-package :cl-nurbs-tests)
 
 (defparameter *alpha* 0.5)
 (defparameter *stability* 1000)
@@ -87,19 +89,6 @@
 	(setf end-u new-u
 	      (elt points (- n 2)) (v+ end-point (v* end-tangent new-u)))))
     new-curve))
-
-(defun split-to-three (curve u1 u2)
-  "Split CURVE to three subcurves at the parameter positions U1 and U2."
-  (let* ((left-rest (bsc-split-curve curve u1))
-	 (middle-right (bsc-split-curve (second left-rest) u2)))
-    (cons (first left-rest) middle-right)))
-
-(defun three-curve-original (curve u1 u2 extrusion filename)
-  (let ((split (split-to-three curve u1 u2)))
-    (write-rdn (mapcar (lambda (curve) (bsc-extrude curve extrusion))
-		       split)
-	       filename)
-    split))
 
 (defun three-curve-iterative-test (curve u1 u2 extrusion filename &rest keys)
   (let* ((split (split-to-three curve u1 u2))

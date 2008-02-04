@@ -1,4 +1,6 @@
-(in-package :cl-nurbs)
+;; -*- mode: lisp; syntax: common-lisp -*-
+
+(in-package :cl-nurbs-tests)
 
 (defparameter *alpha* 0.5)
 (defparameter *stability* 1)
