@@ -187,8 +187,49 @@ The border points are not included."
 				   (copy-list (aref points i j)))))
 	  (finally (return ppts)))))
 
+(defun create-patch (up vp uendp vendp)
+  "Create a set of points at the meeting point of UP's u border and VP's v
+border. The u border is at v=0 if VENDP is false; similarly for the v border."
+  (let* ((nu (array-dimension up 0))
+	 (nv (array-dimension vp 1))
+	 (result (make-array (list nu nv))))
+    (dotimes (i nu)
+      (dotimes (j nv)
+	(flet ((get-dvec (array udir endp)
+		 (let ((p1 (aref array
+				 (if udir
+				     (if endp
+					 (1- (array-dimension array 0))
+					 0)
+				     i)
+				 (if udir
+				     j
+				     (if endp
+					 (1- (array-dimension array 1))
+					 0))))
+		       (p2 (aref array
+				 (if udir
+				     (if endp
+					 (- (array-dimension array 0) 2)
+					 1)
+				     i)
+				 (if udir
+				     j
+				     (if endp
+					 (- (array-dimension array 1) 2)
+					 1)))))
+		   (list p1 (v- p1 p2)))))
+	  (let* ((du (get-dvec up nil vendp))
+		 (res-u (v+ (first du) (v* (second du)
+					   (if vendp j (- nv j 1)))))
+		 (dv (get-dvec vp t uendp))
+		 (res-v (v+ (first dv) (v* (second dv)
+					   (if uendp i (- nu i 1))))))
+	    (setf (aref result i j) (affine-combine res-u 0.5 res-v))))))
+    (list result)))
+
 (defun suppressed-fit-xnode (xnode faired-points resolution held-points
-			     loose-tolerance tight-tolerance)
+			     loose-tolerance tight-tolerance patch-corners)
   (let* ((lower (bss-lower-parameter (first xnode)))
 	 (upper (bss-upper-parameter (first xnode)))
 	 (domain (mapcar #'- upper lower))
@@ -221,7 +262,15 @@ The border points are not included."
 			   (d (list (first lower)
 				    (- (second lower) held-hi-v)))
 			   (u (list (first lower)
-				    (+ (second upper) held-lo-v)))))
+				    (+ (second upper) held-lo-v)))
+			   (ld (list (- (first lower) held-hi-u)
+				     (- (second lower) held-hi-v)))
+			   (rd (list (+ (first upper) held-lo-u)
+				     (- (second lower) held-hi-v)))
+			   (lu (list (- (first lower) held-hi-u)
+				     (+ (second upper) held-lo-v)))
+			   (ru (list (+ (first upper) held-lo-u)
+				     (+ (second upper) held-lo-v)))))
 		   (to (case dir
 			 (l (list (- (first lower) held-lo-u)
 				  (second upper)))
@@ -230,20 +279,50 @@ The border points are not included."
 			 (d (list (first upper)
 				  (- (second lower) held-lo-v)))
 			 (u (list (first upper)
-				  (+ (second upper) held-hi-v))))))
+				  (+ (second upper) held-hi-v)))
+			 (ld (list (- (first lower) held-lo-u)
+				   (- (second lower) held-lo-v)))
+			 (rd (list (+ (first upper) held-hi-u)
+				   (- (second lower) held-lo-v)))
+			 (lu (list (- (first lower) held-lo-u)
+				   (+ (second upper) held-hi-v)))
+			 (ru (list (+ (first upper) held-hi-u)
+				   (+ (second upper) held-hi-v))))))
 	       (uniform-parameter-points-2d-inner (first sample)
 						  (first from) (first to)
 						  (second from) (second to)))))
       (bss-fit-engine
        '(3 3)
-       (list (cons tight-tolerance (samples-to-parameter-points lpoints 'l))
-	     (cons tight-tolerance (samples-to-parameter-points rpoints 'r))
- 	     (cons tight-tolerance (samples-to-parameter-points dpoints 'd))
- 	     (cons tight-tolerance (samples-to-parameter-points upoints 'u))
-	     (cons loose-tolerance (uniform-parameter-points-2d
-				    faired-points
-				    (first lower) (first upper)
-				    (second lower) (second upper))))
+       (append
+	(list (cons tight-tolerance (samples-to-parameter-points lpoints 'l))
+	      (cons tight-tolerance (samples-to-parameter-points rpoints 'r))
+	      (cons tight-tolerance (samples-to-parameter-points dpoints 'd))
+	      (cons tight-tolerance (samples-to-parameter-points upoints 'u))
+	      (cons loose-tolerance (uniform-parameter-points-2d
+				     faired-points
+				     (first lower) (first upper)
+				     (second lower) (second upper))))
+	(and patch-corners
+	     (let ((ldpoints (create-patch (first lpoints) (first dpoints)
+					   nil nil))
+		   (rdpoints (create-patch (first rpoints) (first dpoints)
+					   t nil))
+		   (lupoints (create-patch (first lpoints) (first upoints)
+					   nil t))
+		   (rupoints (create-patch (first rpoints) (first upoints)
+					   t t)))
+;; 	       (write-points2-vtk (first ldpoints) "results/ld.vtk")
+;; 	       (write-points2-vtk (first rdpoints) "results/rd.vtk")
+;; 	       (write-points2-vtk (first lupoints) "results/lu.vtk")
+;; 	       (write-points2-vtk (first rupoints) "results/ru.vtk")
+	       (list (cons tight-tolerance
+			   (samples-to-parameter-points ldpoints 'ld))
+		     (cons tight-tolerance
+			   (samples-to-parameter-points rdpoints 'rd))
+		     (cons tight-tolerance
+			   (samples-to-parameter-points lupoints 'lu))
+		     (cons tight-tolerance
+			   (samples-to-parameter-points rupoints 'ru))))))
        :number-of-control-points-u (+ (first lengths) 2)
        :number-of-control-points-v (+ (second lengths) 2)
        :smoothness-functional :smf-none
@@ -277,13 +356,15 @@ The border points are not included."
 			   (iteration 100) (max-deviation 1000)
 			   (loose-tolerance 0.1) (tight-tolerance 0.001)
 			   (number-of-held-points 5)
-			   no-fairing simple-fitting cutting)
-  "The key CUTTING is a list of symbols.
-   * NIL  : no cutting
-   * GRID : grid cut with the function JUST-A-PROJECTION
-   * EVAL : grid cut with the function JUST-AN-EVALUATION
-   * ZAP  : ensure G0 connectivity (usually used with EVAL)
-   * G1   : ensure G1 connectivity (usually used with ZAP)"
+			   no-fairing simple-fitting patch-corners cutting)
+  "The missing corner regions are created (by an educated guess) if
+`PATCH-CORNERS' is set.
+The key `CUTTING' is a list of symbols.
+* NIL  : no cutting
+* GRID : grid cut with the function `JUST-A-PROJECTION'
+* EVAL : grid cut with the function `JUST-AN-EVALUATION'
+* ZAP  : ensure G0 connectivity (usually used with EVAL)
+* G1   : ensure G1 connectivity (usually used with ZAP)"
   (let* ((res (xnode-resolution xnode resolution))
 	 (faired (if no-fairing
 		     (first (sample-surface (first xnode) (first res)))
@@ -294,7 +375,8 @@ The border points are not included."
 	(let ((suppressed
 	       (suppressed-fit-xnode xnode faired res
 				     number-of-held-points
-				     loose-tolerance tight-tolerance)))
+				     loose-tolerance tight-tolerance
+				     patch-corners)))
 	  (assert suppressed nil "Suppressed fit failed")
 	  (if cutting
 	      (let ((cut-sf (cond ((member 'eval cutting)
