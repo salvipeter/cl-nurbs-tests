@@ -11,7 +11,7 @@
   :author "Peter Salvi"
   :licence "Private"
   :description "Research test environment based on CL-NURBS."
-  :depends-on (:iterate :cl-nurbs :ieee-floats)
+  :depends-on (:iterate :cffi :fff :cl-nurbs :ieee-floats)
   :components ((:file "package")
 	       (:file "three-curve" :depends-on ("package"))
 	       (:file "three-curve-iterative" :depends-on ("three-curve"))

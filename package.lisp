@@ -4,4 +4,10 @@
 
 (defpackage :cl-nurbs-tests
   (:nicknames :n-test)
-  (:use :common-lisp :iterate :cl-nurbs :ieee-floats))
+  (:use :common-lisp :iterate :cffi :fff :cl-nurbs)
+  (:import-from :cl-nurbs
+		:sequence->double-array
+		:bspline-curve-from-gcf
+		:uniform-parameter-points
+		:uniform-parameter-points-2d
+		:bspline-surface-from-sf))
