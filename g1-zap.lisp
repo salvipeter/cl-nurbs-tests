@@ -68,25 +68,16 @@
 				    (second (bss-lower-parameter surface))
 				    (second (bss-upper-parameter surface))))
 	(surface (copy-bspline-surface surface)))
-    (loop with i = 0
-	  for curve-short = (>= i (length (knot-vector curve)))
-	  for surface-short = (>= i (length (second (knot-vectors surface))))
-	  while (and (not curve-short) (not surface-short)) do
-	  (if (or curve-short
-		  (and (not surface-short)
-		       (> (elt (knot-vector curve) i)
-			  (elt (second (knot-vectors surface)) i))))
-	      (setf curve
-		    (bsc-insert-knot curve
-				     (elt (second (knot-vectors surface)) i)))
-	      (when (or surface-short
-			(< (elt (knot-vector curve) i)
-			   (elt (second (knot-vectors surface)) i)))
-		(setf surface
-		      (bsc-insert-knot surface
-				       (elt (knot-vector curve) i)
-				       :u-direction nil))))
-	  (setf i (1+ i)))
+    (iter (for i first 0 then (1+ i))
+	  (while (and (< i (length (knot-vector curve)))
+		      (< i (length (second (knot-vectors surface))))))
+	  (for curve-knot = (elt (knot-vector curve) i))
+	  (for surface-knot = (elt (second (knot-vectors surface)) i))
+	  (cond ((> curve-knot surface-knot)
+		 (setf curve (bsc-insert-knot curve surface-knot)))
+		((< curve-knot surface-knot)
+		 (setf surface (bss-insert-knot surface curve-knot
+						:u-direction nil)))))
     (dotimes (i (length (control-points curve)))
       (setf (aref (control-net surface) 0 i) (elt (control-points curve) i)))
     surface))
@@ -127,9 +118,9 @@
     result))
 
 (defun ensure-g1-continuity (surface lsurface rsurface dsurface usurface)
-  (let* ((nu (array-dimension (control-net surface) 0))
-	 (nv (array-dimension (control-net surface) 1))
-	 (cnet (control-net surface))
+  (let* ((cnet (control-net surface))
+	 (nu (array-dimension cnet 0))
+	 (nv (array-dimension cnet 1))
 	 (lnet (list (control-net lsurface) t t))
 	 (rnet (list (control-net rsurface) t nil))
 	 (dnet (list (control-net dsurface) nil t))
@@ -143,7 +134,7 @@
       (dolist (net (list lnet rnet dnet unet))
 	(iter (with u-dir = (second net))
 	      (with end = (third net))
-	      (for k from 1 below (if (second net) (1- nv) (1- nu)))
+	      (for k from 1 below (if u-dir (1- nv) (1- nu)))
 	      (for i = (if u-dir (get-index cnet 1 t (not end)) k))
 	      (for j = (if u-dir k (get-index cnet 1 nil (not end))))
 	      (for i0 = (if u-dir (get-index (first net) 0 t end) k))
