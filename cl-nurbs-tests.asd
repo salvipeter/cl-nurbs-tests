@@ -17,6 +17,7 @@
 	       (:file "three-curve-iterative" :depends-on ("three-curve"))
 	       (:file "geomagic-formats" :depends-on ("package"))
 	       (:file "g1-zap" :depends-on ("package"))
+	       (:file "file-preparation" :depends-on ("g1-zap"))
 	       (:file "closest-point" :depends-on ("package"))
 	       (:file "five-surface" :depends-on ("geomagic-formats"
 						  "g1-zap"
