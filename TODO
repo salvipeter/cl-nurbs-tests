@@ -3,10 +3,14 @@
 * Suppressed fit
 ** sarkokat kipotolni bilinear patchekkel
 - a ket szomszedos patch meghosszabitasabol mintavetelezunk es atlagoljuk
-** ebbol fajlokat generalni
-- uncut
-- cut-no-g1 (just zap)
-- cut (zap + g1)
+- az atlagolasnal olyan blending fuggveny kell, ami a blendekkel
+  erintkezo oldalakat csak az adott blendtol fuggove teszi
+* Kiterjesztes
+1. Kiterjeszteni a parametertartomanyt (a pontok maradnak ugyanazokkal a
+   parameterekkel ugyanott)
+2. A blendekre ravetitjuk a margo-pontokat (Newton-Raphson)
+3. A sarkokban es ahol nem sikerul a vetites, ott lazan, a vetitett pontokat
+   szorosan fitteljuk (a parametereket a kiterjesztesbol kapjuk)
 * G1 enforcing
 ** twiseteket eloszor lefixalni
 *** a normal tranzverzalissal
@@ -19,3 +23,4 @@
 - a szoritott fitnek bovitett knot vektorokat adunk at
 - nem csinalunk parameterkorrekciot
 - algebrai vagas
+- fff: set-boundary
