@@ -33,7 +33,7 @@
   "Extends a curve at both sides by PERCENT%."
   (let* ((lower (bsc-lower-parameter curve))
 	 (upper (bsc-upper-parameter curve))
-	 (new-knot (+ lower (* (* percent 0.01) (- upper lower)))))
+	 (new-knot (* percent 0.01 (- upper lower))))
     (bsc-reverse-parameterization
      (bsc-extend-end
       (bsc-reverse-parameterization
@@ -82,7 +82,7 @@
   "Extends the U domain of a surface at both sides by PERCENT%."
   (let* ((lower (first (bss-lower-parameter surface)))
 	 (upper (first (bss-upper-parameter surface)))
-	 (new-knot (+ lower (* (* percent 0.01) (- upper lower)))))
+	 (new-knot (* percent 0.01 (- upper lower))))
     (bss-reverse-parameterization
      (bss-extend-u-end
       (bss-reverse-parameterization
