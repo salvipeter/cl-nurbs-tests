@@ -170,20 +170,29 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
 
 (defun uniform-parameter-points-2d-inner (points &optional
 					  (start-u 0.0) (end-u 1.0)
-					  (start-v 0.0) (end-v 1.0))
+					  (start-v 0.0) (end-v 1.0)
+					  u-keep-p v-keep-p)
   "Returns a list of the form (U1 V1 X1 Y1 Z1 U2 V2 X2...),
 where U1..UN/V1..VN are equidistant points of the [(U1,V1), (U2,V2)] interval.
-The border points are not included."
-  (let ((n (array-dimension points 0))
-	(m (array-dimension points 1))
-	(len-u (- end-u start-u))
-	(len-v (- end-v start-v)))
-    (iter (for i from 1 below (1- n))
+The border points are not included, except if U/V-KEEP-P is true."
+  (let* ((n (array-dimension points 0))
+	 (m (array-dimension points 1))
+	 (len-u (- end-u start-u))
+	 (len-v (- end-v start-v))
+	 (ufrom (if u-keep-p 0 1))
+	 (vfrom (if v-keep-p 0 1))
+	 (uto (if u-keep-p (1- n) (- n 2)))
+	 (vto (if v-keep-p (1- m) (- m 2))))
+    (iter (for i from ufrom to uto)
 	  (with ppts)
-	  (iter (for j from 1 below (1- m))
+	  (iter (for j from vfrom to vto)
 		(setf ppts (append ppts
-				   (list (+ (/ (* len-u i) (1- n)) start-u)
-					 (+ (/ (* len-v j) (1- m)) start-v))
+				   (list (+ (/ (* len-u (- i ufrom))
+					       (- uto ufrom))
+					    start-u)
+					 (+ (/ (* len-v (- j vfrom))
+					       (- vto vfrom))
+					    start-v))
 				   (copy-list (aref points i j)))))
 	  (finally (return ppts)))))
 
@@ -289,7 +298,9 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 				   (+ (second upper) held-hi-v))))))
 	       (uniform-parameter-points-2d-inner (first sample)
 						  (first from) (first to)
-						  (second from) (second to)))))
+						  (second from) (second to)
+						  (member dir '(d u))
+						  (member dir '(l r))))))
       (bss-fit-engine
        '(3 3)
        (append
@@ -314,13 +325,13 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 ;; 	       (write-points2-vtk (first rdpoints) "results/rd.vtk")
 ;; 	       (write-points2-vtk (first lupoints) "results/lu.vtk")
 ;; 	       (write-points2-vtk (first rupoints) "results/ru.vtk")
-	       (list (cons tight-tolerance
+	       (list (cons loose-tolerance
 			   (samples-to-parameter-points ldpoints 'ld))
-		     (cons tight-tolerance
+		     (cons loose-tolerance
 			   (samples-to-parameter-points rdpoints 'rd))
-		     (cons tight-tolerance
+		     (cons loose-tolerance
 			   (samples-to-parameter-points lupoints 'lu))
-		     (cons tight-tolerance
+		     (cons loose-tolerance
 			   (samples-to-parameter-points rupoints 'ru))))))
        :number-of-control-points-u (+ (first lengths) 2)
        :number-of-control-points-v (+ (second lengths) 2)
