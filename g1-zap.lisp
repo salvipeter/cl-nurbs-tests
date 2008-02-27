@@ -2,71 +2,11 @@
 
 (in-package :cl-nurbs-tests)
 
-(defun reparametrize-curve (curve min max)
-  (let* ((old-min (bsc-lower-parameter curve))
-	 (old-max (bsc-upper-parameter curve))
-	 (knots (knot-vector curve))
-	 (n (length knots))
-	 (points (control-points curve))
-	 (m (length points))
-	 (new-knots (make-array n))
-	 (new-points (make-array m)))
-    (dotimes (i n)
-      (setf (elt new-knots i)
-	    (+ min (* (- max min) (/ (- (elt knots i) old-min)
-				     (- old-max old-min))))))
-    (dotimes (i m)
-      (setf (elt new-points i) (copy-list (elt points i))))
-    (make-bspline-curve (degree curve) new-knots new-points)))
-
-(defun flip-uv (surface)
-  (with-accessors ((degrees degrees)
-		   (knots knot-vectors)
-		   (net control-net))
-      surface
-    (let* ((n (array-dimension net 0))
-	   (m (array-dimension net 1))
-	   (new-net (make-array (list m n))))
-      (dotimes (i n)
-	(dotimes (j m)
-	  (setf (aref new-net j i) (aref net i j))))
-      (make-bspline-surface (reverse degrees) (reverse knots) new-net))))
-
-(defun reverse-parametrization (surface &key u v)
-  (with-accessors ((degrees degrees)
-		   (knots knot-vectors)
-		   (net control-net))
-      surface
-    (let* ((n (array-dimension net 0))
-	   (m (array-dimension net 1))
-	   (k (length (first knots)))
-	   (l (length (second knots)))
-	   (new-knots (list (if u (make-array k) (copy-seq (first knots)))
-			    (if v (make-array l) (copy-seq (second knots)))))
-	   (new-net (make-array (list n m))))
-      (when u
-	(let ((low (elt (first knots) 0))
-	      (high (elt (first knots) (1- k))))
-	  (dotimes (i k)
-	    (setf (elt (first new-knots) i)
-		  (+ low (- high (elt (first knots) (- k i 1))))))))
-      (when v
-	(let ((low (elt (second knots) 0))
-	      (high (elt (second knots) (1- l))))
-	  (dotimes (i l)
-	    (setf (elt (second new-knots) i)
-		  (+ low (- high (elt (second knots) (- l i 1))))))))
-      (dotimes (i n)
-	(dotimes (j m)
-	  (setf (aref new-net i j)
-		(aref net (if u (- n i 1) i) (if v (- m j 1) j)))))
-      (make-bspline-surface (copy-list degrees) new-knots new-net))))
-
 (defun zap-to-curve (surface curve)
   "Zaps the u=0 isocurve of SURFACE to CURVE."
-  (let ((curve (reparametrize-curve curve
-				    (second (bss-lower-parameter surface))
-				    (second (bss-upper-parameter surface))))
+  (let ((curve (bsc-reparameterize curve
+				  (second (bss-lower-parameter surface))
+				  (second (bss-upper-parameter surface))))
 	(surface (copy-bspline-surface surface)))
     (iter (for i first 0 then (1+ i))
 	  (while (and (< i (length (knot-vector curve)))
@@ -89,32 +29,32 @@
 			(bss-get-surface-curve
 			 lsurface (first (bss-upper-parameter lsurface))
 			 :u-curve nil)))
-    (setf result (flip-uv result))
+    (setf result (bss-flip-uv result))
 ;;; ----
     (setf result
 	  (zap-to-curve result
 			(bss-get-surface-curve
 			 dsurface (second (bss-upper-parameter dsurface))
 			 :u-curve t)))
-    (setf result (flip-uv result))
+    (setf result (bss-flip-uv result))
 ;;; ----
-    (setf result (reverse-parametrization result :u t :v nil))
+    (setf result (bss-reverse-parameterization result :u t :v nil))
     (setf result
 	  (zap-to-curve result
 			(bss-get-surface-curve
 			 rsurface (first (bss-lower-parameter rsurface))
 			 :u-curve nil)))
-    (setf result (reverse-parametrization result :u t :v nil))
+    (setf result (bss-reverse-parameterization result :u t :v nil))
 ;;; ----
-    (setf result (flip-uv result))
-    (setf result (reverse-parametrization result :u t :v nil))
+    (setf result (bss-flip-uv result))
+    (setf result (bss-reverse-parameterization result :u t :v nil))
     (setf result
 	  (zap-to-curve result
 			(bss-get-surface-curve
 			 usurface (second (bss-lower-parameter usurface))
 			 :u-curve t)))
-    (setf result (reverse-parametrization result :u t :v nil))
-    (setf result (flip-uv result))
+    (setf result (bss-reverse-parameterization result :u t :v nil))
+    (setf result (bss-flip-uv result))
     result))
 
 (defun ensure-g1-continuity (surface lsurface rsurface dsurface usurface)

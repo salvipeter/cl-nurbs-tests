@@ -2,20 +2,12 @@
 
 (in-package :cl-nurbs-tests)
 
-(defun shift-knot-vectors (surface &key (u 0.0) (v 0.0))
-  (let ((result (copy-bspline-surface surface)))
-    (setf (knot-vectors result)
-	  (mapcar (lambda (lst shift)
-		    (mapcar (lambda (x) (+ x shift)) (coerce lst 'list)))
-		  (knot-vectors result) (list u v)))
-    result))
-
 (defun flip-reverse-to-match (surface corners)
-  (dolist (flipped (list surface (flip-uv surface)))
+  (dolist (flipped (list surface (bss-flip-uv surface)))
     (dolist (reversal '((nil nil) (t nil) (nil t) (t t)))
-      (let* ((reversed (reverse-parametrization flipped
-						:u (first reversal)
-						:v (second reversal)))
+      (let* ((reversed (bss-reverse-parameterization flipped
+						     :u (first reversal)
+						     :v (second reversal)))
 	     (net (control-net reversed))
 	     (bl (aref net 0 0))
 	     (br (aref net (1- (array-dimension net 0)) 0))
@@ -34,13 +26,13 @@
     (when flipped
       (let ((uknot (first (knot-vectors flipped)))
 	    (vknot (second (knot-vectors flipped))))
-	(shift-knot-vectors flipped
-			    :u (- u (if uendp
-					(elt uknot (1- (length uknot)))
-					(elt uknot 0)))
-			    :v (- v (if vendp
-					(elt vknot (1- (length vknot)))
-					(elt vknot 0))))))))
+	(bss-shift-parameterization flipped
+				    :u (- u (if uendp
+						(elt uknot (1- (length uknot)))
+						(elt uknot 0)))
+				    :v (- v (if vendp
+						(elt vknot (1- (length vknot)))
+						(elt vknot 0))))))))
 
 (defun write-xnode (vertex s1 s2 s3 s4 filename)
   (let* ((vertex-net (control-net vertex))
