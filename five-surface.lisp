@@ -38,16 +38,16 @@ negative, the the V-directional border line at Umax is left out."
 	 (step (mapcar #'(lambda (x y z) (/ (- x y) (1- z))) upper lower n))
 	 (from-u (cond ((null number-of-points-u) 0)
 		       ((> number-of-points-u 0) 1)
-		       (t (+ (first n) number-of-points-u))))
+		       (t (+ (first n) number-of-points-u -1))))
 	 (from-v (cond ((null number-of-points-v) 0)
 		       ((> number-of-points-v 0) 1)
-		       (t (+ (second n) number-of-points-v))))
+		       (t (+ (second n) number-of-points-v -1))))
 	 (to-u (cond ((null number-of-points-u) (1- (first n)))
 		     ((< number-of-points-u 0) (- (first n) 2))
-		     (t (1- number-of-points-u))))
+		     (t number-of-points-u)))
 	 (to-v (cond ((null number-of-points-v) (1- (second n)))
 		     ((< number-of-points-v 0) (- (second n) 2))
-		     (t (1- number-of-points-v))))
+		     (t number-of-points-v)))
 	 (points (make-array (list (- to-u from-u -1) (- to-v from-v -1)))))
     (iter (for i from from-u to to-u)
 	  (iter (for j from from-v to to-v)
@@ -198,8 +198,68 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 		  (affine-combine (first closest) 0.5 (second closest)))))))
     result))
 
+(defun fit-extended (surface percent resolution tolerance)
+  "Extends the U and V domain of a surface at both sides by PERCENT%.
+It fits on RESOLUTION points with TOLERANCE."
+  (flet ((generate-knot (knot deg)
+	   (let* ((lower (elt knot deg))
+		  (upper (elt knot (- (length knot) deg 1)))
+		  (plus (* percent (- upper lower) 0.01)))
+	     (concatenate 'vector
+			  (iter (repeat (1+ deg)) (collect (- lower plus)))
+			  (subseq knot deg (- (length knot) deg))
+			  (iter (repeat (1+ deg)) (collect (+ upper plus)))))))
+    (let* ((knots (knot-vectors surface))
+	   (degrees (degrees surface))
+	   (new-knots (mapcar #'generate-knot knots degrees))
+	   (points nil))
+      (iter (with lower = (bss-lower-parameter surface))
+	    (with upper = (bss-upper-parameter surface))
+	    (with length = (mapcar #'- upper lower))
+	    (with res = (if (listp resolution)
+			    resolution
+			    (list resolution resolution)))
+	    (for i from 0 below (first res))
+	    (for u = (+ (first lower) (/ (* i (first length))
+					 (1- (first res)))))
+	    (iter (for j from 0 below (second res))
+		  (for v = (+ (second lower) (/ (* j (second length))
+						(1- (second res)))))
+		  (for p = (bss-evaluate surface (list u v)))
+		  (setf points (append (list u v) p points))))
+      (bss-fit-engine degrees (list (cons tolerance points))
+		      :knot-vector-u (first new-knots)
+		      :knot-vector-v (second new-knots)
+		      :smoothness-functional :smf-crv
+		      :optimize-parameters nil))))
+
+(defun guess-sample-parameters (surface point-array &optional threshold)
+  "For every point in the 2D POINT-ARRAY, project the point to SURFACE to
+get an approximate parameterization.
+
+When THRESHOLD is given, the algorithm doesn't include points whose
+approximation deviates more than THRESHOLD.
+Returns a list of the form \(U0 V0 X0 Y0 Z0 U1 V1 X1 Y1 Z1 ...).
+TODO: Bogus parameters to BSS-PROJECT-POINT."
+  (let ((acc nil)
+	(count 0))
+    (dotimes (j (array-dimension point-array 1))
+      (dotimes (i (array-dimension point-array 0))
+	(let* ((p (aref point-array i j))
+	       (uv (bss-project-point surface p 10 '(10 10))) ; kutykurutty
+	       (q (bss-evaluate surface uv)))
+	  (unless (and threshold (> (vlength (v- p q)) threshold))
+	    (setf acc (append uv p acc))
+	    (incf count)))))
+    (let ((all (apply #'* (array-dimensions point-array))))
+      (when (< count all)
+	(warn "GUESS-SAMPLE-PARAMETERS: Using only ~d points of ~d."
+	      count all)))
+    acc))
+
 (defun suppressed-fit-xnode (xnode faired-points resolution held-points
 			     loose-tolerance tight-tolerance patch-corners)
+  "TODO: Bogus parameters to FIT-EXTENDED."
   (let* ((lower (bss-lower-parameter (first xnode)))
 	 (upper (bss-upper-parameter (first xnode)))
 	 (domain (mapcar #'- upper lower))
@@ -217,7 +277,9 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 				  :number-of-points-v (- held-points)))
 	 (upoints (sample-surface (fifth xnode) (fifth resolution)
 				  :number-of-points-v held-points))
-	 (lengths (array-dimensions (control-net (first xnode)))))
+	 (lengths (array-dimensions (control-net (first xnode))))
+	 (extended (fit-extended (first xnode)
+				 20 50 tight-tolerance))) ; kutykurutty
 ;;     (write-points2-vtk lpoints "results/left.vtk")
 ;;     (write-points2-vtk rpoints "results/right.vtk")
 ;;     (write-points2-vtk dpoints "results/bottom.vtk")
@@ -225,14 +287,6 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 ;;     (write-points2-vtk faired-points "results/center.vtk")
     (flet ((samples-to-parameter-points (sample dir)
 	     (let ((from (case dir
-			   (l (list (- (first lower) held-hi-u)
-				    (second lower)))
-			   (r (list (+ (first upper) held-lo-u)
-				    (second lower)))
-			   (d (list (first lower)
-				    (- (second lower) held-hi-v)))
-			   (u (list (first lower)
-				    (+ (second upper) held-lo-v)))
 			   (ld (list (- (first lower) held-hi-u)
 				     (- (second lower) held-hi-v)))
 			   (rd (list (+ (first upper) held-lo-u)
@@ -242,14 +296,6 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 			   (ru (list (+ (first upper) held-lo-u)
 				     (+ (second upper) held-lo-v)))))
 		   (to (case dir
-			 (l (list (- (first lower) held-lo-u)
-				  (second upper)))
-			 (r (list (+ (first upper) held-hi-u)
-				  (second upper)))
-			 (d (list (first upper)
-				  (- (second lower) held-lo-v)))
-			 (u (list (first upper)
-				  (+ (second upper) held-hi-v)))
 			 (ld (list (- (first lower) held-lo-u)
 				   (- (second lower) held-lo-v)))
 			 (rd (list (+ (first upper) held-hi-u)
@@ -263,10 +309,14 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
       (bss-fit-engine
        '(3 3)
        (append
-	(list (cons tight-tolerance (samples-to-parameter-points lpoints 'l))
-	      (cons tight-tolerance (samples-to-parameter-points rpoints 'r))
-	      (cons tight-tolerance (samples-to-parameter-points dpoints 'd))
-	      (cons tight-tolerance (samples-to-parameter-points upoints 'u))
+	(list (cons tight-tolerance
+		    (guess-sample-parameters extended lpoints tight-tolerance))
+	      (cons tight-tolerance
+		    (guess-sample-parameters extended rpoints tight-tolerance))
+	      (cons tight-tolerance
+		    (guess-sample-parameters extended dpoints tight-tolerance))
+	      (cons tight-tolerance
+		    (guess-sample-parameters extended upoints tight-tolerance))
 	      (cons loose-tolerance (uniform-parameter-points-2d
 				     faired-points
 				     (first lower) (first upper)
@@ -288,8 +338,8 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 			   (samples-to-parameter-points lupoints 'lu))
 		     (cons loose-tolerance
 			   (samples-to-parameter-points rupoints 'ru))))))
-       :number-of-control-points-u (+ (first lengths) 2)
-       :number-of-control-points-v (+ (second lengths) 2)
+       :number-of-control-points-u (first lengths)
+       :number-of-control-points-v (second lengths)
        :smoothness-functional :smf-none
        :optimize-parameters nil))))
 

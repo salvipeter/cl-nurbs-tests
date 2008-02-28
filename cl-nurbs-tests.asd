@@ -25,6 +25,7 @@
 	       (:file "closest-point" :depends-on ("matrix"))
 	       (:file "five-surface" :depends-on ("geomagic-formats"
 						  "g1-zap"
+						  "projection"
 						  "closest-point"))
 	       (:file "five-surface-iterative"
 		      :depends-on ("geomagic-formats"))))
