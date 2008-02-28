@@ -20,7 +20,9 @@
 	       (:file "g1-zap" :depends-on ("parameterization"))
 	       (:file "file-preparation" :depends-on ("parameterization"))
 	       (:file "extensions" :depends-on ("parameterization"))
-	       (:file "closest-point" :depends-on ("package"))
+	       (:file "matrix" :depends-on ("package"))
+	       (:file "projection" :depends-on ("matrix"))
+	       (:file "closest-point" :depends-on ("matrix"))
 	       (:file "five-surface" :depends-on ("geomagic-formats"
 						  "g1-zap"
 						  "closest-point"))
