@@ -28,20 +28,26 @@
 
 (defun sample-surface (surface n &key number-of-points-u number-of-points-v)
   "If NUMBER-OF-POINTS-(U|V) is negative, take from the end.
-Returns a list, the first element is an array containing the sampled values,
-the second element is the parameter interval ((U1 V1) (U2 V2))."
+
+N is the resolution -- a list for U and V, or an integer if they are equal.
+The first (last) row (column) is not included: e.g. if NUMBER-OF-POINTS-U is
+negative, the the V-directional border line at Umax is left out."
   (let* ((n (if (listp n) n (list n n)))
 	 (lower (bss-lower-parameter surface))
 	 (upper (bss-upper-parameter surface))
 	 (step (mapcar #'(lambda (x y z) (/ (- x y) (1- z))) upper lower n))
-	 (from-u (if (or (null number-of-points-u) (> number-of-points-u 0))
-		     0 (+ (first n) number-of-points-u)))
-	 (from-v (if (or (null number-of-points-v) (> number-of-points-v 0))
-		     0 (+ (second n) number-of-points-v)))
-	 (to-u (if (or (null number-of-points-u) (< number-of-points-u 0))
-		   (1- (first n)) (1- number-of-points-u)))
-	 (to-v (if (or (null number-of-points-v) (< number-of-points-v 0))
-		   (1- (second n)) (1- number-of-points-v)))
+	 (from-u (cond ((null number-of-points-u) 0)
+		       ((> number-of-points-u 0) 1)
+		       (t (+ (first n) number-of-points-u))))
+	 (from-v (cond ((null number-of-points-v) 0)
+		       ((> number-of-points-v 0) 1)
+		       (t (+ (second n) number-of-points-v))))
+	 (to-u (cond ((null number-of-points-u) (1- (first n)))
+		     ((< number-of-points-u 0) (- (first n) 2))
+		     (t (1- number-of-points-u))))
+	 (to-v (cond ((null number-of-points-v) (1- (second n)))
+		     ((< number-of-points-v 0) (- (second n) 2))
+		     (t (1- number-of-points-v))))
 	 (points (make-array (list (- to-u from-u -1) (- to-v from-v -1)))))
     (iter (for i from from-u to to-u)
 	  (iter (for j from from-v to to-v)
@@ -49,11 +55,7 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
 				(+ (second lower) (* (second step) j))))
 		(setf (aref points (- i from-u) (- j from-v))
 		      (bss-evaluate surface uv))))
-    (list points
-	  (mapcar (lambda (uv)
-		    (mapcar (lambda (x lower step) (+ lower (* step x)))
-			    uv lower step))
-		  `((,from-u ,from-v) (,to-u ,to-v))))))
+    points))
 
 (defun fair-xnode-in-one-direction (xnode resolution iteration distance
 				    &key (u-direction t))
@@ -168,34 +170,6 @@ the second element is the parameter interval ((U1 V1) (U2 V2))."
      :smoothness-functional :smf-none
      :optimize-parameters nil)))
 
-(defun uniform-parameter-points-2d-inner (points &optional
-					  (start-u 0.0) (end-u 1.0)
-					  (start-v 0.0) (end-v 1.0)
-					  u-keep-p v-keep-p)
-  "Returns a list of the form (U1 V1 X1 Y1 Z1 U2 V2 X2...),
-where U1..UN/V1..VN are equidistant points of the [(U1,V1), (U2,V2)] interval.
-The border points are not included, except if U/V-KEEP-P is true."
-  (let* ((n (array-dimension points 0))
-	 (m (array-dimension points 1))
-	 (len-u (- end-u start-u))
-	 (len-v (- end-v start-v))
-	 (ufrom (if u-keep-p 0 1))
-	 (vfrom (if v-keep-p 0 1))
-	 (uto (if u-keep-p (1- n) (- n 2)))
-	 (vto (if v-keep-p (1- m) (- m 2))))
-    (iter (for i from ufrom to uto)
-	  (with ppts)
-	  (iter (for j from vfrom to vto)
-		(setf ppts (append ppts
-				   (list (+ (/ (* len-u (- i ufrom))
-					       (- uto ufrom))
-					    start-u)
-					 (+ (/ (* len-v (- j vfrom))
-					       (- vto vfrom))
-					    start-v))
-				   (copy-list (aref points i j)))))
-	  (finally (return ppts)))))
-
 (defun create-patch (up vp uendp vendp)
   "Create a set of points at the meeting point of UP's u border and VP's v
 border. The u border is at v=0 if VENDP is false; similarly for the v border."
@@ -205,36 +179,24 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
     (dotimes (i nu)
       (dotimes (j nv)
 	(flet ((get-dvec (array udir endp)
-		 (let ((p1 (aref array
-				 (if udir
-				     (if endp
-					 (1- (array-dimension array 0))
-					 0)
-				     i)
-				 (if udir
-				     j
-				     (if endp
-					 (1- (array-dimension array 1))
-					 0))))
-		       (p2 (aref array
-				 (if udir
-				     (if endp
-					 (- (array-dimension array 0) 2)
-					 1)
-				     i)
-				 (if udir
-				     j
-				     (if endp
-					 (- (array-dimension array 1) 2)
-					 1)))))
-		   (list p1 (v- p1 p2)))))
+		 (macrolet ((index (axis i)
+			      `(if endp
+				   (- (array-dimension array ,axis) ,(1+ i))
+				   ,i)))
+		   (let ((p1 (aref array
+				   (if udir (index 0 0) i)
+				   (if udir j (index 1 0))))
+			 (p2 (aref array
+				   (if udir (index 0 1) i)
+				   (if udir j (index 1 1)))))
+		     (list p1 (v- p1 p2))))))
 	  (let* ((du (get-dvec up nil vendp))
 		 (dv (get-dvec vp t uendp))
 		 (closest (closest-point (first du) (second du)
 					 (first dv) (second dv))))
 	    (setf (aref result i j)
 		  (affine-combine (first closest) 0.5 (second closest)))))))
-    (list result)))
+    result))
 
 (defun suppressed-fit-xnode (xnode faired-points resolution held-points
 			     loose-tolerance tight-tolerance patch-corners)
@@ -248,18 +210,18 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 	 (held-hi-v (/ (* (second domain) held-points)
 		       (second (first resolution))))
 	 (lpoints (sample-surface (second xnode) (second resolution)
-				  :number-of-points-u (- (+ held-points 2))))
+				  :number-of-points-u (- held-points)))
 	 (rpoints (sample-surface (third xnode) (third resolution)
-				  :number-of-points-u (+ held-points 2)))
+				  :number-of-points-u held-points))
 	 (dpoints (sample-surface (fourth xnode) (fourth resolution)
-				  :number-of-points-v (- (+ held-points 2))))
+				  :number-of-points-v (- held-points)))
 	 (upoints (sample-surface (fifth xnode) (fifth resolution)
-				  :number-of-points-v (+ held-points 2)))
+				  :number-of-points-v held-points))
 	 (lengths (array-dimensions (control-net (first xnode)))))
-;;     (write-points2-vtk (first lpoints) "results/left.vtk")
-;;     (write-points2-vtk (first rpoints) "results/right.vtk")
-;;     (write-points2-vtk (first dpoints) "results/bottom.vtk")
-;;     (write-points2-vtk (first upoints) "results/top.vtk")
+;;     (write-points2-vtk lpoints "results/left.vtk")
+;;     (write-points2-vtk rpoints "results/right.vtk")
+;;     (write-points2-vtk dpoints "results/bottom.vtk")
+;;     (write-points2-vtk upoints "results/top.vtk")
 ;;     (write-points2-vtk faired-points "results/center.vtk")
     (flet ((samples-to-parameter-points (sample dir)
 	     (let ((from (case dir
@@ -296,11 +258,8 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 				   (+ (second upper) held-hi-v)))
 			 (ru (list (+ (first upper) held-hi-u)
 				   (+ (second upper) held-hi-v))))))
-	       (uniform-parameter-points-2d-inner (first sample)
-						  (first from) (first to)
-						  (second from) (second to)
-						  (member dir '(d u))
-						  (member dir '(l r))))))
+	       (uniform-parameter-points-2d
+		sample (first from) (first to) (second from) (second to)))))
       (bss-fit-engine
        '(3 3)
        (append
@@ -313,18 +272,14 @@ border. The u border is at v=0 if VENDP is false; similarly for the v border."
 				     (first lower) (first upper)
 				     (second lower) (second upper))))
 	(and patch-corners
-	     (let ((ldpoints (create-patch (first lpoints) (first dpoints)
-					   nil nil))
-		   (rdpoints (create-patch (first rpoints) (first dpoints)
-					   t nil))
-		   (lupoints (create-patch (first lpoints) (first upoints)
-					   nil t))
-		   (rupoints (create-patch (first rpoints) (first upoints)
-					   t t)))
-;; 	       (write-points2-vtk (first ldpoints) "results/ld.vtk")
-;; 	       (write-points2-vtk (first rdpoints) "results/rd.vtk")
-;; 	       (write-points2-vtk (first lupoints) "results/lu.vtk")
-;; 	       (write-points2-vtk (first rupoints) "results/ru.vtk")
+	     (let ((ldpoints (create-patch lpoints dpoints nil nil))
+		   (rdpoints (create-patch rpoints dpoints t nil))
+		   (lupoints (create-patch lpoints upoints nil t))
+		   (rupoints (create-patch rpoints upoints t t)))
+;; 	       (write-points2-vtk ldpoints "results/ld.vtk")
+;; 	       (write-points2-vtk rdpoints "results/rd.vtk")
+;; 	       (write-points2-vtk lupoints "results/lu.vtk")
+;; 	       (write-points2-vtk rupoints "results/ru.vtk")
 	       (list (cons loose-tolerance
 			   (samples-to-parameter-points ldpoints 'ld))
 		     (cons loose-tolerance
