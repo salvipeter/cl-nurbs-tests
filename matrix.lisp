@@ -2,6 +2,14 @@
 
 (in-package :cl-nurbs-tests)
 
+(defun matrix-transpose (m)
+  (let* ((n (array-dimensions m))
+	 (result (make-array (reverse n))))
+    (dotimes (i (first n))
+      (dotimes (j (second n))
+	(setf (aref result j i) (aref m i j))))
+    result))
+
 (defun matrix-multiplication (m1 m2)
   (let ((n1 (array-dimension m1 0))
 	(n (array-dimension m1 1))
@@ -15,6 +23,13 @@
 		(iter (for k from 0 below n)
 		      (sum (* (aref m1 i k) (aref m2 k j)))))))
       result)))
+
+(defun matrix->vector (m)
+  (unless (= (array-dimension m 1) 1) (error "This matrix is not a vector."))
+  (let ((result (make-array (array-dimension m 0))))
+    (dotimes (i (array-dimension m 0))
+      (setf (elt result i) (aref m i 0)))
+    result))
 
 (defun matrix-inverse-2x2 (m)
   (let* ((a (aref m 0 0))

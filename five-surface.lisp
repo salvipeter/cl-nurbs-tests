@@ -402,13 +402,16 @@ The key `CUTTING' is a list of symbols.
 				   (grid-cut (first xnode) suppressed
 					     (first res) tight-tolerance
 					     #'just-a-surface-projection)))))
-		(let ((g1-sf
-		       (if (member 'g1 cutting)
-			   (apply #'ensure-g1-continuity cut-sf (rest xnode))
+		(let ((zap-sf
+		       (if (member 'zap cutting)
+			   (apply #'zap-to-surfaces cut-sf (rest xnode))
 			   cut-sf)))
-		  (if (member 'zap cutting)
-		      (apply #'zap-to-surfaces g1-sf (rest xnode))
-		      g1-sf)))
+		  (if (member 'g1 cutting)
+			   (ensure-g1-continuity zap-sf
+						 (second xnode) (third xnode)
+						 (fourth xnode) (fifth xnode)
+						 (first res))
+			   zap-sf)))
 	      suppressed)))))
 
 (defun five-surface-test (xnode filename &rest keys)

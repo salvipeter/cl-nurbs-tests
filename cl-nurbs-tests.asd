@@ -17,12 +17,13 @@
 	       (:file "three-curve-iterative" :depends-on ("three-curve"))
 	       (:file "geomagic-formats" :depends-on ("package"))
 	       (:file "parameterization" :depends-on ("package"))
-	       (:file "g1-zap" :depends-on ("parameterization"))
 	       (:file "file-preparation" :depends-on ("parameterization"))
 	       (:file "extensions" :depends-on ("parameterization"))
 	       (:file "matrix" :depends-on ("package"))
+	       (:file "lu" :depends-on ("package"))
 	       (:file "projection" :depends-on ("matrix"))
 	       (:file "closest-point" :depends-on ("matrix"))
+	       (:file "g1-zap" :depends-on ("parameterization" "matrix" "lu"))
 	       (:file "five-surface" :depends-on ("geomagic-formats"
 						  "g1-zap"
 						  "projection"
