@@ -61,7 +61,7 @@
           (let ((tmp (/ 1.0 (aref a j j))))
             (iter (for i from (1+ j) below n)
                   (mulf (aref a i j) tmp))))
-    (values a swaps)))
+    (values a (nreverse swaps))))
 
 (defun lu-back-substitution (a swaps b)
   "Solves the set of n linear equations A·X = B. Here A is input, not
