@@ -34,20 +34,70 @@
 			    :resolution 100 :target-iteration 100
 			    :simplex-iteration 15 :fairing-iteration 5)
 
+(defun test-series (xnode filename &rest keys)
+  (let ((faired (apply #'five-surface-test xnode "results/temp.rdn"
+		       :no-fairing nil :simple-fitting t
+		       :patch-corners nil :cutting nil keys))
+	(enlarged (apply #'five-surface-test xnode "results/temp.rdn"
+			 :no-fairing nil :simple-fitting nil
+			 :patch-corners t :cutting nil keys))
+	(cut (apply #'five-surface-test xnode "results/temp.rdn"
+		    :no-fairing nil :simple-fitting nil
+		    :patch-corners t :cutting '(eval zap) keys))
+	(g1 (apply #'five-surface-test xnode "results/temp.rdn"
+		   :no-fairing nil :simple-fitting nil
+		   :patch-corners t :cutting '(eval zap g1) keys)))
+    (write-rdn (append (list (first xnode) faired enlarged cut g1)
+		       (rest xnode))
+	       filename)))
+
 (defparameter *xnode* (read-rbn "models/xnode.rbn"))
 
 (write-rdn *xnode* "results/original.rdn")
 
 (five-surface-test *xnode* "results/fair-szoritott-fit.rdn"
-		   :resolution '(600 300) :iteration 100 :max-deviation 100
+		   :resolution 1000 :iteration 100 :max-deviation 100
 		   :loose-tolerance 0.001 :tight-tolerance 0.0001
 		   :number-of-held-points 5
 		   :no-fairing nil :simple-fitting nil
 		   :patch-corners t :cutting '(eval zap g1))
 
+(test-series *xnode* "results/xnode-series.rdn"
+	     :resolution 1000 :iteration 100 :max-deviation 100
+	     :loose-tolerance 0.001 :tight-tolerance 0.0001
+	     :number-of-held-points 5)
+
 (five-surface-iterative-test *xnode* "results/fair-cont-iter.rdn"
 			     :resolution 15 :target-iteration 100
 			     :simplex-iteration 30 :fairing-iteration 20)
+
+(defparameter *vb1* (read-rbn "models/vb1.rbn"))
+
+(five-surface-test *vb1* "results/fair-szoritott-fit.rdn"
+		   :resolution 1000 :iteration 100 :max-deviation 100
+		   :loose-tolerance 0.01 :tight-tolerance 0.001
+		   :number-of-held-points 5
+		   :no-fairing nil :simple-fitting nil
+		   :patch-corners t :cutting nil)
+
+(test-series *vb1* "results/vb1-series.rdn"
+	     :resolution 1000 :iteration 100 :max-deviation 100
+	     :loose-tolerance 0.01 :tight-tolerance 0.001
+	     :number-of-held-points 5)
+
+(defparameter *vb2* (read-rbn "models/vb2.rbn"))
+
+(five-surface-test *vb2* "results/fair-szoritott-fit.rdn"
+		   :resolution 1000 :iteration 100 :max-deviation 100
+		   :loose-tolerance 0.001 :tight-tolerance 0.0001
+		   :number-of-held-points 5
+		   :no-fairing nil :simple-fitting t
+		   :patch-corners t :cutting nil)
+
+(test-series *vb2* "results/vb2-series.rdn"
+	     :resolution 1000 :iteration 100 :max-deviation 100
+	     :loose-tolerance 0.001 :tight-tolerance 0.0001
+	     :number-of-held-points 5)
 
 #+emacs-lisp
 (require 'ange-ftp)
