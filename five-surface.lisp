@@ -383,7 +383,7 @@ The key `CUTTING' is a list of symbols.
 * G1   : ensure G1 connectivity (usually used with ZAP)"
   (let* ((res (xnode-resolution xnode resolution))
 	 (faired (if no-fairing
-		     (first (sample-surface (first xnode) (first res)))
+		     (sample-surface (first xnode) (first res))
 		     (fair-xnode xnode (first res) iteration max-deviation))))
     (if simple-fitting
 	(bss-resembling-fit (first xnode) faired loose-tolerance
