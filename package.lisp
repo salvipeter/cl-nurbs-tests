@@ -7,6 +7,7 @@
   (:use :common-lisp :iterate :cffi :fff :cl-nurbs)
   (:import-from :cl-nurbs
 		:safe-/
+		:blend-function
 		:sequence->double-array
 		:bspline-curve-from-gcf
 		:uniform-parameter-points
