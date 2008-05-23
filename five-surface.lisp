@@ -261,88 +261,64 @@ TODO: Bogus parameters to BSS-PROJECT-POINT."
 (defun suppressed-fit-xnode (xnode faired-points resolution held-points
 			     loose-tolerance tight-tolerance patch-corners)
   "TODO: Bogus parameters to FIT-EXTENDED."
-  (let* ((lower (bss-lower-parameter (first xnode)))
-	 (upper (bss-upper-parameter (first xnode)))
-	 (domain (mapcar #'- upper lower))
-	 (held-lo-u (/ (first domain) (first (first resolution))))
-	 (held-hi-u (/ (* (first domain) held-points)
-		       (first (first resolution))))
-	 (held-lo-v (/ (second domain) (second (first resolution))))
-	 (held-hi-v (/ (* (second domain) held-points)
-		       (second (first resolution))))
-	 (lpoints (sample-surface (second xnode) (second resolution)
-				  :number-of-points-u (- held-points)))
-	 (rpoints (sample-surface (third xnode) (third resolution)
-				  :number-of-points-u held-points))
-	 (dpoints (sample-surface (fourth xnode) (fourth resolution)
-				  :number-of-points-v (- held-points)))
-	 (upoints (sample-surface (fifth xnode) (fifth resolution)
-				  :number-of-points-v held-points))
-	 (lengths (array-dimensions (control-net (first xnode))))
-	 (extended (fit-extended (first xnode)
-				 20 50 tight-tolerance))) ; kutykurutty
+  (let ((lower (bss-lower-parameter (first xnode)))
+	(upper (bss-upper-parameter (first xnode)))
+	(lpoints (sample-surface (second xnode) (second resolution)
+				 :number-of-points-u (- held-points)))
+	(rpoints (sample-surface (third xnode) (third resolution)
+				 :number-of-points-u held-points))
+	(dpoints (sample-surface (fourth xnode) (fourth resolution)
+				 :number-of-points-v (- held-points)))
+	(upoints (sample-surface (fifth xnode) (fifth resolution)
+				 :number-of-points-v held-points))
+	(lengths (array-dimensions (control-net (first xnode))))
+	(extended (fit-extended (first xnode)
+				20 50 tight-tolerance))) ; kutykurutty
 ;;     (write-points2-vtk lpoints "results/left.vtk")
 ;;     (write-points2-vtk rpoints "results/right.vtk")
 ;;     (write-points2-vtk dpoints "results/bottom.vtk")
 ;;     (write-points2-vtk upoints "results/top.vtk")
 ;;     (write-points2-vtk faired-points "results/center.vtk")
-    (flet ((samples-to-parameter-points (sample dir)
-	     (let ((from (case dir
-			   (ld (list (- (first lower) held-hi-u)
-				     (- (second lower) held-hi-v)))
-			   (rd (list (+ (first upper) held-lo-u)
-				     (- (second lower) held-hi-v)))
-			   (lu (list (- (first lower) held-hi-u)
-				     (+ (second upper) held-lo-v)))
-			   (ru (list (+ (first upper) held-lo-u)
-				     (+ (second upper) held-lo-v)))))
-		   (to (case dir
-			 (ld (list (- (first lower) held-lo-u)
-				   (- (second lower) held-lo-v)))
-			 (rd (list (+ (first upper) held-hi-u)
-				   (- (second lower) held-lo-v)))
-			 (lu (list (- (first lower) held-lo-u)
-				   (+ (second upper) held-hi-v)))
-			 (ru (list (+ (first upper) held-hi-u)
-				   (+ (second upper) held-hi-v))))))
-	       (uniform-parameter-points-2d
-		sample (first from) (first to) (second from) (second to)))))
-      (bss-fit-engine
-       '(3 3)
-       (append
-	(list (cons tight-tolerance
-		    (guess-sample-parameters extended lpoints tight-tolerance))
-	      (cons tight-tolerance
-		    (guess-sample-parameters extended rpoints tight-tolerance))
-	      (cons tight-tolerance
-		    (guess-sample-parameters extended dpoints tight-tolerance))
-	      (cons tight-tolerance
-		    (guess-sample-parameters extended upoints tight-tolerance))
-	      (cons loose-tolerance (uniform-parameter-points-2d
-				     faired-points
-				     (first lower) (first upper)
-				     (second lower) (second upper))))
-	(and patch-corners
-	     (let ((ldpoints (create-patch lpoints dpoints nil nil))
-		   (rdpoints (create-patch rpoints dpoints t nil))
-		   (lupoints (create-patch lpoints upoints nil t))
-		   (rupoints (create-patch rpoints upoints t t)))
-;; 	       (write-points2-vtk ldpoints "results/ld.vtk")
-;; 	       (write-points2-vtk rdpoints "results/rd.vtk")
-;; 	       (write-points2-vtk lupoints "results/lu.vtk")
-;; 	       (write-points2-vtk rupoints "results/ru.vtk")
-	       (list (cons loose-tolerance
-			   (samples-to-parameter-points ldpoints 'ld))
-		     (cons loose-tolerance
-			   (samples-to-parameter-points rdpoints 'rd))
-		     (cons loose-tolerance
-			   (samples-to-parameter-points lupoints 'lu))
-		     (cons loose-tolerance
-			   (samples-to-parameter-points rupoints 'ru))))))
-       :number-of-control-points-u (first lengths)
-       :number-of-control-points-v (second lengths)
-       :smoothness-functional :smf-none
-       :optimize-parameters nil))))
+    (bss-fit-engine
+     '(3 3)
+     (append
+      (list (cons tight-tolerance
+		  (guess-sample-parameters extended lpoints tight-tolerance))
+	    (cons tight-tolerance
+		  (guess-sample-parameters extended rpoints tight-tolerance))
+	    (cons tight-tolerance
+		  (guess-sample-parameters extended dpoints tight-tolerance))
+	    (cons tight-tolerance
+		  (guess-sample-parameters extended upoints tight-tolerance))
+	    (cons loose-tolerance (uniform-parameter-points-2d
+				   faired-points
+				   (first lower) (first upper)
+				   (second lower) (second upper))))
+      (and patch-corners
+	   (let ((ldpoints (create-patch lpoints dpoints nil nil))
+		 (rdpoints (create-patch rpoints dpoints t nil))
+		 (lupoints (create-patch lpoints upoints nil t))
+		 (rupoints (create-patch rpoints upoints t t)))
+;; 	     (write-points2-vtk ldpoints "results/ld.vtk")
+;; 	     (write-points2-vtk rdpoints "results/rd.vtk")
+;; 	     (write-points2-vtk lupoints "results/lu.vtk")
+;; 	     (write-points2-vtk rupoints "results/ru.vtk")
+	     (list (cons loose-tolerance
+			 (guess-sample-parameters
+			  extended ldpoints loose-tolerance))
+		   (cons loose-tolerance
+			 (guess-sample-parameters
+			  extended rdpoints loose-tolerance))
+		   (cons loose-tolerance
+			 (guess-sample-parameters
+			  extended lupoints loose-tolerance))
+		   (cons loose-tolerance
+			 (guess-sample-parameters
+			  extended rupoints loose-tolerance))))))
+     :number-of-control-points-u (first lengths)
+     :number-of-control-points-v (second lengths)
+     :smoothness-functional :smf-none
+     :optimize-parameters nil)))
 
 (defun just-a-surface-projection (original faired u v)
   (let ((n (bss-surface-normal original (list u v)))
