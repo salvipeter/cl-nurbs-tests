@@ -24,6 +24,8 @@
 	       (:file "projection" :depends-on ("matrix"))
 	       (:file "closest-point" :depends-on ("matrix"))
 	       (:file "g1-zap" :depends-on ("parameterization" "matrix" "lu"))
+	       (:file "g2" :depends-on ("g1-zap"))
+	       (:file "g-krr" :depends-on ("g2"))
 	       (:file "fair-surface-from-corners" :depends-on ("package"))
 	       (:file "five-surface" :depends-on ("geomagic-formats"
 						  "g1-zap"

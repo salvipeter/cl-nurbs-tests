@@ -1,5 +1,8 @@
 			  -*- mode: org -*-
 
+* Swap the fairing / enlarging phases
+* Gorberendszereket raillesztunk, azokat faireljuk es erre illesztunk
+* Faireles LSQ-val surface szinten?
 * Suppressed fit
 ** sarkokat kipotolni bilinear patchekkel
 - a ket szomszedos patch meghosszabitasabol mintavetelezunk es atlagoljuk
@@ -10,6 +13,7 @@
 *** a normal tranzverzalissal
 - a ket egyenes legkozelebbi reszenel az osszekoto szakasz felezopontja
 *** G1 = a feluletek erintosikjanak (normalisanak) a simasaga
+* G2 enforcing
 * Bugkereses
 - tipp: l/d, r/u van egyben, miert csak az egyik rossz?
 * Cut
