@@ -180,7 +180,8 @@ The twist control points will not be moved."
 				(control-normal surface j index)))
               (setf (aref net i1 i2)
 		    (v+ (aref net i1 i2)
-			(v* normal (elt solution (- j 3))))))))))
+			(v* normal (elt solution (- j 3)))))))))
+  surface)
 
 (defun ensure-g2-continuity (surface lsurface rsurface dsurface usurface res)
   (let ((result (copy-bspline-surface surface)))

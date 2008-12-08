@@ -91,3 +91,16 @@
 		    (mapcar (lambda (x) (+ x shift)) (coerce lst 'list)))
 		  (knot-vectors result) (list u v)))
     result))
+
+(defun bss-reparametrize (surface umin umax vmin vmax)
+  (let* ((result (copy-bspline-surface surface))
+	 (low (bss-lower-parameter surface))
+	 (length (mapcar #'- (bss-upper-parameter surface) low)))
+    (setf (knot-vectors result)
+	  (mapcar (lambda (knots min new-min len scale)
+		    (mapcar (lambda (x)
+			      (+ new-min (/ (* (- x min) scale) len)))
+			    (coerce knots 'list)))
+		  (knot-vectors result) low (list umin vmin) length
+		  (list (- umax umin) (- vmax vmin))))
+    result))
