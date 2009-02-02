@@ -1,6 +1,12 @@
 ;; -*- mode: lisp; syntax: common-lisp -*-
 
-(in-package :cl-nurbs-tests)
+(in-package :cl-user)
+
+(defpackage :lu-solver
+  (:use :common-lisp :iterate)
+  (:export :solve :least-squares))
+
+(in-package :lu-solver)
 
 (defconstant +tiny+ 1.0e-20
   "A very small number.")
@@ -91,6 +97,12 @@
                    (aref a i i))))
     b))
 
-(defun lu-solve (a b)
+(defun solve (a b)
   (multiple-value-bind (lu swaps) (lu-decomposition a)
     (lu-back-substitution lu swaps b)))
+
+(defun least-squares (x y)
+  "Solve (X^T X)b = X^T y, where X is an (n,m) matrix and Y is an (n) vector."
+  (solve
+   (matrix:multiplication (matrix:transpose x) x)
+   (matrix:to-vector (matrix:multiplication (matrix:transpose x) y))))

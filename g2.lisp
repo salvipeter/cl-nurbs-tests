@@ -96,7 +96,7 @@ TYPE is UP or DOWN."
 	   (alpha '())
 	   (u (if endp umax umin))
 	   (du (- umax umin))
-	   (dv (ecase type (up (- vmax v)) (down (- v vmin)))))
+	   (dv (ecase type (up (- vmax v)) (down (- vmin v)))))
       (iter (for i from 0 below n)
 	    (iter (for j from 0 below m)
 		  (for alpha1 =
@@ -171,7 +171,7 @@ The twist control points will not be moved."
 	      (setf (aref y (+ start k -1) 0)
 		    (- (* target-curvature (scalar-product d1 d1))
 		       (scalar-product d2 normal)))))
-      (let ((solution (least-squares x y)))
+      (let ((solution (lu-solver:least-squares x y)))
         (iter (for j from 3 to (- m 3))
               (for i1 = (if u-dir index j))
               (for i2 = (if u-dir j index))

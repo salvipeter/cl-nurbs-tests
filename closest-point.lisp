@@ -18,7 +18,7 @@ and the plane defined by the points P0, P1 and P2."
 	      `((,(- (x la) (x p0)))
 		(,(- (y la) (y p0)))
 		(,(- (z la) (z p0)))))))
-      (let ((result (matrix-multiplication (matrix-inverse-3x3 m) v)))
+      (let ((result (matrix:multiplication (matrix:inverse-3x3 m) v)))
 	(v+ la (v* (v- lb la) (aref result 0 0)))))))
 
 (defun closest-point (p p-dir q q-dir)

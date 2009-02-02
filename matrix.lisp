@@ -1,8 +1,14 @@
 ;; -*- mode: lisp; syntax: common-lisp -*-
 
-(in-package :cl-nurbs-tests)
+(in-package :cl-user)
 
-(defun matrix-transpose (m)
+(defpackage :matrix
+  (:use :common-lisp :iterate)
+  (:export :transpose :multiplication :to-vector :inverse-2x2 :inverse-3x3))
+
+(in-package :matrix)
+
+(defun transpose (m)
   (let* ((n (array-dimensions m))
 	 (result (make-array (reverse n))))
     (dotimes (i (first n))
@@ -10,7 +16,7 @@
 	(setf (aref result j i) (aref m i j))))
     result))
 
-(defun matrix-multiplication (m1 m2)
+(defun multiplication (m1 m2)
   (let ((n1 (array-dimension m1 0))
 	(n (array-dimension m1 1))
 	(n2 (array-dimension m2 1)))
@@ -24,14 +30,14 @@
 		      (sum (* (aref m1 i k) (aref m2 k j)))))))
       result)))
 
-(defun matrix->vector (m)
+(defun to-vector (m)
   (unless (= (array-dimension m 1) 1) (error "This matrix is not a vector."))
   (let ((result (make-array (array-dimension m 0))))
     (dotimes (i (array-dimension m 0))
       (setf (elt result i) (aref m i 0)))
     result))
 
-(defun matrix-inverse-2x2 (m)
+(defun inverse-2x2 (m)
   (let* ((a (aref m 0 0))
 	 (b (aref m 0 1))
 	 (c (aref m 1 0))
@@ -41,7 +47,7 @@
 		`((,(/ d divisor) ,(/ (- b) divisor))
 		  (,(/ (- c) divisor) ,(/ a divisor))))))
 
-(defun matrix-inverse-3x3 (m)
+(defun inverse-3x3 (m)
   (let ((result (make-array '(3 3)))
 	(det (+ (* (aref m 0 0) (- (* (aref m 2 2) (aref m 1 1))
 				   (* (aref m 2 1) (aref m 1 2))))

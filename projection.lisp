@@ -71,7 +71,7 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 ,(+ (scalar-product du dv) (scalar-product r duv)))
 	       (,(+ (scalar-product du dv) (scalar-product r duv))
 		 ,(+ (scalar-product dv dv) (scalar-product r dv2))))))
-	 (delta (matrix-multiplication (matrix-inverse-2x2 J) k)))
+	 (delta (matrix:multiplication (matrix:inverse-2x2 J) k)))
     (list (aref delta 0 0) (aref delta 1 0))))
 
 (defun bss-project-point (surface point iterations search-resolution &optional

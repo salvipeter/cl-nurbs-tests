@@ -76,11 +76,6 @@
 			 (- (elt knots (+ i p 1)) (elt knots (1+ i))))
 		 (bspline-basis knots (1+ i) (1- p) u))))))
 
-(defun least-squares (x y)
-  "Solve (X^T X)b = X^T y, where X is an (n,m) matrix and Y is an (n) vector."
-  (lu-solve (matrix-multiplication (matrix-transpose x) x)
-	    (matrix->vector (matrix-multiplication (matrix-transpose x) y))))
-
 (defun ensure-g1-one-side (surface master resolution &key u-dir endp)
   "Ensure destructively G1-connectivity with MASTER at one side of SURFACE.
 
@@ -122,7 +117,7 @@ The twist control points will not be moved."
 	    (for right-side = (v* n (scalar-product v1 n) -1.0))
 	    (iter (for r from 0 below 3)
 		  (setf (aref y (+ (* 3 (1- k)) r) 0) (elt right-side r))))
-      (let ((solution (least-squares x y)))
+      (let ((solution (lu-solver:least-squares x y)))
         (iter (for j from 2 to (- m 2))
               (for i1 = (if u-dir index j))
               (for i2 = (if u-dir j index))
