@@ -1,0 +1,45 @@
+;;; -*- mode: lisp; syntax: common-lisp -*-
+
+(in-package :kobbelt)
+
+(defun test (surface resolution file1 file2 &optional projectionp)
+  (let ((obj (kobbelt:initialize (* resolution resolution)))
+	(lower (bss-lower-parameter surface))
+	(upper (bss-upper-parameter surface)))
+    (with-open-file (s file1 :direction :output :if-exists :supersede)
+      (iter (for ui from 0 below resolution)
+	    (for u = (interpolate (first lower)
+				  (/ ui (1- resolution))
+				  (first upper)))
+	    (iter (for vi from 0 below resolution)
+		  (for v = (interpolate (second lower)
+					(/ vi (1- resolution))
+					(second upper)))
+		  (for p = (bss-evaluate surface (list u v)))
+;; 		  (for (k1 k2) = (bss-principal-curvatures surface (list u v)))
+;; 		  (format s "~{~f ~}~f~%" p (+ (* k1 k1) (* k2 k2)))
+		  (insert-point obj p))))
+    (flet ((tr (x y) (+ (* x resolution) y)))
+      (dotimes (i (1- resolution))
+	(dotimes (j (1- resolution))
+	  (set-triangle obj (tr i j) (tr (1+ i) j) (tr (1+ i) (1+ j)))
+	  (set-triangle obj (tr i j) (tr (1+ i) (1+ j)) (tr i (1+ j))))))
+    (merge-neighbors obj)
+    (parameterize obj (if projectionp
+			  #'parameterize-projection
+			  #'parameterize-polar))
+    (derivatives obj)
+    (with-open-file (s file2 :direction :output :if-exists :supersede)
+      (iter (for p in-vector (points obj))
+	    (for d = (point-derivatives p))
+	    (for uu = (derivative-uu d))
+	    (for uv = (derivative-uv d))
+	    (for vv = (derivative-vv d))
+	    (format s "~{~f ~}~f~%" (point-coordinates p)
+		    (+ (scalar-product uu uu)
+		       (* 2 (scalar-product uv uv))
+		       (scalar-product vv vv)))))))
+
+#+nil
+(test (first (read-rbn "models/bottom.rbn")) 100
+      "/tmp/bottom-precise" "/tmp/bottom-approximate" t)

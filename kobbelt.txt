@@ -1,0 +1,49 @@
+			  -*- mode: org -*-
+
+* Másodfokú parciális deriváltak
+Keresünk egy másodfokú illesztést: egy p0 pont esetén vesszük a
+szomszédait (p_1...p_n) és ha n>=5, akkor LSQ, egyébként nagyobb
+szomszédságot nézünk vagy a legkisebb normás megoldást vesszük.
+Legyen p_i paraméterezése (u_i,v_i). Kezdetben (u_0,v_0)=(0,0).
+Az LSQ interpoláló polinom:
+F(u,v) = F + u F_u + v F_v + 1/2 u^2 F_uu + u v F_uv + 1/2 v^2 F_vv
+Tehát p_0 = F(0,0) = F, így a lineáris Vandermonde rendszer V X = P,
+ahol X = [F_u,F_v,F_uu,F_uv,F_vv], P = [p_1-p_0,p_2-p_0,...,p_n-p_0]
+és V i. sora [u_i,v_i,1/2 u_i^2,u_i v_i,1/2 v_i^2].
+Az LSQ megoldás tehát X = D P, ahol D = (V^T V)^-1 V^T.
+A D mátrix sorai az osztott differencia-operátorok együtthatói.
+* Paraméterezés
+Lokálisan paraméterezünk, közelítőleg izometrikusan. Az alábbi
+módszerek elforgatástól eltekintve egyértelműen meghatározzák a
+paramétereket. Mivel a görbület a forgatástól nem függ, ezt szabadon
+megválaszthatjuk (pl. hogy (u_1,v_1) legyen az u tengelyen).
+** Síkra vetítéssel
+1. közelítjük a normálvektort p_0-ban, ez alapján van egy p_0-on
+   átmenő simulósíkunk
+2. p_i-ket rávetítjük a simulósíkra (p_i')
+3. a vetített pontokat az (u_0,v_0) bázisban fejezzük ki, ahol
+   u_0 = (p_1'-p_0) és v_0 = u_0 x normális [normalizálva]
+** Polárkoordinátákkal
+(u_i,v_i) = h_i (cos(sum_{j=1}^{i-1} alpha_j),
+                 sin(sum_{j=1}^{i-1} alpha_j)),
+ahol h_i arányos a ||p_i-p_0|| hosszal és alpha_j arányos a
+(p_j,p_0,p_j+1) szöggel úgy, hogy sum_{j=1}^n alpha_j = 2pi.
+* Fairing
+A főgörbületek négyzetösszege helyett a második deriváltak
+négyzetösszegét minimalizáljuk (F_uu^2 + 2 F_uv^2 + F_vv^2),
+ami az alábbi módon diszkretizálható:
+E(S) = sum_i omega_i ((sum_j alpha_i,j p_i,j)^2 +
+                     2 (sum_j beta_i,j p_i,j)^2 +
+                      (sum_j gamma_i,j p_i,j)^2),
+ahol alpha,beta,gamma az osztott differencia-operátorok együtthatói,
+omega_i pedig a súly, amire pl. jó választás a szomszédos háromszögek
+területének összege.
+E(S) parciális deriváltjai kifejezhetők a pontokkal:
+dE(S)/dp_i = sum_k w_i,k p_k = 0.
+A megoldást Gauss-Seidel iteratív módszerrel meg lehet keresni, ahol
+  p_i = -1/w_i,i sum_{k/=i} w_i,k p_k
+az iterációs frissítés.
+* Egyéb
+- a határpontok és tangensek a széleken levő háromszögek
+  lerögzítésével biztosíthatóak.
+- különböző decimálási szintekkel fel lehet gyorsítani a fairelést

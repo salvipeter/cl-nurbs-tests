@@ -4,7 +4,8 @@
 
 (defpackage :matrix
   (:use :common-lisp :iterate)
-  (:export :transpose :multiplication :to-vector :inverse-2x2 :inverse-3x3))
+  (:export :transpose :multiplication :from-vector :to-vector
+	   :inverse-2x2 :inverse-3x3))
 
 (in-package :matrix)
 
@@ -30,9 +31,15 @@
 		      (sum (* (aref m1 i k) (aref m2 k j)))))))
       result)))
 
+(defun from-vector (v)
+  (make-array (list (length v) 1)
+	      :element-type (array-element-type v)
+	      :initial-contents (map 'list #'list v)))
+
 (defun to-vector (m)
   (unless (= (array-dimension m 1) 1) (error "This matrix is not a vector."))
-  (let ((result (make-array (array-dimension m 0))))
+  (let ((result (make-array (array-dimension m 0)
+			    :element-type (array-element-type m))))
     (dotimes (i (array-dimension m 0))
       (setf (elt result i) (aref m i 0)))
     result))

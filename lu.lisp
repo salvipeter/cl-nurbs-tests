@@ -4,7 +4,7 @@
 
 (defpackage :lu-solver
   (:use :common-lisp :iterate)
-  (:export :solve :least-squares))
+  (:export :solve :least-squares :least-norm))
 
 (in-package :lu-solver)
 
@@ -102,7 +102,14 @@
     (lu-back-substitution lu swaps b)))
 
 (defun least-squares (x y)
-  "Solve (X^T X)b = X^T y, where X is an (n,m) matrix and Y is an (n) vector."
+  "Solve (X^T X)b = X^T y, where X is an (n,m) matrix and Y is an (n,1) matrix."
   (solve
    (matrix:multiplication (matrix:transpose x) x)
    (matrix:to-vector (matrix:multiplication (matrix:transpose x) y))))
+
+(defun least-norm (x y)
+  "Solve (X X^T)b = y, where X is an (n,m) matrix and Y is an (n,1) matrix,
+and return X^T b."
+  (let* ((xt (matrix:transpose x))
+	 (b (solve (matrix:multiplication x xt) (matrix:to-vector y))))
+    (matrix:to-vector (matrix:multiplication xt (matrix:from-vector b)))))
