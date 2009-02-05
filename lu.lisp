@@ -4,7 +4,7 @@
 
 (defpackage :lu-solver
   (:use :common-lisp :iterate)
-  (:export :solve :least-squares :least-norm))
+  (:export :inverse :solve :least-squares :least-norm))
 
 (in-package :lu-solver)
 
@@ -96,6 +96,18 @@
                             (sum (* (aref a i j) (aref b j)))))
                    (aref a i i))))
     b))
+
+(defun inverse (a)
+  (multiple-value-bind (lu swaps) (lu-decomposition a)
+    (let* ((n (array-dimension a 0))
+	   (b (make-array n))
+	   (result (make-array (list n n))))
+      (iter (for j from 0 below n)
+	    (dotimes (i n) (setf (elt b i) 0.0d0))
+	    (setf (elt b j) 1.0d0)
+	    (for solved = (lu-back-substitution lu swaps b))
+	    (dotimes (i n) (setf (aref result i j) (elt solved i))))
+      result)))
 
 (defun solve (a b)
   (multiple-value-bind (lu swaps) (lu-decomposition a)
