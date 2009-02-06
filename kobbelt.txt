@@ -36,13 +36,19 @@ E(S) = sum_i omega_i ((sum_j alpha_i,j p_i,j)^2 +
                      2 (sum_j beta_i,j p_i,j)^2 +
                       (sum_j gamma_i,j p_i,j)^2),
 ahol alpha,beta,gamma az osztott differencia-operátorok együtthatói,
-omega_i pedig a súly, amire pl. jó választás a szomszédos háromszögek
-területének összege.
+azaz alpha_i,j = D_i(3,j), beta_i,j = D_i(4,j) és gamma_i,j = D_i(5,j);
+p_i,j a p_i pont szomszédai, omega_i pedig a súly, amire pl. jó
+választás a szomszédos háromszögek területének összege.
 E(S) parciális deriváltjai kifejezhetők a pontokkal:
 dE(S)/dp_i = sum_k w_i,k p_k = 0.
 A megoldást Gauss-Seidel iteratív módszerrel meg lehet keresni, ahol
   p_i = -1/w_i,i sum_{k/=i} w_i,k p_k
 az iterációs frissítés.
+  w_I,J = sum_i omega_i 2 (alpha_i,j0 alpha_i,j1 +
+                          2 beta_i,j0  beta_i,j1 +
+                           gamma_i,j0 gamma_i,j1)
+ahol p_i,j0 = w_I és p_i,j1 = w_J, és i a p_I és p_J közös szomszédait
+futja be.
 * Egyéb
 - a határpontok és tangensek a széleken levő háromszögek
   lerögzítésével biztosíthatóak.

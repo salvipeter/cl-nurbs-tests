@@ -7,6 +7,10 @@
 ;;; and also insert triangles with SET-TRIANGLE.
 ;;; Finally call FAIR with the desired parameters.
 
+;;; BUG: The weights appear to be wrong.
+;;; BUG: Polar parameterization gives complex results.
+;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
+
 (in-package :cl-user)
 
 (defpackage :kobbelt
@@ -15,12 +19,12 @@
 
 (in-package :kobbelt)
 
-(defstruct point coordinates neighbors closedp derivatives)
+(defstruct point coordinates neighbors border-p derivatives)
 (defstruct neighbor index parameters)
-(defstruct derivative u v uu uv vv)
 (defclass neighbors ()
   ((size :initform 0 :accessor size)
-   (points :accessor points)))
+   (points :accessor points)
+   (weights :accessor weights)))
 
 (defun neighbor-coordinates (obj neighbor)
   (point-coordinates (elt (points obj) (neighbor-index neighbor))))
@@ -48,14 +52,15 @@
 
 (defun merge-neighbors (obj)
   "Destructively merges the neighborhood triangles into one list per point."
-  (labels ((rec (lst item)
+  (labels ((rec (lst item last-needed-p)
 	     (if (null lst)
-		 (list item)
+		 (if last-needed-p (list item) nil)
 		 (let ((next (find item lst :test #'member)))
 		   (cons item (rec (remove next lst :test #'equal)
 				   (if (= (first next) item)
 				       (second next)
-				       (first next))))))))
+				       (first next))
+				   last-needed-p))))))
     (iter (for i from 0 below (size obj))
 	  (for neighborhood = (point-neighbors (elt (points obj) i)))
 	  (for flattened = (reduce #'append neighborhood))
@@ -63,8 +68,13 @@
 			       (remove-duplicates flattened)))
 	  (setf (point-neighbors (elt (points obj) i))
 		(mapcar (lambda (index) (make-neighbor :index index))
-			(rec neighborhood (or edge (first flattened)))))
-	  (setf (point-closedp (elt (points obj) i)) (null edge)))))
+			(rec neighborhood (or edge (first flattened)) edge)))
+	  (when edge
+	    (setf (point-border-p (elt (points obj) i)) 'border)
+	    (iter (for neighbor in (point-neighbors (elt (points obj) i)))
+		  (for npoint = (elt (points obj) (neighbor-index neighbor)))
+		  (unless (point-border-p npoint)
+		    (setf (point-border-p npoint) 'inner)))))))
 
 (defun parameterize (obj param-fn)
   "Calls PARAM-FN for all points in OBJ."
@@ -73,7 +83,7 @@
 
 (defun neighborhood-triangles (point &optional force-close-p)
   (let ((neighborhood (point-neighbors point)))
-    (append (if (or force-close-p (point-closedp point))
+    (append (if (or force-close-p (not (eq (point-border-p point) 'border)))
 		(list (append (last neighborhood)
 			      (list (first neighborhood))))
 		nil)
@@ -134,6 +144,63 @@
 			  (* (/ deviation max-deviation)
 			     (sin (* alpha weight))))))))))
 
+(defun triangle-area (p1 p2 p3)
+  (let* ((a (point-distance p1 p2))
+	 (b (point-distance p2 p3))
+	 (c (point-distance p1 p3))
+	 (s (/ (+ a b c) 2.0d0)))
+    (sqrt (* s (- s a) (- s b) (- s c)))))
+
+(defun point-area (obj i)
+  (let ((pos (point-coordinates (elt (points obj) i))))
+    (reduce #'+ (mapcar (lambda (triangle)
+			  (apply #'triangle-area pos
+				 (mapcar (lambda (neighbor)
+					   (neighbor-coordinates obj neighbor))
+					 triangle)))
+			(neighborhood-triangles (elt (points obj) i))))))
+
+(defun compute-weights (obj)
+  (let ((n (size obj)))
+    (setf (weights obj) (make-array n))
+    (dotimes (i n) (setf (elt (weights obj) i) (make-hash-table))))
+  (iter (for i from 0 below (size obj))
+	(for p = (elt (points obj) i))
+	(unless (eq (point-border-p p) 'border)
+	  (for area = (point-area obj i))
+	  (for neighborhood = (point-neighbors p))
+	  (for n = (length neighborhood))
+	  (for x = (make-array (list (* 3 n) 15) :initial-element 0.0d0))
+	  (iter (for j from 0 below n)
+		(for neighbor in neighborhood)
+		(for (u v) = (neighbor-parameters neighbor))
+		(for coefficients = (list u v (* 1/2 u u) (* u v) (* 1/2 v v))) 
+		(dotimes (k 3)
+		  (iter (for l from 0 below 5)
+			(for coefficient in coefficients)
+			(setf (aref x (+ (* 3 j) k) (+ (* 3 l) k))
+			      coefficient))))
+	  (for xt = (matrix:transpose x))
+	  (for d = (matrix:multiplication
+		    (lu-solver:inverse (matrix:multiplication xt x))
+		    xt))
+	  (iter (for n1 in neighborhood)
+		(for k1 upfrom 0)
+		(for n1-index = (neighbor-index n1))
+		(iter (for n2 in neighborhood)
+		      (for k2 upfrom 0)
+		      (for n2-index = (neighbor-index n2))
+		      (unless (gethash n2-index (elt (weights obj) n1-index))
+			(setf (gethash n2-index (elt (weights obj) n1-index))
+			      0.0d0))
+		      (incf (gethash n2-index (elt (weights obj) n1-index))
+			    (* 2.0d0 area
+			       (+ (* (aref d 2 k1) (aref d 2 k2))
+				  (* 2 (aref d 3 k1) (aref d 3 k2))
+				  (* (aref d 4 k1) (aref d 4 k2))))))))))
+
+;;; Not used at present.
+(defstruct derivative u v uu uv vv)
 (defun derivatives (obj)
   "Destructively sets the derivatives for every point."
   (flet ((extract-coordinates (v i)
@@ -166,16 +233,40 @@
 				 :uv (extract-coordinates solution 9)
 				 :vv (extract-coordinates solution 12))))))
 
-(defun triangle-area (p1 p2 p3)
-  (let* ((a (point-distance p1 p2))
-	 (b (point-distance p2 p3))
-	 (c (point-distance p1 p3))
-	 (s (/ (+ a b c) 2.0d0)))
-    (sqrt (* s (- s a) (- s b) (- s c)))))
+;;; Not used at present.
+(defun two-neighborhood (obj i)
+  (let ((neighborhood (point-neighbors (elt (points obj) i))))
+    (remove i (delete-duplicates
+	       (append neighborhood
+		       (mapcan (lambda (n)
+				 (point-neighbors
+				  (elt (points obj) (neighbor-index n))))
+			       neighborhood)))
+	    :key #'neighbor-index)))
 
-(defun fair (obj &key (parameterization 'projection))
+(defun fair (obj iteration &key
+	     (parameterization 'projection) (preserve-tangents t))
   (merge-neighbors obj)
   (parameterize obj (ecase parameterization
 		      (projection #'parameterize-projection)
 		      (polar #'parameterize-polar)))
-  'TODO)
+  (compute-weights obj)
+  (flet ((fixed-point-p (p)
+	   (let ((borderp (point-border-p p)))
+	     (or (eq borderp 'border)
+		 (and preserve-tangents (eq borderp 'inner))))))
+    (iter (with n = (size obj))
+	  (with points = (points obj))
+	  (with weights = (weights obj))
+	  (repeat iteration)
+	  (dotimes (i n)
+	    (unless (fixed-point-p (elt points i))
+	      (setf (point-coordinates (elt points i))
+		    (iter (with q = '(0 0 0))
+			  (for (index weight) in-hashtable (elt weights i))
+			  (for point = (point-coordinates (elt points index)))
+			  (when (/= index i)
+			    (setf q (v+ q (v* point weight))))
+			  (finally
+			   (let ((weight (gethash i (elt weights i))))
+			     (return (v* q (/ (- weight)))))))))))))
