@@ -7,8 +7,7 @@
 ;;; and also insert triangles with SET-TRIANGLE.
 ;;; Finally call FAIR with the desired parameters.
 
-;;; BUG: The weights appear to be wrong.
-;;; BUG: Polar parameterization gives complex results.
+;;; BUG: Does not work when dataset is large.
 ;;; TODO: The weights probably go wrong, when PRESERVE-TANGENTS is NIL.
 ;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
 
@@ -84,13 +83,13 @@
 
 (defun neighborhood-triangles (point &optional force-close-p)
   (let ((neighborhood (point-neighbors point)))
-    (append (if (or force-close-p (not (eq (point-border-p point) 'border)))
+    (append (mapcar #'list
+		    (butlast neighborhood)
+		    (cdr neighborhood))
+	    (if (or force-close-p (not (eq (point-border-p point) 'border)))
 		(list (append (last neighborhood)
 			      (list (first neighborhood))))
-		nil)
-	    (mapcar #'list
-		    (butlast neighborhood)
-		    (cdr neighborhood)))))
+		nil))))
 
 (defun approximate-normal (obj i)
   (let* ((p (elt (points obj) i))
