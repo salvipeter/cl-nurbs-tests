@@ -9,6 +9,7 @@
 
 ;;; BUG: The weights appear to be wrong.
 ;;; BUG: Polar parameterization gives complex results.
+;;; TODO: The weights probably go wrong, when PRESERVE-TANGENTS is NIL.
 ;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
 
 (in-package :cl-user)
@@ -169,35 +170,53 @@
 	(unless (eq (point-border-p p) 'border)
 	  (for area = (point-area obj i))
 	  (for neighborhood = (point-neighbors p))
-	  (for n = (length neighborhood))
-	  (for x = (make-array (list (* 3 n) 15) :initial-element 0.0d0))
-	  (iter (for j from 0 below n)
+	  (for m = (length neighborhood))
+	  (for x = (make-array (list m 5)))
+	  (iter (for j from 0 below m)
 		(for neighbor in neighborhood)
 		(for (u v) = (neighbor-parameters neighbor))
-		(for coefficients = (list u v (* 1/2 u u) (* u v) (* 1/2 v v))) 
-		(dotimes (k 3)
-		  (iter (for l from 0 below 5)
-			(for coefficient in coefficients)
-			(setf (aref x (+ (* 3 j) k) (+ (* 3 l) k))
-			      coefficient))))
+		(setf (aref x j 0) u
+		      (aref x j 1) v
+		      (aref x j 2) (* 1/2 u u)
+		      (aref x j 3) (* u v)
+		      (aref x j 4) (* 1/2 v v)))
 	  (for xt = (matrix:transpose x))
 	  (for d = (matrix:multiplication
 		    (lu-solver:inverse (matrix:multiplication xt x))
 		    xt))
-	  (iter (for n1 in neighborhood)
-		(for k1 upfrom 0)
-		(for n1-index = (neighbor-index n1))
-		(iter (for n2 in neighborhood)
-		      (for k2 upfrom 0)
-		      (for n2-index = (neighbor-index n2))
-		      (unless (gethash n2-index (elt (weights obj) n1-index))
-			(setf (gethash n2-index (elt (weights obj) n1-index))
-			      0.0d0))
-		      (incf (gethash n2-index (elt (weights obj) n1-index))
-			    (* 2.0d0 area
-			       (+ (* (aref d 2 k1) (aref d 2 k2))
-				  (* 2 (aref d 3 k1) (aref d 3 k2))
-				  (* (aref d 4 k1) (aref d 4 k2))))))))))
+	  (for alpha-sum = (iter (for k from 0 below m) (sum (aref d 2 k))))
+	  (for beta-sum = (iter (for k from 0 below m) (sum (aref d 3 k))))
+	  (for gamma-sum = (iter (for k from 0 below m) (sum (aref d 4 k))))
+	  (flet ((add-weight (i1 i2 w)
+		   (unless (gethash i2 (elt (weights obj) i1))
+		     (setf (gethash i2 (elt (weights obj) i1)) 0.0d0))
+		   (incf (gethash i2 (elt (weights obj) i1)) w)))
+	    (add-weight i i (* 2.0d0 area
+			       (+ (* alpha-sum alpha-sum)
+				  (* beta-sum beta-sum)
+				  (* gamma-sum gamma-sum))))
+	    (iter (for n1 in neighborhood)
+		  (for k1 upfrom 0)
+		  (for n1-index = (neighbor-index n1))
+		  (for alpha1 = (aref d 2 k1))
+		  (for beta1 = (aref d 3 k1))
+		  (for gamma1 = (aref d 4 k1)) 
+		  (add-weight n1-index i (* -2.0d0 area
+					    (+ (* alpha-sum alpha1)
+					       (* 2 beta-sum beta1)
+					       (* gamma-sum gamma1))))
+		  (add-weight i n1-index (* -2.0d0 area
+					    (+ (* alpha-sum alpha1)
+					       (* 2 beta-sum beta1)
+					       (* gamma-sum gamma1))))
+		  (iter (for n2 in neighborhood)
+			(for k2 upfrom 0)
+			(for n2-index = (neighbor-index n2))
+			(for weight = (* 2.0d0 area
+					 (+ (* alpha1 (aref d 2 k2))
+					    (* 2 beta1 (aref d 3 k2))
+					    (* gamma1 (aref d 4 k2)))))
+			(add-weight n1-index n2-index weight)))))))
 
 ;;; Not used at present.
 (defstruct derivative u v uu uv vv)

@@ -47,8 +47,21 @@ az iterációs frissítés.
   w_I,J = sum_i omega_i 2 (alpha_i,j0 alpha_i,j1 +
                           2 beta_i,j0  beta_i,j1 +
                            gamma_i,j0 gamma_i,j1)
-ahol p_i,j0 = w_I és p_i,j1 = w_J, és i a p_I és p_J közös szomszédait
-futja be.
+          - omega_I 2 (alpha_J S_alpha_I +
+                      2 beta_J  S_beta_I +
+                       gamma_J S_gamma_I)
+          - omega_J 2 (alpha_I S_alpha_J +
+                      2 beta_I  S_beta_J +
+                       gamma_I S_gamma_J)
+és
+  w_I,I = sum_i omega_i 2 (alpha_i,j0 alpha_i,j1 +
+                          2 beta_i,j0  beta_i,j1 +
+                           gamma_i,j0 gamma_i,j1)
+          + omega_I 2 (S_alpha_I S_alpha_I +
+	              2 S_beta_I  S_beta_I +
+		       S_gamma_I S_gamma_I)
+ahol p_i,j0 = p_I és p_i,j1 = p_J, és i a p_I és p_J közös szomszédait
+futja be, S_a_x = sum_j a_x,j.
 * Egyéb
 - a határpontok és tangensek a széleken levő háromszögek
   lerögzítésével biztosíthatóak.

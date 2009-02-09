@@ -31,7 +31,7 @@
 
 #+nil
 (test (first (read-rbn "models/bottom.rbn")) "/tmp/bottom-faired"
-      :resolution 20 :iteration 1 :projectionp t)
+      :resolution 100 :iteration 2 :projectionp t)
 
 (defun test-fn (fn filename &key (resolution 100) (iteration 100) projectionp)
   (let ((obj (kobbelt:initialize (* resolution resolution))))
