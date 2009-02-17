@@ -23,6 +23,7 @@
 	  (set-triangle obj (tr i j) (tr (1+ i) (1+ j)) (tr i (1+ j))))))
     (fair obj iteration :parameterization (if projectionp 'projection 'polar))
     (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "~d ~d~%" resolution resolution)
       (iter (for i from 0 below (size obj))
 	    (for p = (elt (points obj) i))
 	    (for pos = (point-coordinates p))
@@ -30,8 +31,8 @@
     obj))
 
 #+nil
-(test (first (read-rbn "models/bottom.rbn")) "/tmp/bottom-faired"
-      :resolution 100 :iteration 2 :projectionp t)
+(test (first (read-rbn "models/bottom.rbn")) "/tmp/bottom-faired.pts"
+      :resolution 100 :iteration 100 :projectionp t)
 
 (defun test-fn (fn filename &key (resolution 100) (iteration 100) projectionp)
   (let ((obj (kobbelt:initialize (* resolution resolution))))
@@ -46,6 +47,7 @@
 	  (set-triangle obj (tr i j) (tr (1+ i) (1+ j)) (tr i (1+ j))))))
     (fair obj iteration :parameterization (if projectionp 'projection 'polar))
     (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "~d ~d~%" resolution resolution)
       (iter (for i from 0 below (size obj))
 	    (for p = (elt (points obj) i))
 	    (for pos = (point-coordinates p))
@@ -53,5 +55,5 @@
     obj))
 
 #+nil
-(test-fn (lambda (u v) (list u v (+ (* u u) v))) "/tmp/fn-faired"
+(test-fn (lambda (u v) (list u v (+ (* u u) v))) "/tmp/fn-faired.pts"
       :resolution 10 :iteration 100 :projectionp t)

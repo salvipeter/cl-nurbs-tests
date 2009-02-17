@@ -7,7 +7,9 @@
 ;;; and also insert triangles with SET-TRIANGLE.
 ;;; Finally call FAIR with the desired parameters.
 
-;;; BUG: Does not work when dataset is large.
+;;; Note: This implementation assumes that there are no dangling triangles,
+;;; ie. each neighborhood has zero [inside] or one [edge] hole.
+
 ;;; TODO: The weights probably go wrong, when PRESERVE-TANGENTS is NIL.
 ;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
 
@@ -192,7 +194,7 @@
 		   (incf (gethash i2 (elt (weights obj) i1)) w)))
 	    (add-weight i i (* 2.0d0 area
 			       (+ (* alpha-sum alpha-sum)
-				  (* beta-sum beta-sum)
+				  (* 2 beta-sum beta-sum)
 				  (* gamma-sum gamma-sum))))
 	    (iter (for n1 in neighborhood)
 		  (for k1 upfrom 0)
