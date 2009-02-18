@@ -17,7 +17,8 @@
 
 (defpackage :kobbelt
   (:use :common-lisp :iterate :cl-nurbs)
-  (:export :initialize :insert-point :set-triangle :fair :write-vtk-mesh))
+  (:export :initialize :insert-point :set-triangle :fair
+	   :write-vtk-mesh :write-ply-mesh))
 
 (in-package :kobbelt)
 
@@ -311,7 +312,26 @@
                  POINTS ~d float~%"
 	      (size obj))
       (dotimes (i (size obj))
-	(format s "~{~f ~}~%" (point-coordinates (elt points i))))
+	(format s "~{~f~^ ~}~%" (point-coordinates (elt points i))))
       (let ((n (length triangles)))
 	(format s "~%POLYGONS ~d ~d~%" n (* 4 n)))
+      (dolist (p triangles) (format s "3~{ ~d~}~%" p)))))
+
+(defun write-ply-mesh (obj filename)
+  (let ((triangles (generate-triangle-list obj))
+	(points (points obj)))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "ply~%~
+                 format ascii 1.0~%~
+                 comment Exported Mesh~%~
+                 element vertex ~d~%~
+                 property float x~%~
+                 property float y~%~
+                 property float z~%~
+                 element face ~d~%~
+                 property list uchar int vertex_index~%~
+                 end_header~%"
+	      (size obj) (length triangles))
+      (dotimes (i (size obj))
+	(format s "~{~f~^ ~}~%" (point-coordinates (elt points i))))
       (dolist (p triangles) (format s "3~{ ~d~}~%" p)))))
