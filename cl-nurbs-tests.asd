@@ -34,4 +34,5 @@
 						  "closest-point"
 						  "fair-surface-from-corners"))
 	       (:file "five-surface-iterative"
-		      :depends-on ("geomagic-formats"))))
+		      :depends-on ("geomagic-formats"))
+	       (:file "n-test" :depends-on ("g-krr" "kobbelt"))))
