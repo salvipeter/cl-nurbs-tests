@@ -17,7 +17,7 @@
 
 (defpackage :kobbelt
   (:use :common-lisp :iterate :cl-nurbs)
-  (:export :initialize :insert-point :set-triangle :fair))
+  (:export :initialize :insert-point :set-triangle :fair :write-vtk-mesh))
 
 (in-package :kobbelt)
 
@@ -290,3 +290,28 @@
 			  (finally
 			   (let ((weight (gethash i (elt weights i))))
 			     (return (v* q (/ (- weight)))))))))))))
+
+(defun generate-triangle-list (obj)
+  (iter (for i from 0 below (size obj))
+	(appending (mapcan (lambda (tr)
+			     (let ((indices (mapcar #'neighbor-index tr)))
+			       (when (and (< i (first indices))
+					  (< i (second indices)))
+				 (list (cons i indices)))))
+			   (neighborhood-triangles (elt (points obj) i))))))
+
+(defun write-vtk-mesh (obj filename)
+  (let ((triangles (generate-triangle-list obj))
+	(points (points obj)))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "# vtk DataFile Version 1.0~%~
+                 Exported Mesh~%~
+                 ASCII~%~
+                 DATASET POLYDATA~%~
+                 POINTS ~d float~%"
+	      (size obj))
+      (dotimes (i (size obj))
+	(format s "~{~f ~}~%" (point-coordinates (elt points i))))
+      (let ((n (length triangles)))
+	(format s "~%POLYGONS ~d ~d~%" n (* 4 n)))
+      (dolist (p triangles) (format s "3~{ ~d~}~%" p)))))
