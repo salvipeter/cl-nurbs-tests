@@ -10,6 +10,7 @@
 ;;; Note: This implementation assumes that there are no dangling triangles,
 ;;; ie. each neighborhood has zero [inside] or one [edge] hole.
 
+;;; TODO: The writing functions work only after FAIR (merge-neighbors).
 ;;; TODO: The weights probably go wrong, when PRESERVE-TANGENTS is NIL.
 ;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
 
@@ -266,11 +267,11 @@
 	    :key #'neighbor-index)))
 
 (defun fair (obj iteration &key
-	     (parameterization 'projection) (preserve-tangents t))
+	     (parameterization :projection) (preserve-tangents t))
   (merge-neighbors obj)
   (parameterize obj (ecase parameterization
-		      (projection #'parameterize-projection)
-		      (polar #'parameterize-polar)))
+		      (:projection #'parameterize-projection)
+		      (:polar #'parameterize-polar)))
   (compute-weights obj)
   (flet ((fixed-point-p (p)
 	   (let ((borderp (point-border-p p)))

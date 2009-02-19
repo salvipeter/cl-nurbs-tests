@@ -35,4 +35,4 @@
 						  "fair-surface-from-corners"))
 	       (:file "five-surface-iterative"
 		      :depends-on ("geomagic-formats"))
-	       (:file "n-test" :depends-on ("g-krr" "kobbelt"))))
+	       (:file "n-patch" :depends-on ("g-krr" "kobbelt"))))
