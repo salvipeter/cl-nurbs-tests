@@ -417,7 +417,6 @@ TODO: This should rely on the original parameters of the points and thus be very
 	      (for side = (accumulate-from-patch (1+ i)))
 	      ;; saving the side of the first patch that meets with the last
 	      (when (= i 0) (setf first-side (accumulate-from-patch (1- n))))))
-	  ;; set up the triangles
 	  (iter (for ui from 0 below width)
 		(for u = (interpolate u-low (/ ui (1- width)) u-high))
 		(iter (for vi from 0 below height)
@@ -429,14 +428,34 @@ TODO: This should rely on the original parameters of the points and thus be very
     result))
 
 ;;; (defparameter *inner* (first (unify-npatch *five*)))
-;;; (defparameter *points* (with-open-file (s "/tmp/faired-points") (read s)))
+#+nil
+(defparameter *points*
+  (let ((points '()))
+    (with-open-file (s "/tmp/faired-points")
+      (handler-case (iter (for x = (read s))
+			  (for y = (read s))
+			  (for z = (read s))
+			  (push (list x y z) points))
+	(end-of-file () (nreverse points))))))
 ;;; (defparameter *param-points* (parameterize-npatch-points *inner* *points*))
-;;; (defparameter *param-points* (npatch-original-parameters *inner* *points* 2000))
+;;; (defparameter *param-points* (npatch-original-parameters *inner* *points* 10000))
 
-(defun npatch-refit (inner-npatch points &key size
+#+nil
+(iter (for n from 0 below (length *param-points*))
+      (for name = (format nil "/tmp/p~d" (1+ n)))
+      (with-open-file (s name :direction :output :if-exists :supersede)
+	(iter (with points = (elt *param-points* n))
+	      (for i from 2 below (length points) by 5)
+	      (format s "~f ~f ~f~%"
+		      (elt points i)
+		      (elt points (1+ i))
+		      (elt points (+ i 2))))))
+
+(defun npatch-refit (inner-npatch points &key retain-knot-vectors-p size
 		     (tolerance 1.0d-6) (iterations 20) (resolution '(10 10)))
   "Give SIZE [the parameter for KOBBELT-NPATCH] for the original parameters,
-or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
+or give ITERATIONS and RESOLUTION for Newton-Raphson projections.
+TODO: Boundaries should be interpolated with SF-SET-BOUNDARY."
   (iter (for patch in inner-npatch)
 	(for group in-vector
 	     (if size
@@ -445,9 +464,13 @@ or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
 		  :iterations iterations :resolution resolution)))
 	(collect (bss-fit-engine
 		  (degrees patch) (list (cons tolerance group))
+		  :knot-vector-u (and retain-knot-vectors-p
+				      (first (knot-vectors patch)))
+		  :knot-vector-v (and retain-knot-vectors-p
+				      (second (knot-vectors patch)))
 		  :smoothness-functional :smf-none :optimize-parameters t))))
 
-;; (defparameter *refit* (npatch-refit *inner* *points* :size 2000 :tolerance 1.0d-4))
+;; (defparameter *refit* (npatch-refit *inner* *points* :retain-knot-vectors-p t :size 10000 :tolerance 1.0d-4))
 
 (defun npatch-with-refitted (npatch refitted)
   (let ((result (copy-list npatch))
@@ -458,68 +481,20 @@ or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
 
 ;; (defparameter *faired-npatch* (npatch-with-refitted *five* *refit*))
 
-(defun simon-says-unify-pair (simon1 simon2 s1 s2)
-  "Do the same transformations on S1 and S2 that would do on SIMON1 and SIMON2.
-TODO: Code duplication, see UNIFY-PAIR."
-  (labels ((u-p (corners)
-	     (let ((sorted (sort corners #'<)))
-	       (or (equal sorted '(1 2)) (equal sorted '(0 3)))))
-	   (flip (p1 p2 r1 r2)
-	     (let ((match (unify-match-corners p1 p2)))
-	       (list (if (u-p (mapcar #'first match))
-			 (bss-flip-uv p1)
-			 p1)
-		     (if (u-p (mapcar #'second match))
-			 (bss-flip-uv p2)
-			 p2)
-		     (if (u-p (mapcar #'first match))
-			 (bss-flip-uv r1)
-			 r1)
-		     (if (u-p (mapcar #'second match))
-			 (bss-flip-uv r2)
-			 r2))))
-	   (reverse-u (p1 p2 r1 r2)
-	     (let ((match (unify-match-corners p1 p2)))
-	       (list (if (equal (sort (mapcar #'first match) #'<) '(0 1))
-			 (bss-reverse-parameterization p1 :u t)
-			 p1)
-		     (if (equal (sort (mapcar #'second match) #'<) '(2 3))
-			 (bss-reverse-parameterization p2 :u t)
-			 p2)
-		     (if (equal (sort (mapcar #'first match) #'<) '(0 1))
-			 (bss-reverse-parameterization r1 :u t)
-			 r1)
-		     (if (equal (sort (mapcar #'second match) #'<) '(2 3))
-			 (bss-reverse-parameterization r2 :u t)
-			 r2))))
-	   (reverse-v (p1 p2 r1 r2)
-	     (let ((match (unify-match-corners p1 p2)))
-	       (list p1
-		     (if (or (equal (first match) '(3 0))
-			     (equal (first match) '(2 1)))
-			 p2
-			 (bss-reverse-parameterization p2 :v t))
-		     r1
-		     (if (or (equal (first match) '(3 0))
-			     (equal (first match) '(2 1)))
-			 r2
-			 (bss-reverse-parameterization r2 :v t))))))
-    (destructuring-bind (x y a b)
-	(apply #'reverse-v (apply #'reverse-u (flip simon1 simon2 s1 s2)))
-      (declare (ignore x y))
-      (list (bss-reparametrize a 0.0d0 1.0d0 0.0d0 1.0d0)
-	    (bss-reparametrize b 1.0d0 2.0d0 0.0d0 1.0d0)))))
-
-(defun g0-g1-g2-and-fair-npatch (npatch new-npatch &key
-				 (resolution 100) (iteration 100))
-  (let ((indices (unified-indices npatch)))
+(defun g0-g1-g2-and-fair-npatch (npatch refitted unification-tolerance &key
+				 (zap-p t) (resolution 100) (iteration 100))
+  (let ((indices (unified-indices npatch))
+	(new-npatch (npatch-with-refitted npatch refitted))
+	(*unification-tolerance* unification-tolerance))
     (flet ((g2-and-reverse-if-needed (p1 p2)
 	     (destructuring-bind (master slave)
-		 (simon-says-unify-pair (elt npatch p1) (elt npatch p2)
-					(elt new-npatch p1) (elt new-npatch p2)) 
-	       (let* ((g2 (zap-surfaces slave master))
-;; 		      (g1 (ensure-g1-one-side g0 master resolution :u-dir t))
-;; 		      (g2 (ensure-g2-one-side g1 master resolution :u-dir t))
+		 (unify-pair (elt new-npatch p1) (elt new-npatch p2)) 
+	       (let* ((g0 (if zap-p
+			      (zap-surfaces slave master)
+			      (ensure-g0-one-side slave master resolution
+						  :u-dir t)))
+		      (g1 (ensure-g1-one-side g0 master resolution :u-dir t))
+		      (g2 (ensure-g2-one-side g1 master resolution :u-dir t))
 		      (low (bss-lower-parameter (elt new-npatch p2)))
 		      (high (bss-upper-parameter (elt new-npatch p2)))
 		      (middle (affine-combine low 1/2 high)))
@@ -535,9 +510,8 @@ TODO: Code duplication, see UNIFY-PAIR."
       (iter (for p1 first (car (last (first indices))) then p2)
 	    (for p2 in (first indices))
 	    (g2-and-reverse-if-needed p1 p2))
-      ;;     (iter (for index in (first indices))
-      ;; 	  (setf (elt new-npatch index)
-      ;; 		(g-fair-krr-additive (elt new-npatch index) iteration 2)))
+      (iter (for index in (first indices))
+	    (g-fair-krr-additive (elt new-npatch index) iteration 2))
       new-npatch)))
 
-;; (defparameter *g2* (g0-g1-g2-and-fair-npatch *five* *faired-npatch*))
+;; (defparameter *g2* (g0-g1-g2-and-fair-npatch *five* *refit* 1.0d-4 :iteration 0 :zap-p nil))
