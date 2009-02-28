@@ -31,7 +31,7 @@
     (dotimes (i k)
       (setf (elt new-knots i) (+ lower (- upper (elt knots (- k i 1))))))
     (dotimes (i n)
-      (setf (aref new-points i) (aref points (- n i 1))))
+      (setf (aref new-points i) (copy-list (aref points (- n i 1)))))
     (make-bspline-curve (degree curve) new-knots new-points)))
 
 (defun bsc-shift-parameterization (curve shift)
@@ -51,7 +51,7 @@
 	   (new-net (make-array (list m n))))
       (dotimes (i n)
 	(dotimes (j m)
-	  (setf (aref new-net j i) (aref net i j))))
+	  (setf (aref new-net j i) (copy-list (aref net i j)))))
       (make-bspline-surface (reverse degrees) (reverse knots) new-net))))
 
 (defun bss-reverse-parameterization (surface &key u v)
@@ -81,7 +81,7 @@
       (dotimes (i n)
 	(dotimes (j m)
 	  (setf (aref new-net i j)
-		(aref net (if u (- n i 1) i) (if v (- m j 1) j)))))
+		(copy-list (aref net (if u (- n i 1) i) (if v (- m j 1) j))))))
       (make-bspline-surface (copy-list degrees) new-knots new-net))))
 
 (defun bss-shift-parameterization (surface &key (u 0.0) (v 0.0))
