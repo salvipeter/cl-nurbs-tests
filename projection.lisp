@@ -37,8 +37,8 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 			cosine-tolerance)
 		    (and last
 			 (<= (vlength (v* d (- u last))) distance-tolerance)))
-	    (leave u))
-	  (finally (return u)))))
+	    (leave (values u (vlength deviation))))
+	  (finally (return (values u (vlength deviation)))))))
 
 (defun bss-projection-starting-value (surface point res)
   (iter (with lower = (bss-lower-parameter surface))
@@ -105,5 +105,5 @@ are checked for a suitable initial value."
 			 (<= (+ (vlength (v* du (- (first uv) (first last))))
 				(vlength (v* dv (- (second uv) (second last)))))
 			     distance-tolerance)))
-	    (leave uv))
-	  (finally (return uv)))))
+	    (leave (values uv (vlength deviation))))
+	  (finally (return (values uv (vlength deviation)))))))
