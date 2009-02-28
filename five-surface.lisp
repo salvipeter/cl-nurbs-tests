@@ -153,15 +153,18 @@ negative, the the V-directional border line at Umax is left out."
 	(sf-destroy sf)
 	(dolist (array arrays) (foreign-free (third array)))))))
 
-(defun bss-resembling-fit (surface points tolerance &key knot-vector)
+(defun bss-resembling-fit (surface points tolerance &key
+			   knot-vector with-parameters optimize-parameters)
+  "POINTS can be a 2D array, parameterized uniformly, when WITH-PARAMETERS is NIL;
+or it can be an already parameterized list of points \(U1 V1 X1 Y1 Z1 U2 ...)."
   (let ((low (bss-lower-parameter surface))
 	(high (bss-upper-parameter surface)))
     (bss-fit-engine
      (degrees surface)
      (list (cons tolerance
-		 (uniform-parameter-points-2d points
-					      (first low) (first high)
-					      (second low) (second high))))
+		 (or (and with-parameters points)
+		     (uniform-parameter-points-2d points
+		      (first low) (first high) (second low) (second high)))))
      :number-of-control-points-u (unless knot-vector
 				   (array-dimension (control-net surface) 0))
      :number-of-control-points-v (unless knot-vector
@@ -169,7 +172,7 @@ negative, the the V-directional border line at Umax is left out."
      :knot-vector-u (and knot-vector (first (knot-vectors surface)))
      :knot-vector-v (and knot-vector (second (knot-vectors surface)))
      :smoothness-functional :smf-none
-     :optimize-parameters nil)))
+     :optimize-parameters optimize-parameters)))
 
 (defun create-patch (up vp uendp vendp)
   "Create a set of points at the meeting point of UP's u border and VP's v
