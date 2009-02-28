@@ -3,12 +3,12 @@
 (in-package :cl-nurbs-tests)
 
 (defun zap-to-curve (surface curve)
-  "Zaps the u=0 isocurve of SURFACE to CURVE."
+  "Zaps the lower u isocurve of SURFACE to CURVE."
   (let ((curve (bsc-reparameterize curve
 				  (second (bss-lower-parameter surface))
 				  (second (bss-upper-parameter surface))))
 	(surface (copy-bspline-surface surface)))
-    (iter (for i first 0 then (1+ i))
+    (iter (for i upfrom 0)
 	  (while (and (< i (length (knot-vector curve)))
 		      (< i (length (second (knot-vectors surface))))))
 	  (for curve-knot = (elt (knot-vector curve) i))
@@ -76,6 +76,81 @@
 			 (- (elt knots (+ i p 1)) (elt knots (1+ i))))
 		 (bspline-basis knots (1+ i) (1- p) u))))))
 
+(defun zap-surfaces (surface master &key &allow-other-keys)
+  "TODO: Works only at the lower U side of SURFACE."
+  (zap-to-curve surface
+		(bss-get-surface-curve
+		 master (first (bss-upper-parameter master))
+		 :u-curve nil)))
+
+(defun insert-some-knots (surface n &key u-dir)
+  "Inserts N knots into SURFACE at arbitrary places."
+  (flet ((ufirst (lst) (if u-dir (first lst) (second lst))))
+    (iter (repeat (1+ n))
+	  (for result first surface then
+	       (bss-insert-knot result place :u-direction u-dir))
+	  (for knots = (ufirst (knot-vectors result)))
+	  (for place =
+	       (iter (for i from 0 below (1- (length knots)))
+		     (for k1 = (elt knots i))
+		     (for k2 = (elt knots (1+ i)))
+		     (finding (interpolate k1 0.5d0 k2) maximizing (- k2 k1))))
+	  (finally (return result)))))
+
+(defun ensure-g0-one-side (surface master resolution &key u-dir endp)
+  (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
+	 (usecond (lst) (if u-dir (second lst) (first lst))))
+    (let ((missing-knots (- (length (usecond (knot-vectors master)))
+			    (length (usecond (knot-vectors surface))))))
+      (when (> missing-knots 0)
+	(setf surface (insert-some-knots surface missing-knots
+					 :u-dir (not u-dir)))))
+    (let* ((p (degrees surface))
+	   (knots (knot-vectors surface))
+	   (net (control-net surface))
+	   (n (1- (array-dimension net (if u-dir 0 1))))
+	   (m (1- (array-dimension net (if u-dir 1 0))))
+	   (u-low (ufirst (bss-lower-parameter surface)))
+	   (u-high (ufirst (bss-upper-parameter surface)))
+	   (v-low (usecond (bss-lower-parameter surface)))
+	   (v-high (usecond (bss-upper-parameter surface)))
+	   (u (if endp u-high u-low))
+	   (length-v (- v-high v-low))
+	   (index (if endp n 0))
+	   (base-u (bspline-basis (ufirst knots) index (ufirst p) u))
+	   (x (make-array (list (* resolution 3) (* (1+ m) 3))
+			  :initial-element 0.0d0))
+	   (y (make-array (list (* resolution 3) 1))))
+      (iter (for k from 0 below resolution)
+	    (for vk = (+ v-low (/ (* k length-v) (1- resolution))))
+	    (for uv = (if u-dir (list u vk) (list vk u)))
+	    (iter (for j from 0 to m)
+		  (for base-v = (bspline-basis (usecond knots) j
+					       (usecond p) vk))
+		  (for c = (* base-u base-v))
+		  (iter (for r from 0 below 3)
+			(setf (aref x (+ (* 3 k) r) (+ (* 3 j) r)) c)))
+	    (for v1 = (bss-evaluate master uv))
+	    (iter (for r from 0 below 3)
+		  (setf (aref y (+ (* 3 k) r) 0) (elt v1 r))))
+      (let ((solution (lu-solver:least-squares x y)))
+        (iter (for j from 0 to m)
+              (for i1 = (if u-dir index j))
+              (for i2 = (if u-dir j index))
+              (setf (aref net i1 i2)
+		    (list (elt solution (+ (* j 3) 0))
+			  (elt solution (+ (* j 3) 1))
+			  (elt solution (+ (* j 3) 2))))))))
+  surface)
+
+(defun ensure-g0-continuity (surface lsurface rsurface dsurface usurface res)
+  (let ((result (copy-bspline-surface surface)))
+    (ensure-g0-one-side result lsurface (second res) :u-dir t :endp nil)
+    (ensure-g0-one-side result rsurface (second res) :u-dir t :endp t)
+    (ensure-g0-one-side result dsurface (first res) :u-dir nil :endp nil)
+    (ensure-g0-one-side result usurface (first res) :u-dir nil :endp t)
+    result))
+
 (defun ensure-g1-one-side (surface master resolution &key u-dir endp)
   "Ensure destructively G1-connectivity with MASTER at one side of SURFACE.
 
@@ -125,7 +200,8 @@ The twist control points will not be moved."
                     (v+ (aref net i1 i2)
                         (list (elt solution (+ (* (- j 2) 3) 0))
                               (elt solution (+ (* (- j 2) 3) 1))
-                              (elt solution (+ (* (- j 2) 3) 2))))))))))
+                              (elt solution (+ (* (- j 2) 3) 2)))))))))
+  surface)
 
 (defun ensure-g1-continuity (surface lsurface rsurface dsurface usurface res)
   (let ((result (copy-bspline-surface surface)))
