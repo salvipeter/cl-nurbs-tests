@@ -137,12 +137,12 @@ they meet at U=1."
       (list (/ (reduce #'+
 		       (mapcar (lambda (x)
 				 (bsc-estimate-arc-length (get-curve x t)))
-			       (mapcar #'first (list low mid high))))
+			       (mapcar #'second (list low mid high))))
 	       3)
 	    (/ (reduce #'+
 		       (mapcar (lambda (x)
 				 (bsc-estimate-arc-length (get-curve x nil)))
-			       (mapcar #'second (list low mid high))))
+			       (mapcar #'first (list low mid high))))
 	       3)))))
 
 (defun proportional-resolution (lst size)
