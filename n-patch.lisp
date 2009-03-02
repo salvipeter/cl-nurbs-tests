@@ -519,10 +519,8 @@ or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
       (setf (elt result (elt (first indices) i)) (elt refitted i)))
     result))
 
-;; (defparameter *faired-npatch* (npatch-with-refitted *five* *refit*))
-
-(defun g0-g1-g2-and-fair-npatch (npatch refitted unification-tolerance &key
-				 (zap-p t) (resolution 100) (iteration 100))
+(defun g0-g1-g2-npatch (npatch refitted unification-tolerance &key
+				 (zap-p t) (resolution 100))
   (let ((indices (unified-indices npatch))
 	(new-npatch (npatch-with-refitted npatch refitted))
 	(*unification-tolerance* unification-tolerance))
@@ -550,8 +548,12 @@ or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
       (iter (for p1 first (car (last (first indices))) then p2)
 	    (for p2 in (first indices))
 	    (g2-and-reverse-if-needed p1 p2))
-      (iter (for index in (first indices))
-	    (g-fair-krr-additive (elt new-npatch index) iteration 2))
       new-npatch)))
 
-;; (defparameter *g2* (g0-g1-g2-and-fair-npatch *five* *refit* 1.0d-4 :iteration 0 :zap-p nil))
+(defun krr-fair-npatch (npatch &key (iteration 100))
+  (let ((indices (unified-indices npatch)))
+    (iter (for index in (first indices))
+	  (g-fair-krr-additive (elt npatch index) iteration 2))
+    npatch))
+
+;; (defparameter *g2* (g0-g1-g2-npatch *five* *refit* 1.0d-4))
