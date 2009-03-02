@@ -454,8 +454,7 @@ TODO: This should rely on the original parameters of the points and thus be very
 (defun npatch-refit (inner-npatch points &key retain-knot-vectors-p size
 		     (tolerance 1.0d-6) (iterations 20) (resolution '(10 10)))
   "Give SIZE [the parameter for KOBBELT-NPATCH] for the original parameters,
-or give ITERATIONS and RESOLUTION for Newton-Raphson projections.
-TODO: Boundaries should be interpolated with SF-SET-BOUNDARY."
+or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
   (iter (for patch in inner-npatch)
 	(for group in-vector
 	     (if size
@@ -471,6 +470,47 @@ TODO: Boundaries should be interpolated with SF-SET-BOUNDARY."
 		  :smoothness-functional :smf-none :optimize-parameters t))))
 
 ;; (defparameter *refit* (npatch-refit *inner* *points* :retain-knot-vectors-p t :size 10000 :tolerance 1.0d-4))
+
+(defun npatch-boundaries (patch npatch)
+  "Returns a list of pairs containing the boundary type \(e.g. :U-UPPER) and the curve.
+Only those boundaries are returned that are shared with an outer surface."
+  (let ((indices (second (unified-indices npatch)))
+	(i (position patch npatch :test #'eq)))
+    (dolist (j (mapcar #'first (remove i indices :key #'second :test-not #'=)))
+      (destructuring-bind (up endp reversep)
+	  (joining-side patch (elt npatch j))
+	(declare (ignore reversep))
+	(let* ((side (if endp
+			 (bss-upper-parameter patch)
+			 (bss-lower-parameter patch)))
+	       (uv (if up (second side) (first side))))
+	  (list (cond ((and up endp)       :u-upper)
+		      ((and up (not endp)) :u-lower)
+		      ((and (not up) endp) :v-upper)
+		      (t                   :v-lower))
+		(bss-get-surface-curve patch uv :u-curve up)))))))
+
+(defun npatch-refit-with-boundaries (npatch points &key retain-knot-vectors-p size
+		     (tolerance 1.0d-6) (iterations 20) (resolution '(10 10)))
+  "Give SIZE [the parameter for KOBBELT-NPATCH] for the original parameters,
+or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
+  (iter (with inner = (first (unify-npatch npatch)))
+	(for patch in inner)
+	(for group in-vector
+	     (if size
+		 (npatch-original-parameters inner points size)
+		 (parameterize-npatch-points inner points
+		  :iterations iterations :resolution resolution)))
+	(collect (bss-fit-engine
+		  (degrees patch) (list (cons tolerance group))
+		  :knot-vector-u (and retain-knot-vectors-p
+				      (first (knot-vectors patch)))
+		  :knot-vector-v (and retain-knot-vectors-p
+				      (second (knot-vectors patch)))
+		  :boundaries (npatch-boundaries patch npatch)
+		  :smoothness-functional :smf-none :optimize-parameters t))))
+
+;; (defparameter *refit* (npatch-refit-with-boundaries *five* *points* :retain-knot-vectors-p t :size 10000 :tolerance 1.0d-4))
 
 (defun npatch-with-refitted (npatch refitted)
   (let ((result (copy-list npatch))
