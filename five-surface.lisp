@@ -116,7 +116,7 @@ negative, the the V-directional border line at Umax is left out."
 
 (defun bss-fit-engine (degree point-group-list &key
 		       number-of-control-points-u number-of-control-points-v
-		       knot-vector-u knot-vector-v
+		       knot-vector-u knot-vector-v boundaries
 		       smoothness-functional optimize-parameters)
   (assert (not (or (and number-of-control-points-u knot-vector-u)
 		   (and number-of-control-points-v knot-vector-v))))
@@ -137,14 +137,23 @@ negative, the the V-directional border line at Umax is left out."
       (sf-set-nr-ctrl-points-v sf number-of-control-points-v))
     (sf-set-optimize-parameters sf optimize-parameters)
     (sf-set-smoothness-functional sf (or smoothness-functional :smf-none))
-    (flet ((set-sf-parameter (param-fn data)
-	     (when data
-	       (let ((size-of-data (length data))
-		     (data-array (sequence->double-array data)))
+    (labels ((seq-to-array (seq)
+	       (let ((size-of-data (length seq))
+		     (data-array (sequence->double-array seq)))
 		 (push (list nil size-of-data data-array) arrays)
-		 (funcall param-fn sf size-of-data data-array)))))
+		 (values data-array size-of-data)))
+	     (set-sf-parameter (param-fn data)
+	       (when data
+		 (multiple-value-bind (array size) (seq-to-array data)
+		   (funcall param-fn sf size array)))))
       (set-sf-parameter #'sf-set-knot-vector-u knot-vector-u)
-      (set-sf-parameter #'sf-set-knot-vector-v knot-vector-v))
+      (set-sf-parameter #'sf-set-knot-vector-v knot-vector-v)
+      (dolist (boundary boundaries)
+	(let ((curve (second boundary)))
+	  (multiple-value-bind (points nc)
+	      (seq-to-array (control-points curve))
+	    (sf-set-boundary sf (first boundary) (degree curve) nc
+			     (seq-to-array (knot-vector curve)) points nil)))))
     (unwind-protect
 	 (if (eql (sf-fit sf) :success)
 	     (bspline-surface-from-sf sf)
