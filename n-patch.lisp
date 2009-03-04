@@ -213,11 +213,37 @@ REVERSEP is T if the two patches have different directions at the joining side."
 					   *unification-tolerance*)))
 		      (length inner-npatch))))))
 
-(defun kobbelt-npatch (npatch size iteration &key vtk-file ply-file
+(defun sample-near-boundary-points (surface n &key u-dir endp reversep)
+  "Sample N points from the side of SURFACE defined by U-DIR and ENDP.
+The points are sampled so that with equally sampled boundary points it would
+create squares \(ie. the second triangle line). The order of the sampled points is
+the same as the non-U-DIR direction, or reversed, if REVERSEP is T.
+Note: U-DIR, ENDP and REVERSEP are usually taken from \(JOINING-SIDE SURFACE ...)."
+  (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
+	 (usecond (lst) (if u-dir (second lst) (first lst))))
+    (let* ((size (bss-approximate-size surface))
+	   (lower (bss-lower-parameter surface))
+	   (upper (bss-upper-parameter surface))
+	   (m (1+ (* (/ (usecond size) (ufirst size)) (1- n))))
+	   (v (interpolate (usecond lower)
+			   (if endp (/ (- m 2) (1- m)) (/ (1- m)))
+			   (usecond upper)))
+	   (result '()))
+      (iter (for i from 0 below n)
+	    (for u = (interpolate (ufirst lower) (/ i (1- n)) (ufirst upper)))
+	    (push (bss-evaluate surface (if u-dir (list u v) (list v u)))
+		  result))
+      (if reversep result (nreverse result)))))
+
+(defun kobbelt-npatch (npatch size iteration &key vtk-file ply-file wingsp
 		       (parameterization :projection))
   "SIZE is the approximate number of data points, which is divided between
-the surfaces proportionally to their respective (approximate) area."
-  (let* ((inner (first (unify-npatch npatch)))
+the surfaces proportionally to their respective (approximate) area.
+When WINGSP is T, one additional row of triangles is added from the external surfaces."
+  (let* ((unified (unify-npatch npatch))
+	 (inner (first unified))
+	 (wings (second unified))
+	 (wing-sides (make-array (length wings)))
 	 (resolutions (proportional-resolution inner size))
 	 (sizes (mapcar (lambda (x) (reduce #'* x)) resolutions))
 	 (obj (kobbelt:initialize (reduce #'+ sizes)))
@@ -279,22 +305,29 @@ the surfaces proportionally to their respective (approximate) area."
 			    (t (let ((p (bss-evaluate patch (list u v))))
 				 (setf (aref points ui vi)
 				       (kobbelt:insert-point obj p)))))))
-	  (unless (= i (1- n))
-	    (flet ((accumulate-from-patch (patch-index)
-		     (iter (with (up endp revp) =
-				 (joining-side patch (elt inner patch-index)))
-			   (declare (ignore revp))
-			   (for ui from 0 below (if up width height))
-			   (with vi = (cond ((not endp) 0)
-					    (up (1- height))
-					    (t (1- width))))
-			   (collect (if up
-					(aref points ui vi)
-					(aref points vi ui))))))
+	  (flet ((accumulate-from-patch (other-patch)
+		   (iter (with (up endp revp) =
+			       (joining-side patch other-patch))
+			 (declare (ignore revp))
+			 (for ui from 0 below (if up width height))
+			 (with vi = (cond ((not endp) 0)
+					  (up (1- height))
+					  (t (1- width))))
+			 (collect (if up
+				      (aref points ui vi)
+				      (aref points vi ui))))))
+	    (unless (= i (1- n))
 	      ;; saving the side that meets with the next patch
-	      (for side = (accumulate-from-patch (1+ i)))
+	      (for side = (accumulate-from-patch (elt inner (1+ i))))
 	      ;; saving the side of the first patch that meets with the last
-	      (when (= i 0) (setf first-side (accumulate-from-patch (1- n))))))
+	      (when (= i 0)
+		(setf first-side (accumulate-from-patch (elt inner (1- n))))))
+	    (when wingsp
+	      (iter (for (wing inner-patch) in wings)
+		    (for wi upfrom 0)
+		    (when (eq inner-patch patch)
+		      (setf (elt wing-sides wi)
+			    (accumulate-from-patch wing))))))
 	  ;; set up the triangles
 	  (flet ((p (i j) (aref points i j)))
 	    (dotimes (i (1- width))
@@ -303,6 +336,25 @@ the surfaces proportionally to their respective (approximate) area."
 				      (p (1+ i) j) (p (1+ i) (1+ j)))
 		(kobbelt:set-triangle obj (p i j)
 				      (p (1+ i) (1+ j)) (p i (1+ j)))))))
+    (when wingsp
+      (format *error-output* "Inserting wings...~%")
+      (iter (for (wing inner-patch) in wings)
+	    (for side in-vector wing-sides)
+	    (for wing-points =
+		 (destructuring-bind (up endp reversep)
+		     (joining-side wing inner-patch)
+		   (sample-near-boundary-points wing (length side)
+						:u-dir up :endp endp
+						:reversep reversep)))
+	    (for wing-indices =
+		 (iter (for p in wing-points)
+		       (collect (kobbelt:insert-point obj p))))
+	    (iter (for last-i1 first (first side) then i1)
+		  (for last-i2 first (first wing-indices) then i2)
+		  (for i1 in (rest side))
+		  (for i2 in (rest wing-indices))
+		  (kobbelt:set-triangle obj last-i1 last-i2 i2)
+		  (kobbelt:set-triangle obj last-i1 i1 i2))))
     (format *error-output* "Fairing...~%")
     (kobbelt:fair obj iteration
 		  :parameterization parameterization
