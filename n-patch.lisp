@@ -571,20 +571,25 @@ or give ITERATIONS and RESOLUTION for Newton-Raphson projections."
       (setf (elt result (elt (first indices) i)) (elt refitted i)))
     result))
 
-(defun g0-g1-g2-npatch (npatch refitted unification-tolerance &key
-				 (zap-p t) (resolution 100))
+(defun g0-g1-g2-npatch (npatch refitted &key g0p g1p g2p (resolution 100)
+				 (zap-p t) (unification-tolerance 1.0d-4))
   (let ((indices (unified-indices npatch))
-	(new-npatch (npatch-with-refitted npatch refitted))
-	(*unification-tolerance* unification-tolerance))
+	(new-npatch (npatch-with-refitted npatch refitted)))
     (flet ((g2-and-reverse-if-needed (p1 p2)
 	     (destructuring-bind (master slave)
 		 (unify-pair (elt new-npatch p1) (elt new-npatch p2)) 
-	       (let* ((g0 (if zap-p
-			      (zap-surfaces slave master)
-			      (ensure-g0-one-side slave master resolution
-						  :u-dir t)))
-		      (g1 (ensure-g1-one-side g0 master resolution :u-dir t))
-		      (g2 (ensure-g2-one-side g1 master resolution :u-dir t))
+	       (let* ((g0 (let ((*unification-tolerance* unification-tolerance))
+			    (cond ((not g0p) slave)
+				  (zap-p (zap-surfaces slave master))
+				  (t (ensure-g0-one-side slave master
+							 resolution
+							 :u-dir t)))))
+		      (g1 (if g1p
+			      (ensure-g1-one-side g0 master resolution :u-dir t)
+			      g0))
+		      (g2 (if g2p
+			      (ensure-g2-one-side g1 master resolution :u-dir t)
+			      g1))
 		      (low (bss-lower-parameter (elt new-npatch p2)))
 		      (high (bss-upper-parameter (elt new-npatch p2)))
 		      (middle (affine-combine low 1/2 high)))
