@@ -84,7 +84,8 @@
      (cross-product (v- (aref net (1+ i) j) (aref net (1- i) j))
 		    (v- (aref net i (1+ j)) (aref net i (1- j)))))))
 
-(defun ensure-g2-one-side (surface master resolution &key u-dir endp)
+;;; Uses the control-net-based outward direction
+(defun ensure-g2-one-side-fixed-dir (surface master resolution &key u-dir endp)
   "Ensure destructively G2-connectivity with MASTER at one side of SURFACE.
 
 RESOLUTION gives the size of the LSQ-matrix used in the minimization.
@@ -139,12 +140,86 @@ The twist control points will not be moved."
 			(v* normal (elt solution (- j 3)))))))))
   surface)
 
-(defun ensure-g2-continuity (surface lsurface rsurface dsurface usurface res)
+;;; Minimizes the deviation from the original.
+(defun ensure-g2-one-side-min-dev (surface master resolution &key u-dir endp)
+  "Ensure destructively G2-connectivity with MASTER at one side of SURFACE.
+
+RESOLUTION gives the size of the LSQ-matrix used in the minimization.
+The twist control points will not be moved."
+  (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
+	 (usecond (lst) (if u-dir (second lst) (first lst))))
+    (let* ((udegree (ufirst (degrees surface)))
+	   (vdegree (usecond (degrees surface)))
+	   (uknots (ufirst (knot-vectors surface)))
+	   (vknots (usecond (knot-vectors surface)))
+	   (net (control-net surface))
+	   (n (1- (array-dimension net (if u-dir 0 1))))
+	   (m (1- (array-dimension net (if u-dir 1 0))))
+	   (u-low (ufirst (bss-lower-parameter surface)))
+	   (u-high (ufirst (bss-upper-parameter surface)))
+	   (v-low (usecond (bss-lower-parameter surface)))
+	   (v-high (usecond (bss-upper-parameter surface)))
+	   (u (if endp u-high u-low))
+	   (length-v (- v-high v-low))
+	   (index (if endp (- n 2) 2))
+	   (x (make-array (list (* 3 (- resolution 2)) (* 3 (- m 5)))
+			  :initial-element 0.0d0))
+	   (y (make-array (list (* 3 (- resolution 2)) 1))))
+      (iter (for k from 1 below (1- resolution))
+	    (for vk = (+ v-low (/ (* k length-v) (1- resolution))))
+	    (for uv = (if u-dir (list u vk) (list vk u)))
+	    (for d1 = (bss-evaluate surface uv
+				    :derivative (if u-dir '(1 0) '(0 1))))
+	    (for d1-square = (scalar-product d1 d1))
+	    (for k-master = (normal-curvature master uv d1))
+	    (for k-surface = (normal-curvature surface uv d1))
+	    (for normal = (bss-surface-normal surface uv))
+	    (iter (for j from 0 to (- m 6))
+		  (iter (for s from 0 below 3)
+			(setf (aref x (+ (* 3 (1- k)) s) (+ (* 3 j) s))
+			      (bspline-basis vknots (+ j 3) vdegree vk))))
+	    (for right-side =
+		 (v* normal
+		     (/ (* (- k-master k-surface) d1-square
+			   (- (elt uknots (+ udegree 1)) (elt uknots 2))
+			   (- (elt uknots (+ udegree 2)) (elt uknots 2)))
+			(* udegree (1- udegree)))))
+	    (iter (for s from 0 below 3)
+		  (setf (aref y (+ (* 3 (1- k)) s) 0)
+			(elt right-side s))))
+      (let ((solution (lu-solver:least-squares x y)))
+        (iter (for j from 3 to (- m 3))
+              (for i1 = (if u-dir index j))
+              (for i2 = (if u-dir j index))
+	      (for normal = (control-normal surface i1 i2))
+              (setf (aref net i1 i2)
+		    (v+ (aref net i1 i2)
+			(list (elt solution (+ (* 3 (- j 3)) 0))
+			      (elt solution (+ (* 3 (- j 3)) 1))
+			      (elt solution (+ (* 3 (- j 3)) 2)))))))))
+  surface)
+
+(defun ensure-g2-one-side (surface master resolution &key u-dir endp
+			   (algorithm 'minimal-deviation))
+  (ecase algorithm
+    (minimal-deviation
+     (ensure-g2-one-side-min-dev surface master resolution
+				 :u-dir u-dir :endp endp))
+    (fixed-direction
+     (ensure-g2-one-side-fixed-dir surface master resolution
+				   :u-dir u-dir :endp endp))))
+
+(defun ensure-g2-continuity (surface lsurface rsurface dsurface usurface res
+			     &key (algorithm 'minimal-deviation))
   (let ((result (copy-bspline-surface surface)))
-    (ensure-g2-one-side result lsurface (second res) :u-dir t :endp nil)
-    (ensure-g2-one-side result rsurface (second res) :u-dir t :endp t)
-    (ensure-g2-one-side result dsurface (first res) :u-dir nil :endp nil)
-    (ensure-g2-one-side result usurface (first res) :u-dir nil :endp t)
+    (ensure-g2-one-side result lsurface (second res)
+			:u-dir t :endp nil :algorithm algorithm)
+    (ensure-g2-one-side result rsurface (second res)
+			:u-dir t :endp t :algorithm algorithm)
+    (ensure-g2-one-side result dsurface (first res)
+			:u-dir nil :endp nil :algorithm algorithm)
+    (ensure-g2-one-side result usurface (first res)
+			:u-dir nil :endp t :algorithm algorithm)
     result))
 
 ;;; Pl:
