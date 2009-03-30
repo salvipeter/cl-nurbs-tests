@@ -34,7 +34,8 @@
   (sample-surface (g-fair-krr-additive (first xnode) iteration) resolution))
 
 (defun fair-g2-halved (node &key (halving 'inner)
-		       (resolution '(100 100)) (iteration 100))
+		       (resolution '(100 100)) (iteration 100)
+		       (algorithm 'minimal-deviation))
   (let ((fn (ecase halving
 	      (none #'identity)
 	      (end #'halve-end-intervals)
@@ -42,5 +43,5 @@
 	      (all #'halve-all-intervals))))
     (g-fair-krr-additive
      (apply #'ensure-g2-continuity (funcall fn (first node))
-	    (append (rest node) (list resolution)))
+	    (append (rest node) (list resolution :algorithm algorithm)))
      iteration 2)))
