@@ -21,7 +21,7 @@
 	(dotimes (j (1- resolution))
 	  (set-triangle obj (tr i j) (tr (1+ i) j) (tr (1+ i) (1+ j)))
 	  (set-triangle obj (tr i j) (tr (1+ i) (1+ j)) (tr i (1+ j))))))
-    (fair obj iteration :parameterization (if projectionp 'projection 'polar))
+    (fair obj iteration :parameterization (if projectionp :projection :polar))
     (with-open-file (s filename :direction :output :if-exists :supersede)
       (format s "~d ~d~%" resolution resolution)
       (iter (for i from 0 below (size obj))

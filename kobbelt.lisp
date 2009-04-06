@@ -18,7 +18,7 @@
 
 (defpackage :kobbelt
   (:use :common-lisp :iterate :cl-nurbs)
-  (:export :initialize :insert-point :set-triangle :fair
+  (:export :initialize :insert-point :set-triangle :fair :get-point
 	   :write-vtk-mesh :write-ply-mesh))
 
 (in-package :kobbelt)
@@ -301,6 +301,10 @@
 					  (< i (second indices)))
 				 (list (cons i indices)))))
 			   (neighborhood-triangles (elt (points obj) i))))))
+
+(defun get-point (obj index)
+  (point-coordinates (elt (points obj) index)))
+(declaim (inline get-point))
 
 (defun write-vtk-mesh (obj filename)
   (let ((triangles (generate-triangle-list obj))

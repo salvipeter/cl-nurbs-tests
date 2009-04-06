@@ -85,11 +85,12 @@
 		    (v- (aref net i (1+ j)) (aref net i (1- j)))))))
 
 ;;; Uses the control-net-based outward direction
-(defun ensure-g2-one-side-fixed-dir (surface master resolution &key u-dir endp)
+(defun ensure-g2-one-side-fixed-dir (surface master resolution &key u-dir endp
+				     move-twists)
   "Ensure destructively G2-connectivity with MASTER at one side of SURFACE.
 
 RESOLUTION gives the size of the LSQ-matrix used in the minimization.
-The twist control points will not be moved."
+The twist control points will not be moved, unless MOVE-TWISTS is T."
   (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
 	 (usecond (lst) (if u-dir (second lst) (first lst))))
     (let* ((udegree (ufirst (degrees surface)))
@@ -106,7 +107,9 @@ The twist control points will not be moved."
 	   (u (if endp u-high u-low))
 	   (length-v (- v-high v-low))
 	   (index (if endp (- n 2) 2))
-	   (x (make-array (list (- resolution 2) (- m 5))))
+	   (movable (if move-twists (- m 3) (- m 5)))
+	   (first-movable (if move-twists 2 3))
+	   (x (make-array (list (- resolution 2) movable)))
 	   (y (make-array (list (- resolution 2) 1))))
       (iter (for k from 1 below (1- resolution))
 	    (for vk = (+ v-low (/ (* k length-v) (1- resolution))))
@@ -117,13 +120,15 @@ The twist control points will not be moved."
 	    (for k-master = (normal-curvature master uv d1))
 	    (for k-surface = (normal-curvature surface uv d1))
 	    (for normal = (bss-surface-normal surface uv))
-	    (iter (for j from 0 to (- m 6))
+	    (iter (for j from 0 below movable)
 		  (setf (aref x (1- k) j)
-			(* (bspline-basis vknots (+ j 3) vdegree vk)
+			(* (bspline-basis vknots (+ j first-movable) vdegree vk)
 			   (scalar-product
 			      (if u-dir
-				  (control-normal surface index (+ j 3))
-				  (control-normal surface (+ j 3) index))
+				  (control-normal surface index
+						  (+ j first-movable))
+				  (control-normal surface (+ j first-movable)
+						  index))
 			      normal))))
 	    (setf (aref y (1- k) 0)
 		  (/ (* (- k-master k-surface) d1-square
@@ -131,21 +136,22 @@ The twist control points will not be moved."
 			(- (elt uknots (+ udegree 2)) (elt uknots 2)))
 		     (* udegree (1- udegree)))))
       (let ((solution (lu-solver:least-squares x y)))
-        (iter (for j from 3 to (- m 3))
-              (for i1 = (if u-dir index j))
-              (for i2 = (if u-dir j index))
+        (iter (for j from 0 below movable)
+              (for i1 = (if u-dir index (+ j first-movable)))
+              (for i2 = (if u-dir (+ j first-movable) index))
 	      (for normal = (control-normal surface i1 i2))
               (setf (aref net i1 i2)
 		    (v+ (aref net i1 i2)
-			(v* normal (elt solution (- j 3)))))))))
+			(v* normal (elt solution j))))))))
   surface)
 
 ;;; Minimizes the deviation from the original.
-(defun ensure-g2-one-side-min-dev (surface master resolution &key u-dir endp)
+(defun ensure-g2-one-side-min-dev (surface master resolution &key u-dir endp
+				   move-twists)
   "Ensure destructively G2-connectivity with MASTER at one side of SURFACE.
 
 RESOLUTION gives the size of the LSQ-matrix used in the minimization.
-The twist control points will not be moved."
+The twist control points will not be moved, unless MOVE-TWISTS is T."
   (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
 	 (usecond (lst) (if u-dir (second lst) (first lst))))
     (let* ((udegree (ufirst (degrees surface)))
@@ -162,7 +168,9 @@ The twist control points will not be moved."
 	   (u (if endp u-high u-low))
 	   (length-v (- v-high v-low))
 	   (index (if endp (- n 2) 2))
-	   (x (make-array (list (* 3 (- resolution 2)) (* 3 (- m 5)))
+	   (movable (if move-twists (- m 3) (- m 5)))
+	   (first-movable (if move-twists 2 3))
+	   (x (make-array (list (* 3 (- resolution 2)) (* 3 movable))
 			  :initial-element 0.0d0))
 	   (y (make-array (list (* 3 (- resolution 2)) 1))))
       (iter (for k from 1 below (1- resolution))
@@ -174,10 +182,11 @@ The twist control points will not be moved."
 	    (for k-master = (normal-curvature master uv d1))
 	    (for k-surface = (normal-curvature surface uv d1))
 	    (for normal = (bss-surface-normal surface uv))
-	    (iter (for j from 0 to (- m 6))
+	    (iter (for j from 0 below movable)
 		  (iter (for s from 0 below 3)
 			(setf (aref x (+ (* 3 (1- k)) s) (+ (* 3 j) s))
-			      (bspline-basis vknots (+ j 3) vdegree vk))))
+			      (bspline-basis vknots (+ j first-movable)
+					     vdegree vk))))
 	    (for right-side =
 		 (v* normal
 		     (/ (* (- k-master k-surface) d1-square
@@ -188,26 +197,28 @@ The twist control points will not be moved."
 		  (setf (aref y (+ (* 3 (1- k)) s) 0)
 			(elt right-side s))))
       (let ((solution (lu-solver:least-squares x y)))
-        (iter (for j from 3 to (- m 3))
-              (for i1 = (if u-dir index j))
-              (for i2 = (if u-dir j index))
+        (iter (for j from 0 below movable)
+              (for i1 = (if u-dir index (+ j first-movable)))
+              (for i2 = (if u-dir (+ j first-movable) index))
 	      (for normal = (control-normal surface i1 i2))
               (setf (aref net i1 i2)
 		    (v+ (aref net i1 i2)
-			(list (elt solution (+ (* 3 (- j 3)) 0))
-			      (elt solution (+ (* 3 (- j 3)) 1))
-			      (elt solution (+ (* 3 (- j 3)) 2)))))))))
+			(list (elt solution (+ (* 3 j) 0))
+			      (elt solution (+ (* 3 j) 1))
+			      (elt solution (+ (* 3 j) 2)))))))))
   surface)
 
-(defun ensure-g2-one-side (surface master resolution &key u-dir endp
+(defun ensure-g2-one-side (surface master resolution &key u-dir endp move-twists
 			   (algorithm 'minimal-deviation))
   (ecase algorithm
     (minimal-deviation
      (ensure-g2-one-side-min-dev surface master resolution
-				 :u-dir u-dir :endp endp))
+				 :u-dir u-dir :endp endp
+				 :move-twists move-twists))
     (fixed-direction
      (ensure-g2-one-side-fixed-dir surface master resolution
-				   :u-dir u-dir :endp endp))))
+				   :u-dir u-dir :endp endp
+				   :move-twists move-twists))))
 
 (defun ensure-g2-continuity (surface lsurface rsurface dsurface usurface res
 			     &key (algorithm 'minimal-deviation))

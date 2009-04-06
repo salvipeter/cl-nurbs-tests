@@ -33,6 +33,9 @@
 						  "projection"
 						  "closest-point"
 						  "fair-surface-from-corners"))
+	       (:file "kobbelt-fairing" :depends-on ("kobbelt" "five-surface"))
 	       (:file "five-surface-iterative"
 		      :depends-on ("geomagic-formats"))
+	       (:file "edge-blend-fairing"
+		      :depends-on ("g-krr" "kobbelt" "five-surface"))
 	       (:file "n-patch" :depends-on ("g-krr" "kobbelt"))))

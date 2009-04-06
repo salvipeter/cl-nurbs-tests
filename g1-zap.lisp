@@ -151,11 +151,12 @@
     (ensure-g0-one-side result usurface (first res) :u-dir nil :endp t)
     result))
 
-(defun ensure-g1-one-side (surface master resolution &key u-dir endp)
+(defun ensure-g1-one-side (surface master resolution &key u-dir endp
+			   move-twists)
   "Ensure destructively G1-connectivity with MASTER at one side of SURFACE.
 
 RESOLUTION gives the size of the LSQ-matrix used in the minimization.
-The twist control points will not be moved."
+The twist control points will not be moved, unless MOVE-TWISTS is T."
   (flet ((ufirst (lst) (if u-dir (first lst) (second lst)))
 	 (usecond (lst) (if u-dir (second lst) (first lst))))
     (let* ((p (degrees surface))
@@ -172,17 +173,20 @@ The twist control points will not be moved."
 	   (index (if endp (1- n) 1))
 	   (dbase (bspline-basis (ufirst knots) index (ufirst p) u
 				 :derivative 1))
-	   (x (make-array (list (* (- resolution 2) 3) (* (- m 3) 3))))
+	   (movable (if move-twists (- m 1) (- m 3)))
+	   (first-movable (if move-twists 1 2))
+	   (x (make-array (list (* (- resolution 2) 3) (* movable 3))))
 	   (y (make-array (list (* (- resolution 2) 3) 1))))
       (iter (for k from 1 below (1- resolution))
 	    (for vk = (+ v-low (/ (* k length-v) (1- resolution))))
 	    (for uv = (if u-dir (list u vk) (list vk u)))
 	    (for n = (bss-surface-normal master uv))
-	    (for c = (iter (for j from 2 to (- m 2))
-			   (for base-v = (bspline-basis (usecond knots) j
+	    (for c = (iter (for j from 0 below movable)
+			   (for base-v = (bspline-basis (usecond knots)
+							(+ j first-movable)
 							(usecond p) vk))
 			   (collect (* dbase base-v))))
-	    (iter (for j from 0 to (- m 4))
+	    (iter (for j from 0 below movable)
 		  (iter (for r from 0 below 3)
 			(iter (for s from 0 below 3)
 			      (setf (aref x (+ (* 3 (1- k)) r) (+ (* 3 j) s))
@@ -193,14 +197,14 @@ The twist control points will not be moved."
 	    (iter (for r from 0 below 3)
 		  (setf (aref y (+ (* 3 (1- k)) r) 0) (elt right-side r))))
       (let ((solution (lu-solver:least-squares x y)))
-        (iter (for j from 2 to (- m 2))
-              (for i1 = (if u-dir index j))
-              (for i2 = (if u-dir j index))
+        (iter (for j from 0 below movable)
+              (for i1 = (if u-dir index (+ j first-movable)))
+              (for i2 = (if u-dir (+ j first-movable) index))
               (setf (aref net i1 i2)
                     (v+ (aref net i1 i2)
-                        (list (elt solution (+ (* (- j 2) 3) 0))
-                              (elt solution (+ (* (- j 2) 3) 1))
-                              (elt solution (+ (* (- j 2) 3) 2)))))))))
+                        (list (elt solution (+ (* j 3) 0))
+                              (elt solution (+ (* j 3) 1))
+                              (elt solution (+ (* j 3) 2)))))))))
   surface)
 
 (defun ensure-g1-continuity (surface lsurface rsurface dsurface usurface res)
