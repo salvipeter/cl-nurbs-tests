@@ -70,7 +70,7 @@
 	 (M (scalar-product normal der-11))
 	 (N (scalar-product normal der-12)))
     (destructuring-bind (du dv) (in-system der-00 der-01 direction)
-      (if (= du 0)
+      (if (< du dv)
 	  (let ((x (/ du dv)))
 	    (/ (+ (* L x x) (* 2 M x) N)
 	       (+ (* E x x) (* 2 F x) G)))
