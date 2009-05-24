@@ -25,7 +25,7 @@
 	       (angle (v1 v2)
 		 (let ((n1 (vnormalize v1))
 		       (n2 (vnormalize v2)))
-		   (* (acos (- (scalar-product n1 n2)))
+		   (* (acos (min (max (- (scalar-product n1 n2)) -1.0d0) 1.0d0))
 		      (let ((x (cross-product n1 n2)))
 			(if (> (scalar-product x (second plane)) 0) 1 -1)))))
 	       (error-fn (v)
