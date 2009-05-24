@@ -68,6 +68,100 @@
       (setf (elt cps i) (subseq (elt cps i) 0 2)))
     new-curve))
 
+;;; Using the notations of
+;;; S. Hahmann : Knot-Removal Surface Fairing using Search Strategies
+;;; Note that there is a misprint in the definition of alpha_r, it should be
+;;;            t_{j+1}   - t~_r
+;;; alpha_r = ----------------- .
+;;;           t~_{r+k-1} - t~_r
+(defun bsc-remove-and-reinsert-knot (curve knot &key (using :lsq))
+  "USING can be :LSQ or the index of the \(only) control point to change.
+In the first case, it returns all the control points,
+otherwise only the new coordinates of the specified one."
+  (let ((j (1- knot))
+	(k (1+ (degree curve)))
+	(dim (bsc-dimension curve))
+	(knots (knot-vector curve))
+	(points (control-points curve)))
+    (assert (or (eq using :lsq) (<= (- j k -2) using j)) (using)
+	    "USING should be :LSQ or between ~d and ~d" (- j k -2) j)
+    (assert (<= k knot (- (length knots) (max k 2) 1)) (knot)
+	    "KNOT should be between ~d and ~d"
+	    k (- (length knots) (max k 2) 1))
+    (labels ((u (r) (elt knots r))
+	     (u- (r) (if (<= r j) (u r) (u (1+ r))))
+	     (alpha (r) (safe-/ (- (u (1+ j)) (u- r))
+				(- (u- (+ r k -1)) (u- r)))))
+      (declare (inline u u-))
+      (let* ((rows (if (eq using :lsq) (- k 1) (- k 2)))
+	     (matrix (make-array (list (* rows dim) (* (- k 2) dim))
+				 :initial-element 0.0d0))
+	     (result (make-array (* rows dim))))
+	(iter (with real-row = 0)
+	      (for row upfrom 0)
+	      (for next upfrom (- j k -2))
+	      (while (< real-row rows))
+	      (when (or (eq using :lsq) (/= using next))
+		(unless (= row 0)
+		  (dotimes (d dim)
+		    (setf (aref matrix
+				(+ (* real-row dim) d) (+ (* (1- row) dim) d))
+			  (- 1.0d0 (alpha next)))))
+		(unless (= row (- k 2))
+		  (dotimes (d dim)
+		    (setf (aref matrix
+				(+ (* real-row dim) d) (+ (* row dim) d))
+			  (alpha next))))
+		(for p = (cond ((= row 0)
+				(v- (elt points next)
+				    (v* (elt points (1- next))
+					(- 1.0d0 (alpha next)))))
+			       ((= row (- k 2))
+				(v- (elt points next)
+				    (v* (elt points (1+ next))
+					(alpha next))))
+			       (t (elt points next))))
+		(dotimes (d dim)
+		  (setf (elt result (+ (* real-row dim) d))
+			(elt p d)))
+		(incf real-row)))
+	(flet ((combined (vec)
+		 (concatenate 'vector
+			      (list (elt points (- j k -1)))
+			      (iter (for i from 0 below (/ (length vec) dim))
+				    (collect
+					(iter (for d from 0 below dim)
+					      (collect
+						  (elt vec (+ (* i dim) d))))))
+			      (list (elt points (1+ j)))))
+	       (compute-point (vec index)
+		 (let ((v-index (- index (- j k -2))))
+		   (v+ (v* (elt vec v-index)
+			   (- 1.0d0 (alpha index)))
+		       (v* (elt vec (1+ v-index))
+			   (alpha index))))))
+	  (if (eq using :lsq)
+	      (let ((d (combined (lu-solver:least-squares
+				  matrix (matrix:from-vector result)))))
+		(concatenate 'list
+			     (iter (for i from 0 below (- j k -2))
+				   (collect (elt points i)))
+			     (iter (for i from (- j k -2) to j)
+				   (collect (compute-point d i)))
+			     (iter (for i from (1+ j) below (length points))
+				   (collect (elt points i)))))
+	      (let ((d (combined (lu-solver:solve matrix result))))
+		(compute-point d using))))))))
+
+(defun bsc-krr-better-positions (curve index)
+  "Computes better positions for the control point designated by INDEX.
+Returns a list of points, containing at most \(DEGREE CURVE) elements."
+  (let ((k (1+ (degree curve)))
+	(n (length (knot-vector curve))))
+    (iter (for knot from k to (- n (max k 2) 1))
+	  (when (< (- knot k) index knot)
+	    (collect (bsc-remove-and-reinsert-knot curve knot :using index))))))
+
 #+nil
 (defun test (lst)
   (let ((curve (copy-bspline-curve *curve*)))
