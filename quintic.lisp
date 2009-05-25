@@ -7,7 +7,8 @@
   (let ((len (scalar-product (v- (first plane) point) (second plane))))
     (v+ point (v* (second plane) len))))
 
-(defun bsc-ideal-control-point (curve i iteration &optional (alpha 1))
+(defun bsc-ideal-control-point (curve i &key (iteration 100) (alpha 1/2)
+				just-error-p)
   (flet ((knot (k) (elt (knot-vector curve) (+ k (degree curve))))
 	 (cpoint (k) (elt (control-points curve) k)))
     (let* ((u (knot i))
@@ -18,7 +19,8 @@
 	   (plane (list (affine-combine p1 1/2 r1) (cross-product d n)))
 	   (p2v (project-to-plane p2 plane)) (p1v (project-to-plane p1 plane))
 	   (qv (project-to-plane (cpoint i) plane))
-	   (r2v (project-to-plane r2 plane)) (r1v (project-to-plane r1 plane)))
+	   (r2v (project-to-plane r2 plane)) (r1v (project-to-plane r1 plane))
+	   (krr (bsc-krr-better-positions curve i)))
       (labels ((from-plane (v)
 		 (destructuring-bind (x y) v
 		   (v+ qv (v* n x) (v* d y))))
@@ -32,27 +34,55 @@
 		 (let* ((q (from-plane v))
 			(v-2 (v- p1v p2v)) (v-1 (v- q p1v))
 			(v+1 (v- r1v q)) (v+2 (v- r2v r1v))
-			(len-1 (- (vlength v-1) (vlength v-2)))
-			(len   (- (vlength v+1) (vlength v-1)))
-			(len+1 (- (vlength v+2) (vlength v+1)))
+			(len-1 (vlength v-1)) (len+1 (vlength v+1))
+			(len (interpolate len-1 1/2 len+1))
 			(ang-1 (angle v-2 v-1))
 			(ang   (angle v-1 v+1))
-			(ang+1 (angle v+1 v+2)))
-		   (+ (expt (- (interpolate ang-1 1/2 ang+1) ang) 2)
+			(ang+1 (angle v+1 v+2))
+			(delta (- (interpolate ang-1
+					       (/ len-1 (+ len-1 len+1))
+					       ang+1)
+				  ang)))
+		   (+ (* (- 1.0d0 alpha) (expt (* (/ delta pi) len) 2))
 		      (* alpha
-			 (+ (expt (- len len-1) 2)
-			    (expt (- len+1 len) 2)))))))
-	(from-plane (downhill-simplex:minimize #'error-fn '(0 0) iteration))))))
+			 (reduce #'min
+				 (mapcar (lambda (p) (vlength2 (v- p q)))
+					 krr)))))))
+	(if just-error-p
+	    (error-fn '(0 0))
+	    (from-plane
+	     (downhill-simplex:minimize #'error-fn '(0 0) iteration)))))))
 
 (defun limit-change (old new limit)
   "Moves OLD towards NEW by length LIMIT."
   (v+ old (v* (vnormalize (v- new old)) limit)))
 
-;;; TODO:
-;;; - egysegesiteni kell a hibafuggveny tagjait
-;;; - kene vmi "ertelmes" tag is (gorbulet?)
-;;; - mi alapjan valasztja ki a kovetkezo fairelendo kontrollpontot?
-;;; - mennyit mozgasson egyszerre? (user parameter?)
+(defun limit-deviation (origin radius old new)
+  "We want to move from OLD to NEW, but don't want to go out of the circle
+given by ORIGIN and RADIUS, so the vector is cut off at the intersection."
+  (if (< (point-distance origin new) radius)
+      new
+      (let ((a (v- old origin))
+	    (v (vnormalize (v- new old))))
+	(v+ old (v* v (- (sqrt (max 0 (+ (expt (scalar-product a v) 2)
+					 (- (vlength2 a)) (* radius radius))))
+			 (scalar-product a v)))))))
+
+(defun bsc-fair-control-point (curve i &key (iteration 100) (alpha 1/2)
+			       limit dev-origin dev-limit)
+  (let* ((limit (or limit
+		    (/ (bsc-estimate-arc-length curve)
+		       (* (length (control-points curve)) 30))))
+	 (dev-limit (or dev-limit (* limit 5)))
+	 (dev-origin (or dev-origin (elt (control-points curve) i))))
+    (setf (elt (control-points curve) i)
+	  (limit-deviation dev-origin dev-limit
+			   (elt (control-points curve) i)
+			   (limit-change (elt (control-points curve) i)
+					 (bsc-ideal-control-point
+					  curve i :iteration iteration
+					  :alpha alpha)
+					 limit)))))
 
 (defun bsc-2d-to-3d (curve)
   (let* ((new-curve (copy-bspline-curve curve))
@@ -67,6 +97,29 @@
     (dotimes (i (length cps))
       (setf (elt cps i) (subseq (elt cps i) 0 2)))
     new-curve))
+
+#+nil
+(defun test-to-file (curve n filename &key (remembering 3) alpha limit)
+  (let ((c (bsc-2d-to-3d (copy-bspline-curve curve)))
+	(k (- (length (control-points curve)) 2))
+	(last (iter (repeat remembering) (collect 0))))
+    (flet ((select-next ()
+	     (iter (for index from 2 below k)
+		   (unless (member index last)
+		     (for error =
+			  (bsc-ideal-control-point c index :alpha alpha
+						   :just-error-p t))
+		     (finding index maximizing error)))))
+      (iter (for i from 0 to n)
+	    (for fname = (format nil "~a-~2,'0d.ps" filename i))
+	    (write-ps (bsc-3d-to-2d c) fname 100 :show-knots-p t)
+	    (for next = (select-next))
+	    (setf last (cons next (butlast last)))
+	    (bsc-fair-control-point
+	     c next :alpha alpha :limit limit
+	     :dev-origin (append (elt (control-points curve) next) '(0)))))))
+
+;;; (test-to-file *curve* 50 "/tmp/test" :alpha 0.7)
 
 ;;; Using the notations of
 ;;; S. Hahmann : Knot-Removal Surface Fairing using Search Strategies
@@ -166,16 +219,9 @@ Returns a list of points, containing at most \(DEGREE CURVE) elements."
 (defun test (lst)
   (let ((curve (copy-bspline-curve *curve*)))
     (dolist (i lst)
-      (let ((ideal (bsc-ideal-control-point (bsc-2d-to-3d curve) i 100)))
+      (let ((ideal (bsc-ideal-control-point (bsc-2d-to-3d curve) i)))
 	(setf (elt (control-points curve) i) (subseq ideal 0 2))))
     (write-ps curve "/tmp/proba.ps" 100)))
-
-#+nil
-(defun test2 (n)
-  (let ((lst (iter (with len = (length (control-points *curve*)))
-		   (repeat n)
-		   (collect (+ 2 (random (- len 4)))))))
-    (test lst)))
 
 #+nil
 (defun bss-ideal-control-point (surface i j &key u-dir)
