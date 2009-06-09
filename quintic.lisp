@@ -117,7 +117,8 @@ given by ORIGIN and RADIUS, so the vector is cut off at the intersection."
 	    (setf last (cons next (butlast last)))
 	    (bsc-fair-control-point
 	     c next :alpha alpha :limit limit
-	     :dev-origin (append (elt (control-points curve) next) '(0)))))))
+	     :dev-origin (append (elt (control-points curve) next) '(0)))))
+    c))
 
 ;;; (test-to-file *curve* 50 "/tmp/test" :alpha 0.7)
 
@@ -223,6 +224,14 @@ Returns a list of points, containing at most \(DEGREE CURVE) elements."
 	(setf (elt (control-points curve) i) (subseq ideal 0 2))))
     (write-ps curve "/tmp/proba.ps" 100)))
 
-#+nil
-(defun bss-ideal-control-point (surface i j &key u-dir)
-  )
+(defun bss-ideal-control-point (surface i j &key (iteration 100) (alpha 1/2)
+				just-error-p)
+  (let* ((cu (bss-construction-curve surface j :u-direction t))
+	 (cv (bss-construction-curve surface i :u-direction nil))
+	 (pu (bsc-ideal-control-point cu i :iteration iteration :alpha alpha
+				      :just-error-p just-error-p))
+	 (pv (bsc-ideal-control-point cv j :iteration iteration :alpha alpha
+				      :just-error-p just-error-p)))
+    (if just-error-p
+	(interpolate pu 1/2 pv)
+	(affine-combine pu 1/2 pv))))
