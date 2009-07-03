@@ -21,7 +21,7 @@
       (dotimes (j 2)
 	(setf (aref fform1 i j)
 	      (scalar-product (funcall deriv-fn i) (funcall deriv-fn j)))))
-    (lu-solver:inverse fform1)))
+    (matrix:inverse-2x2 fform1)))
 
 (defun project-to-plane (point plane)
   "PLANE is represented by a list \(origin normal-vector)."
@@ -60,7 +60,7 @@
 	    (for hessian = (hessian (coordinate-function deriv-fn i)
 				    fform1-inverse deriv2-coeff))
 	    (sum (sqr (matrix:mtrace hessian)) into s1)
-	    (sum (lu-solver:determinant hessian) into s2)
+	    (sum (matrix:determinant-2x2 hessian) into s2)
 	    (sum (matrix:mtrace (matrix:multiplication hessian hessian))
 		 into s3)
 	    (finally (return (list s1 s2 s3)))))))
