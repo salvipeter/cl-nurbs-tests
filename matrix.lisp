@@ -5,7 +5,7 @@
 (defpackage :matrix
   (:use :common-lisp :iterate)
   (:export :transpose :multiplication :from-vector :to-vector
-	   :inverse-2x2 :inverse-3x3 :mtrace))
+	   :inverse-2x2 :inverse-3x3 :determinant-2x2 :determinant-3x3 :mtrace))
 
 (in-package :matrix)
 
@@ -77,6 +77,27 @@
       (store 2 1  t  2 1 0 0 2 0 0 1)
       (store 2 2 nil 1 1 0 0 1 0 0 1))
     result))
+
+(defun determinant-2x2 (m)
+  (let* ((a (aref m 0 0))
+	 (b (aref m 0 1))
+	 (c (aref m 1 0))
+	 (d (aref m 1 1)))
+    (- (* a d) (* b c))))
+
+(defun determinant-3x3 (m)
+  (macrolet ((elements (vars &body body)
+	       `(let ,(iter (with index = 0)
+			    (for i from 0 below 3)
+			    (appending
+			     (iter (for j from 0 below 3)
+				   (collect (list (elt vars index)
+						  `(aref m ,i ,j)))
+				   (incf index))))
+		  ,@body)))
+    (elements (a b c d e f g h i)
+      (- (+ (* a e i) (* b f g) (* c d h))
+	 (+ (* g e c) (* h f a) (* i d b))))))
 
 (defun mtrace (matrix)
   (iter (for i from 0 below (array-dimension matrix 0))
