@@ -4,7 +4,7 @@
 
 (defpackage :lu-solver
   (:use :common-lisp :iterate)
-  (:export :inverse :solve :least-squares :least-norm))
+  (:export :inverse :solve :least-squares :least-norm :determinant))
 
 (in-package :lu-solver)
 
@@ -125,3 +125,11 @@ and return X^T b."
   (let* ((xt (matrix:transpose x))
 	 (b (solve (matrix:multiplication x xt) (matrix:to-vector y))))
     (matrix:to-vector (matrix:multiplication xt (matrix:from-vector b)))))
+
+(defun determinant (matrix)
+  (multiple-value-bind (lu swaps)
+      (lu-decomposition matrix)
+    (iter (with result = (if (evenp (length swaps)) 1 -1))
+	  (for i from 0 below (array-dimension lu 0))
+	  (setf result (* result (aref lu i i)))
+	  (finally (return result)))))

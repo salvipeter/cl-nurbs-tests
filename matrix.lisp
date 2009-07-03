@@ -5,7 +5,7 @@
 (defpackage :matrix
   (:use :common-lisp :iterate)
   (:export :transpose :multiplication :from-vector :to-vector
-	   :inverse-2x2 :inverse-3x3))
+	   :inverse-2x2 :inverse-3x3 :mtrace))
 
 (in-package :matrix)
 
@@ -77,3 +77,7 @@
       (store 2 1  t  2 1 0 0 2 0 0 1)
       (store 2 2 nil 1 1 0 0 1 0 0 1))
     result))
+
+(defun mtrace (matrix)
+  (iter (for i from 0 below (array-dimension matrix 0))
+	(sum (aref matrix i i))))
