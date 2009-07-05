@@ -50,6 +50,14 @@
   (lambda (&rest args)
     (elt (apply fn args) i)))
 
+(defun bad-estimated-curvatures (surface uv)
+  (let ((duu (bss-evaluate surface uv :derivative '(2 0)))
+	(duv (bss-evaluate surface uv :derivative '(1 1)))
+	(dvv (bss-evaluate surface uv :derivative '(0 2))))
+    (list (vlength2 (v+ duu dvv))
+	  (- (scalar-product duu dvv) (vlength2 duv))
+	  (+ (vlength2 duu) (* 2 (vlength2 duv)) (vlength2 dvv)))))
+
 (defun estimated-curvatures (surface reference uv)
   (let* ((deriv-fn (derivative-function reference uv))
 	 (fform1-inverse (fform1-inverse deriv-fn))
@@ -70,8 +78,70 @@
       (bss-principal-curvatures surface uv)
     (list (* (+ k1 k2) (+ k1 k2)) (* k1 k2) (+ (* k1 k1) (* k2 k2)))))
 
-(defparameter *surface* (first (read-rbn "models/top.rbn")))
+(defparameter *surface* (first (read-rbn "models/bottom.rbn")))
+(defparameter *faired* (first (read-rbn "models/bottom-faired.rbn")))
+
+#+nil
 (let ((uv '(0.3d0 0.1d0)))
   (format t "~a~%~a~%"
 	  (precise-curvatures *surface* uv)
-	  (estimated-curvatures *surface* *surface* uv)))
+	  (estimated-curvatures *surface* *surface* uv)
+	  (bad-estimated-curvatures *surface* *surface* uv)))
+
+(defun write-curvatures (surface reference filename resolution)
+  (unless (listp resolution)
+    (setf resolution (list resolution resolution)))
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "# vtk DataFile Version 1.0~
+               ~%B-Spline Surface~
+               ~%ASCII~
+               ~%DATASET POLYDATA~%~
+               ~%POINTS ~d float~%" (* (first resolution) (second resolution)))
+    (let* ((lower (mapcar #'max (bss-lower-parameter surface)
+			  (bss-lower-parameter reference)))
+	   (upper (mapcar #'min (bss-upper-parameter surface)
+			  (bss-upper-parameter reference)))
+	   (u-res (first resolution))
+	   (v-res (second resolution))
+	   (curvatures nil))
+      (dotimes (j v-res)
+	(dotimes (i u-res)
+	  (let* ((uv (list (interpolate (first lower)
+					(/ i (1- u-res))
+					(first upper))
+			   (interpolate (second lower)
+					(/ j (1- v-res))
+					(second upper))))
+		 (p (bss-evaluate surface uv)))
+	    (format s "~{~f ~}~%" p)
+	    (push (append (precise-curvatures surface uv)
+			  (estimated-curvatures surface reference uv)
+			  (bad-estimated-curvatures surface uv))
+		  curvatures))))
+      (setf curvatures (nreverse curvatures))
+      (format s "~%POLYGONS ~d ~d~%"
+	      (* (1- u-res) (1- v-res)) (* (1- u-res) (1- v-res) 5))
+      (dotimes (j (1- v-res))
+	(dotimes (i (1- u-res))
+	  (format s "4 ~d ~d ~d ~d~%"
+		  (+ (* j u-res) i) (+ (* j u-res) i 1)
+		  (+ (* j u-res) i u-res 1) (+ (* j u-res) i u-res))))
+      (format s "~%POINT_DATA ~d~%" (* (first resolution) (second resolution)))
+      (flet ((write-scalars (index name)
+	       (format s "~%SCALARS ~a float 1~
+                          ~%LOOKUP_TABLE default~%"
+		       name)
+	       (loop for c in curvatures do
+		     (format s "~f~%" (elt c index)))))
+	(write-scalars 0 "(k1+k2)^2_precise")
+	(write-scalars 1 "k1*k2_precise")
+	(write-scalars 2 "k1^2+k2^2_precise")
+	(write-scalars 3 "(k1+k2)^2_estimation")
+	(write-scalars 4 "k1*k2_estimation")
+	(write-scalars 5 "k1^2+k2^2_estimation")
+	(write-scalars 6 "(k1+k2)^2_simple_estimation")
+	(write-scalars 7 "k1*k2_simple_estimation")
+	(write-scalars 8 "k1^2+k2^2_simple_estimation")))))
+
+;; (write-curvatures *faired* *surface* "/tmp/faired.vtk" 100)
+;;; scalar ranges: 0 - 3e-4; 0 - 5e-5; 0 - 1e-4
