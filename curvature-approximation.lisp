@@ -78,8 +78,8 @@
       (bss-principal-curvatures surface uv)
     (list (* (+ k1 k2) (+ k1 k2)) (* k1 k2) (+ (* k1 k1) (* k2 k2)))))
 
-(defparameter *surface* (first (read-rbn "models/bottom.rbn")))
-(defparameter *faired* (first (read-rbn "models/bottom-faired.rbn")))
+;; (defparameter *surface* (first (read-rbn "models/bottom.rbn")))
+;; (defparameter *faired* (first (read-rbn "models/bottom-faired.rbn")))
 
 #+nil
 (let ((uv '(0.3d0 0.1d0)))
