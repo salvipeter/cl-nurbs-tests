@@ -1,0 +1,10 @@
+syntax: glob
+
+*~
+.\#*
+*.o
+*.fasl
+curve-builder/bspline
+curve-builder/bspline-interpolation
+# Rule out directories
+*/*
