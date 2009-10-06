@@ -2,7 +2,7 @@
 // 
 // Peter Salvi, 2007
 // 
-// Time-stamp: <2009.06.08., 21:43:45 (salvi)>
+// Time-stamp: <2009.10.06., 11:26:12 (psalvi)>
 
 #include <algorithm>
 #include <cmath>
@@ -189,8 +189,16 @@ void display()
 void uniform_knots(int n)
 {
   knots.clear();
-  for(int i = 0; i < n; ++i)
-    knots.push_back((double)i / (double)(n - 1.0));
+  if(n < 2 * degree) {
+    for(int i = 0; i < n; ++i)
+      knots.push_back((double)i / (double)(n - 1.0));
+  } else {
+    knots.insert(knots.end(), degree, 0.0);
+    int k = n - 2 * degree;
+    for(int i = 0; i < k; ++i)
+      knots.push_back((double)i / (double)(k - 1.0));
+    knots.insert(knots.end(), degree, 1.0);
+  }
 }
 
 void reset()
