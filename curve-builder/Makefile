@@ -1,6 +1,14 @@
 all: bspline-interpolation bspline
 
-CXXFLAGS=-g
-LDFLAGS=-lglut
+FLAGS=-g
+ifeq ($(shell uname),Linux)
+	LIBS=-lglut
+else
+	LIBS=-lGL -lGLU -lglut
+endif
 
-bspline-interpolation: interpolate.o lu.o
+bspline-interpolation: bspline-interpolation.o interpolate.o lu.o
+	g++ $(FLAGS) -o $@ $^ $(LIBS)
+
+bspline: bspline.cc
+	g++ $(FLAGS) -o $@ $^ $(LIBS)
