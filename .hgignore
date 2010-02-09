@@ -4,6 +4,8 @@ syntax: glob
 .\#*
 *.o
 *.fasl
+*.fas
+*.lib
 curve-builder/bspline
 curve-builder/bspline-interpolation
 # Rule out directories
