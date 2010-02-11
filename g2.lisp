@@ -98,6 +98,7 @@ The twist control points will not be moved, unless MOVE-TWISTS is T."
 	   (vdegree (usecond (degrees surface)))
 	   (uknots (ufirst (knot-vectors surface)))
 	   (vknots (usecond (knot-vectors surface)))
+	   (uknots-length (length uknots))
 	   (net (control-net surface))
 	   (n (1- (array-dimension net (if u-dir 0 1))))
 	   (m (1- (array-dimension net (if u-dir 1 0))))
@@ -132,10 +133,14 @@ The twist control points will not be moved, unless MOVE-TWISTS is T."
 						  index))
 			      normal))))
 	    (setf (aref y (1- k) 0)
-		  (/ (* (- k-master k-surface) d1-square
-			(- (elt uknots (+ udegree 1)) (elt uknots 2))
-			(- (elt uknots (+ udegree 2)) (elt uknots 2)))
-		     (* udegree (1- udegree)))))
+		  (flet ((uknot (ui)
+			   (if endp
+			       (elt uknots (- uknots-length ui 1))
+			       (elt uknots ui))))
+		    (/ (* (- k-master k-surface) d1-square
+			  (- (uknot (+ udegree 1)) (uknot 2))
+			  (- (uknot (+ udegree 2)) (uknot 2)))
+		       (* udegree (1- udegree))))))
       (let ((solution (lu-solver:least-squares x y)))
         (iter (for j from 0 below movable)
               (for i1 = (if u-dir index (+ j first-movable)))
@@ -159,6 +164,7 @@ The twist control points will not be moved, unless MOVE-TWISTS is T."
 	   (vdegree (usecond (degrees surface)))
 	   (uknots (ufirst (knot-vectors surface)))
 	   (vknots (usecond (knot-vectors surface)))
+	   (uknots-length (length uknots))
 	   (net (control-net surface))
 	   (n (1- (array-dimension net (if u-dir 0 1))))
 	   (m (1- (array-dimension net (if u-dir 1 0))))
@@ -190,10 +196,14 @@ The twist control points will not be moved, unless MOVE-TWISTS is T."
 					     vdegree vk))))
 	    (for right-side =
 		 (v* normal
-		     (/ (* (- k-master k-surface) d1-square
-			   (- (elt uknots (+ udegree 1)) (elt uknots 2))
-			   (- (elt uknots (+ udegree 2)) (elt uknots 2)))
-			(* udegree (1- udegree)))))
+		     (flet ((uknot (ui)
+			      (if endp
+				  (elt uknots (- uknots-length ui 1))
+				  (elt uknots ui))))
+		       (/ (* (- k-master k-surface) d1-square
+			     (- (uknot (+ udegree 1)) (uknot 2))
+			     (- (uknot (+ udegree 2)) (uknot 2)))
+			  (* udegree (1- udegree))))))
 	    (iter (for s from 0 below 3)
 		  (setf (aref y (+ (* 3 (1- k)) s) 0)
 			(elt right-side s))))
