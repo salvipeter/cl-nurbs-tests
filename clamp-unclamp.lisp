@@ -1,0 +1,35 @@
+(in-package :cl-nurbs-tests)
+
+(defun unclamp (curve)
+  "As in the NURBS Book, pp. 577--578."
+  (let ((result (copy-bspline-curve curve)))
+    (with-accessors ((p degree) (U knot-vector) (Pw control-points)) result
+      (let ((n (1- (length Pw))))
+	(iter (for i from 0 below (1- p)) ; Left side
+	      (setf (elt U (- p i 1))
+		    (- (elt U (- p i)) (- (elt U (- n i -1)) (elt U (- n i)))))
+	      (iter (for j from i downto 0)
+		    (for k downfrom (1- p))
+		    (for alfa = (/ (- (elt U p) (elt U k))
+				   (- (elt U (+ p j 1)) (elt U k))))
+		    (setf (elt Pw j)
+			  (v* (v- (elt Pw j) (v* (elt Pw (1+ j)) alfa))
+			      (/ (- 1.0d0 alfa))))))
+	(setf (elt U 0)
+	      (- (elt U 1) (- (elt U (- n p -2)) (elt U (- n p -1)))))
+	(iter (for i from 0 below (1- p)) ; Right side
+	      (setf (elt U (+ n i 2))
+		    (+ (elt U (+ n i 1)) (- (elt U (+ p i 1)) (elt U (+ p i)))))
+	      (iter (for j from i downto 0)
+		    (for alfa = (/ (- (elt U (1+ n)) (elt U (- n j)))
+				   (- (elt U (+ (- n j) i 2)) (elt U (- n j)))))
+		    (setf (elt Pw (- n j))
+			  (v* (v- (elt Pw (- n j))
+				  (v* (elt Pw (- n j 1)) (- 1.0d0 alfa)))
+			      (/ alfa)))))
+	(setf (elt U (+ n p 1))
+	      (+ (elt U (+ n p)) (- (elt U (* 2 p)) (elt U (1- (* 2 p))))))))
+    result))
+
+(defun clamp (curve)
+  (bsc-subcurve curve (bsc-lower-parameter curve) (bsc-upper-parameter curve)))
