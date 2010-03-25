@@ -148,10 +148,11 @@
 	     (format stream "Unknown type id: ~a"
 		     (unknown-rdn-object-id condition)))))
 
+(defparameter *rdn-types* '((40 . bspline-curve) (50 . bspline-surface)))
+
 (defun read-rdn-stream (s)
   (flet ((dummy-read (length) (iter (repeat length) (read-byte s))))
-    (iter (with rdn-types = '((40 . bspline-curve) (50 . bspline-surface)))
-	  (for code = (handler-case (read-unsigned-integer s)
+    (iter (for code = (handler-case (read-unsigned-integer s)
 			(end-of-file () (finish))))
 	  (let ((info-length (read-unsigned-integer s)))
 	    (dummy-read info-length))
@@ -159,7 +160,7 @@
 	  (cond ((= code 2) (finish))	; EndGroup
 		((= code 1)		; BeginGroup
 		 (collect (read-rdn-stream s)))
-		(t (let ((type (cdr (assoc code rdn-types))))
+		(t (let ((type (cdr (assoc code *rdn-types*))))
 		     (restart-case (if type
 				       (collect (read-rdn-object type s))
 				       (error 'unknown-rdn-object :id code))
