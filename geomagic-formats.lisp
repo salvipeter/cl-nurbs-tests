@@ -142,20 +142,34 @@
 (defmethod read-rdn-object ((obj (eql 'bspline-surface)) s)
   (read-bss-stream s))
 
-(defun read-rdn-stream (s)
-  (iter (with rdn-types = '((40 . bspline-curve) (50 . bspline-surface)))
-	(for code = (handler-case (read-unsigned-integer s)
-		      (end-of-file () (finish))))
-	(let ((info-length (read-unsigned-integer s)))
-	  (iter (repeat info-length) (read-byte s)))
-	(read-unsigned-integer s)	; size
-	(cond ((= code 2) (finish))	; EndGroup
-	      ((= code 1)		; BeginGroup
-	       (collect (read-rdn-stream s)))
-	      (t (let ((type (cdr (assoc code rdn-types))))
-		   (assert type (type) "Unknown type: ~a" code)
-		   (collect (read-rdn-object type s)))))))
+(define-condition unknown-rdn-object (simple-error)
+  ((id :initarg :id :reader unknown-rdn-object-id))
+  (:report (lambda (condition stream)
+	     (format stream "Unknown type id: ~a"
+		     (unknown-rdn-object-id condition)))))
 
-(defun read-rdn (filename)
+(defun read-rdn-stream (s)
+  (flet ((dummy-read (length) (iter (repeat length) (read-byte s))))
+    (iter (with rdn-types = '((40 . bspline-curve) (50 . bspline-surface)))
+	  (for code = (handler-case (read-unsigned-integer s)
+			(end-of-file () (finish))))
+	  (let ((info-length (read-unsigned-integer s)))
+	    (dummy-read info-length))
+	  (for size = (read-unsigned-integer s))
+	  (cond ((= code 2) (finish))	; EndGroup
+		((= code 1)		; BeginGroup
+		 (collect (read-rdn-stream s)))
+		(t (let ((type (cdr (assoc code rdn-types))))
+		     (restart-case (if type
+				       (collect (read-rdn-object type s))
+				       (error 'unknown-rdn-object :id code))
+		       (skip () :report "Skip this object."
+			     (dummy-read size)))))))))
+
+(defun read-rdn (filename &optional skip-unknown-p)
   (with-open-file (s filename :element-type '(unsigned-byte 8))
-    (read-rdn-stream s)))
+    (handler-bind ((unknown-rdn-object
+		    (lambda (x)
+		      (when skip-unknown-p
+			(invoke-restart 'skip)))))
+      (read-rdn-stream s))))
