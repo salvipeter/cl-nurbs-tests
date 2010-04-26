@@ -19,6 +19,7 @@
 	       (:file "three-curve" :depends-on ("package"))
 	       (:file "three-curve-iterative" :depends-on ("three-curve"))
 	       (:file "geomagic-formats" :depends-on ("package"))
+	       (:file "stl-format" :depends-on ("geomagic-formats"))
 	       (:file "parameterization" :depends-on ("package"))
 	       (:file "file-preparation" :depends-on ("parameterization"))
 	       (:file "extensions" :depends-on ("parameterization"))

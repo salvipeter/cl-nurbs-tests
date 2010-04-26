@@ -18,8 +18,8 @@
 
 (defpackage :kobbelt
   (:use :common-lisp :iterate :cl-nurbs)
-  (:export :initialize :insert-point :set-triangle :fair :get-point
-	   :write-vtk-mesh :write-ply-mesh))
+  (:export :initialize :insert-point :maybe-insert-point :set-triangle :fair
+	   :get-point :write-vtk-mesh :write-ply-mesh))
 
 (in-package :kobbelt)
 
@@ -44,6 +44,12 @@
       (adjust-array v (* 2 (length v))))
     (setf (elt v n) (make-point :coordinates point))
     (prog1 n (incf n))))
+
+(defun maybe-insert-point (obj point)
+  (with-accessors ((v points) (n size)) obj
+    (or (iter (for i from 0 below n)
+	      (finding i such-that (equal (point-coordinates (elt v i)) point)))
+	(insert-point obj point))))
 
 ;;; Temporarily just store tuples, and merge them before parameterization.
 (defun set-triangle (obj i j k)
@@ -266,13 +272,7 @@
 			       neighborhood)))
 	    :key #'neighbor-index)))
 
-(defun fair (obj iteration &key
-	     (parameterization :projection) (preserve-tangents t))
-  (merge-neighbors obj)
-  (parameterize obj (ecase parameterization
-		      (:projection #'parameterize-projection)
-		      (:polar #'parameterize-polar)))
-  (compute-weights obj)
+(defun fair-more (obj iteration &key (preserve-tangents t))
   (flet ((fixed-point-p (p)
 	   (let ((borderp (point-border-p p)))
 	     (or (eq borderp 'border)
@@ -292,6 +292,15 @@
 			  (finally
 			   (let ((weight (gethash i (elt weights i))))
 			     (return (v* q (/ (- weight)))))))))))))
+
+(defun fair (obj iteration &key
+	     (parameterization :projection) (preserve-tangents t))
+  (merge-neighbors obj)
+  (parameterize obj (ecase parameterization
+		      (:projection #'parameterize-projection)
+		      (:polar #'parameterize-polar)))
+  (compute-weights obj)
+  (fair-more obj iteration :preserve-tangents preserve-tangents))
 
 (defun generate-triangle-list (obj)
   (iter (for i from 0 below (size obj))
