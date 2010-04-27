@@ -117,3 +117,39 @@ Returns a list."
   (if ascii
       (write-stl-ascii triangles filename (or name "exported"))
       (write-stl-binary triangles filename (or header "Exported by CL-NURBS."))))
+
+(defun mesh-bounding-box (mesh)
+  (iter (with min = (first (elt mesh 0)))
+	(with max = (first (elt mesh 0)))
+	(for i from 1 below (length mesh))
+	(iter (for p in (elt mesh i))
+	      (setf min (mapcar #'min min p))
+	      (setf max (mapcar #'max max p)))
+	(finally (return (list min max)))))
+
+(defun index-mesh (mesh &optional octree-depth)
+  "MESH is a sequence of point tuples. There are two result values:
+the first is a list of points, the second is a list of index tuples."
+  (let* ((depth (or octree-depth (1- (floor (log (length mesh) 4)))))
+	 (octree (make-octree (mesh-bounding-box mesh) depth)))
+    (dolist (tr mesh) (dolist (p tr) (octree-insert octree p)))
+    (values (octree-points octree)
+	    (mapcar (lambda (tr)
+		      (mapcar (lambda (p) (octree-position octree p)) tr))
+		    mesh))))
+
+;;; This function does not belong here, but it is good for testing
+(defun write-vtk-indexed-mesh (points polygons filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (let ((n (length polygons)))
+      (format s "# vtk DataFile Version 1.0~%~
+                 Mesh data~%~
+                 ASCII~%~
+                 DATASET POLYDATA~%~%~
+                 POINTS ~d float~%~
+                 ~{~{~f ~}~%~}~%~
+                 POLYGONS ~d ~d~%"
+	      (length points) points n
+	      (+ n (reduce #'+ (mapcar #'length polygons)))))
+    (dolist (poly polygons)
+      (format s "~d~{ ~d~}~%" (length poly) poly))))
