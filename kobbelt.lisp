@@ -5,12 +5,12 @@
 ;;; First INITIALIZE (preferably with a size parameter >= the # of points).
 ;;; Then insert the points with INSERT-POINT, which returns indices,
 ;;; and also insert triangles with SET-TRIANGLE.
+;;; When you are done, call FINALIZE to compute the parameters & weights.
 ;;; Finally call FAIR with the desired parameters.
 
 ;;; Note: This implementation assumes that there are no dangling triangles,
 ;;; ie. each neighborhood has zero [inside] or one [edge] hole.
 
-;;; TODO: The writing functions work only after FAIR (merge-neighbors).
 ;;; TODO: The weights probably go wrong, when PRESERVE-TANGENTS is NIL.
 ;;; TODO: Maybe the triangle-area-weight should be moved into FAIR.
 
@@ -19,7 +19,8 @@
 (defpackage :kobbelt
   (:use :common-lisp :iterate :cl-nurbs)
   (:export :initialize :insert-point :maybe-insert-point :set-triangle :fair
-	   :get-point :write-vtk-mesh :write-ply-mesh))
+	   :finalize :get-point :write-stl-mesh :write-vtk-mesh
+	   :write-ply-mesh))
 
 (in-package :kobbelt)
 
@@ -272,7 +273,7 @@
 			       neighborhood)))
 	    :key #'neighbor-index)))
 
-(defun fair-more (obj iteration &key (preserve-tangents t))
+(defun fair (obj iteration &key (preserve-tangents t))
   (flet ((fixed-point-p (p)
 	   (let ((borderp (point-border-p p)))
 	     (or (eq borderp 'border)
@@ -293,14 +294,12 @@
 			   (let ((weight (gethash i (elt weights i))))
 			     (return (v* q (/ (- weight)))))))))))))
 
-(defun fair (obj iteration &key
-	     (parameterization :projection) (preserve-tangents t))
+(defun finalize (obj &key (parameterization :projection))
   (merge-neighbors obj)
   (parameterize obj (ecase parameterization
 		      (:projection #'parameterize-projection)
 		      (:polar #'parameterize-polar)))
-  (compute-weights obj)
-  (fair-more obj iteration :preserve-tangents preserve-tangents))
+  (compute-weights obj))
 
 (defun generate-triangle-list (obj)
   (iter (for i from 0 below (size obj))
@@ -314,6 +313,16 @@
 (defun get-point (obj index)
   (point-coordinates (elt (points obj) index)))
 (declaim (inline get-point))
+
+(defun write-stl-mesh (obj filename)
+  (let ((triangles (generate-triangle-list obj))
+	(points (points obj)))
+    (write-stl (mapcar (lambda (tr)
+			 (mapcar (lambda (i)
+				   (point-coordinates (elt points i)))
+				 tr))
+		       triangles)
+	       :header "Exported Mesh")))
 
 (defun write-vtk-mesh (obj filename)
   (let ((triangles (generate-triangle-list obj))

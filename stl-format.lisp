@@ -132,11 +132,12 @@ Returns a list."
 the first is a list of points, the second is a list of index tuples."
   (let* ((depth (or octree-depth (1- (floor (log (length mesh) 4)))))
 	 (octree (make-octree (mesh-bounding-box mesh) depth)))
-    (dolist (tr mesh) (dolist (p tr) (octree-insert octree p)))
+    (iter (for i from 0 below (length mesh))
+	  (dolist (p (elt mesh i)) (octree-insert octree p)))
     (values (octree-points octree)
-	    (mapcar (lambda (tr)
-		      (mapcar (lambda (p) (octree-position octree p)) tr))
-		    mesh))))
+	    (map 'list (lambda (tr)
+			 (mapcar (lambda (p) (octree-position octree p)) tr))
+		 mesh))))
 
 ;;; This function does not belong here, but it is good for testing
 (defun write-vtk-indexed-mesh (points polygons filename)
