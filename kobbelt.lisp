@@ -319,15 +319,18 @@
   (point-coordinates (elt (points obj) index)))
 (declaim (inline get-point))
 
+;;; Requires `stl-format' to be loaded
+#+nil
 (defun write-stl-mesh (obj filename)
   (let ((triangles (generate-triangle-list obj))
 	(points (points obj)))
-    (write-stl (mapcar (lambda (tr)
-			 (mapcar (lambda (i)
-				   (point-coordinates (elt points i)))
-				 tr))
-		       triangles)
-	       :header "Exported Mesh")))
+    (cl-nurbs-tests::write-stl
+     (mapcar (lambda (tr)
+	       (mapcar (lambda (i)
+			 (point-coordinates (elt points i)))
+		       tr))
+	     triangles)
+     filename :header "Exported Mesh")))
 
 (defun write-vtk-mesh (obj filename)
   (let ((triangles (generate-triangle-list obj))

@@ -14,9 +14,8 @@
 	  (dotimes (j (1- r2))
 	    (kobbelt:set-triangle obj (p i j) (p (1+ i) j) (p (1+ i) (1+ j)))
 	    (kobbelt:set-triangle obj (p i j) (p (1+ i) (1+ j)) (p i (1+ j))))))
-      (kobbelt:fair obj iteration
-		    :parameterization parameterization
-		    :preserve-tangents preserve-tangents)
+      (kobbelt:finalize obj :parameterization parameterization)
+      (kobbelt:fair obj iteration :preserve-tangents preserve-tangents)
       (iter (with index = 0)
 	    (for i from 0 below r1)
 	    (iter (for j from 0 below r2)

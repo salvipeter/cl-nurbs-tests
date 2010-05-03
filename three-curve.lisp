@@ -142,7 +142,7 @@
 	(fp (bsc-evaluate faired u)))
     (v+ p (v* n (scalar-product (v- fp p) n)))))
 
-(defun grid-cut (original faired resolution tolerance)
+(defun curve-grid-cut (original faired resolution tolerance)
   (iter (with low = (bsc-lower-parameter original))
 	(with high = (bsc-upper-parameter original))
 	(with len = (- high low))
@@ -163,11 +163,12 @@
 					iteration max-deviation))))
     (if simple-fitting
 	(bsc-resembling-fit (second split) faired loose-tolerance)
-	(grid-cut (second split)
-		  (suppressed-fit-middle-curve split faired res
-					       number-of-held-points
-					       loose-tolerance tight-tolerance)
-		  (second res) tight-tolerance))))
+	(curve-grid-cut
+	 (second split)
+	 (suppressed-fit-middle-curve split faired res
+				      number-of-held-points
+				      loose-tolerance tight-tolerance)
+	 (second res) tight-tolerance))))
 
 (defun three-curve-test (curve u1 u2 extrusion filename &rest keys)
   (let* ((split (split-to-three curve u1 u2))

@@ -170,7 +170,8 @@
 (defun read-rdn (filename &optional skip-unknown-p)
   (with-open-file (s filename :element-type '(unsigned-byte 8))
     (handler-bind ((unknown-rdn-object
-		    (lambda (x)
+		    (lambda (c)
+		      (declare (ignore c))
 		      (when skip-unknown-p
 			(invoke-restart 'skip)))))
       (read-rdn-stream s))))

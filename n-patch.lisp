@@ -355,10 +355,10 @@ When WINGSP is T, one additional row of triangles is added from the external sur
 		  (for i2 in (rest wing-indices))
 		  (kobbelt:set-triangle obj last-i1 last-i2 i2)
 		  (kobbelt:set-triangle obj last-i1 i1 i2))))
+    (format *error-output* "Computing weights...~%")
+    (kobbelt:finalize obj :parameterization parameterization)
     (format *error-output* "Fairing...~%")
-    (kobbelt:fair obj iteration
-		  :parameterization parameterization
-		  :preserve-tangents t)
+    (kobbelt:fair obj iteration :preserve-tangents t)
     (when vtk-file
       (format *error-output* "Writing VTK file...~%")
       (kobbelt:write-vtk-mesh obj vtk-file))

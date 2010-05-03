@@ -97,7 +97,9 @@
 
 (defun eb-cut (large original)
   (destructuring-bind (minu minv) (bss-lower-parameter original)
+    (declare (ignore minv))
     (destructuring-bind (maxu maxv) (bss-upper-parameter original)
+      (declare (ignore maxv))
       (bss-subsurface-one-direction large minu maxu t))))
 
 (defun eb-g0 (surface left right)
