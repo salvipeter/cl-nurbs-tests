@@ -12,13 +12,19 @@
   ((bounds :initarg :bounds :reader octree-bounds)
    (regions :initarg :regions :accessor octree-regions)
    (depth :initarg :depth :reader octree-depth)
-   (count :initform 0 :accessor octree-count)))
+   (count :initform 0 :accessor octree-count)
+   (equality :initarg :equality :reader octree-point=)))
 
-(defun make-octree (bbox depth)
-  "BBOX is a list of two points that define the bounding box."
+(defun make-octree (bbox depth &optional tolerance)
+  "BBOX is a list of two points that define the bounding box.
+TOLERANCE is the maximum distance between two points that are considered equal."
   (make-instance 'octree :bounds (list (apply #'mapcar #'min bbox)
 				       (apply #'mapcar #'max bbox))
-		 :depth depth :regions (list nil nil nil nil nil nil nil nil)))
+		 :depth depth :regions (list nil nil nil nil nil nil nil nil)
+		 :equality (if tolerance
+			       (lambda (p1 p2)
+				 (<= (point-distance p1 p2) tolerance))
+			       #'equal)))
 
 (defun octree-index (octree point)
   (destructuring-bind (min max) (octree-bounds octree)
@@ -47,7 +53,8 @@
 (defun octree-insert (octree point)
   (let ((index (octree-index octree point)))
     (cond ((= (octree-depth octree) 1)
-	   (unless (member point (octree-region octree index) :test #'equal)
+	   (unless (member point (octree-region octree index)
+			   :test (octree-point= octree))
 	     (push point (octree-region octree index))
 	     (incf (octree-count octree))))
 	  ((null (octree-region octree index))
@@ -71,7 +78,8 @@ WARNING: any point insertion may invalidate this index."
   (let* ((index (octree-index octree point))
 	 (full (remove-if #'null (subseq (octree-regions octree) 0 index))))
     (if (= (octree-depth octree) 1)
-	(let ((pos (position point (octree-region octree index) :test #'equal)))
+	(let ((pos (position point (octree-region octree index)
+			     :test (octree-point= octree))))
 	  (when pos
 	    (+ (if (null full) 0 (reduce #'+ (mapcar #'length full)))
 	       pos)))

@@ -127,11 +127,12 @@ Returns a list."
 	      (setf max (mapcar #'max max p)))
 	(finally (return (list min max)))))
 
-(defun index-mesh (mesh &optional octree-depth)
+(defun index-mesh (mesh &key octree-depth tolerance)
   "MESH is a sequence of point tuples. There are two result values:
-the first is a list of points, the second is a list of index tuples."
+the first is a list of points, the second is a list of index tuples.
+TOLERANCE is the maximum distance between two points that are considered equal."
   (let* ((depth (or octree-depth (1- (floor (log (length mesh) 4)))))
-	 (octree (make-octree (mesh-bounding-box mesh) depth)))
+	 (octree (make-octree (mesh-bounding-box mesh) depth tolerance)))
     (iter (for i from 0 below (length mesh))
 	  (dolist (p (elt mesh i)) (octree-insert octree p)))
     (values (octree-points octree)
