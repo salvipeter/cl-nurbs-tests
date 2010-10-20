@@ -1,8 +1,10 @@
 (in-package :cl-nurbs-tests)
 
 (defparameter *exponent* 2)
-(defparameter *resolution* 60)
+(defparameter *resolution* 40)
 (defparameter *tiny* 1.0d-5)
+
+(defvar *alpha*)
 
 (defun points-from-angles (angles)
   "For example, for a equilateral triangle give '(120 120 120)."
@@ -66,6 +68,46 @@
 			(when (and (/= k j) (/= (mod (1+ k) n) j))
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
+(defun compute-alpha (lines center)
+  (let ((c (mapcar (lambda (line) (point-line-distance center line)) lines))
+	(n (length lines)))
+    (/ (iter (for k from 0 below n)
+	     (sum (iter (for j from 0 below n)
+			(when (/= j k)
+			  (multiply (expt (elt c j) *exponent*))))))
+       (iter (for j from 0 below n)
+	     (multiply (expt (elt c j) *exponent*)))
+       (1- n))))
+
+(defun interior-blend (d i)
+  (let ((n (length d)))
+    (/ (if (= i n)
+	   (* *alpha* (iter (for j from 0 below n)
+			    (multiply (expt (elt d j) *exponent*))))
+	   (iter (for j from 0 below n)
+		 (when (/= i j)
+		   (multiply (expt (elt d j) *exponent*)))))
+       (+ (iter (for k from 0 below n)
+		(sum (iter (for j from 0 below n)
+			   (when (/= j k)
+			     (multiply (expt (elt d j) *exponent*))))))
+	  (* *alpha* (iter (for j from 0 below n)
+			   (multiply (expt (elt d j) *exponent*))))))))
+
+(defun interior-ribbon-blend (lines p i)
+  (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
+    (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (interior-blend d i))
+	  ((= i (length d))
+	   (if (some (lambda (x) (< (abs x) *tiny*)) d)
+	       0.0d0
+	       (interior-blend d i)))
+	  ((< (min (point-distance (first (elt lines i)) p)
+		   (point-distance (second (elt lines i)) p))
+	      *tiny*)
+	   0.5d0)
+	  ((< (point-line-distance p (elt lines i)) *tiny*) 1.0d0)
+	  (t 0.0d0))))
+
 ;;; triangular mesh
 (defun triangles (n)
   (iter (with result = '())
@@ -109,9 +151,11 @@
 
 (defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend))
   (let* ((n (length angles))
-	 (lines (lines-from-points (points-from-angles angles)))
+	 (points (points-from-angles angles))
+	 (lines (lines-from-points points))
+	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
 	 (vertices (mapcar (lambda (p)
-			     (cons (iter (for i from 0 below n)
+			     (cons (iter (for i from 0 below (length on-off))
 					 (when (elt on-off i)
 					   (sum (funcall blend-function lines p i))))
 				   p))
@@ -140,4 +184,5 @@
     (write-points2-vtk points filename)))
 
 ;; (write-blends '(60 60 80 120 40) '(t t nil nil nil) "/tmp/blend.vtk")
-;; (write-blends '(60 60 80 120 40) '(t t t nil nil) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
+;; (write-blends '(60 60 80 120 40) '(t t nil nil t) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
+;; (write-blends '(60 60 80 120 40) '(t t nil nil nil t) "/tmp/interior-blend.vtk" :blend-function #'interior-ribbon-blend)
