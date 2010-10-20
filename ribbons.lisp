@@ -12,9 +12,9 @@
 	(collect (list (cos alpha) (sin alpha)))))
 
 (defun lines-from-points (points)
-  (cons (cons (first points) (last points))
-	(iter (for k from 1 below (length points))
-	      (collect (list (elt points k) (elt points (1- k)))))))
+  (cons (list (car (last points)) (first points))
+	(iter (for k from 0 below (1- (length points)))
+	      (collect (list (elt points k) (elt points (1+ k)))))))
 
 (defun point-line-distance (p line &optional signedp)
   (let* ((v (v- (second line) (first line)))
@@ -23,7 +23,7 @@
     (if signedp d (abs d))))
 
 (defun line-point (line u)
-  (affine-combine (second line) u (first line)))
+  (affine-combine (first line) u (second line)))
 
 (defun insidep (lines p)
   (every (lambda (line)
@@ -42,7 +42,7 @@
 			(when (/= j k)
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
-(defun blend-function (lines p i)
+(defun ribbon-blend (lines p i)
   (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
     (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (blend d i))
 	  ((< (min (point-distance (first (elt lines i)) p)
@@ -51,6 +51,20 @@
 	   0.5d0)
 	  ((< (point-line-distance p (elt lines i)) *tiny*) 1.0d0)
 	  (t 0.0d0))))
+
+(defun corner-blend (lines p i)
+  (let ((d (mapcar (lambda (line)
+		     (let ((x (point-line-distance p line)))
+		       (if (< (abs x) *tiny*) 0 x)))
+		   lines))
+	(n (length lines)))
+    (/ (iter (for j from 0 below n)
+	     (when (and (/= i j) (/= (mod (1+ i) n) j))
+	       (multiply (expt (elt d j) *exponent*))))
+       (iter (for k from 0 below n)
+	     (sum (iter (for j from 0 below n)
+			(when (and (/= k j) (/= (mod (1+ k) n) j))
+			  (multiply (expt (elt d j) *exponent*)))))))))
 
 ;;; triangular mesh
 (defun triangles (n)
@@ -93,19 +107,19 @@
 		      (push (affine-combine center coeff lp) result))))
     (nreverse result)))
 
-(defun write-blends (angles on-off filename)
+(defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend))
   (let* ((n (length angles))
 	 (lines (lines-from-points (points-from-angles angles)))
 	 (vertices (mapcar (lambda (p)
 			     (cons (iter (for i from 0 below n)
 					 (when (elt on-off i)
-					   (sum (blend-function lines p i))))
+					   (sum (funcall blend-function lines p i))))
 				   p))
 			   (vertices angles))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
 ;;; quadrilateral mesh
-(defun write-blends-quad (angles on-off filename)
+(defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend))
   (let* ((lines (lines-from-points (points-from-angles angles)))
 	 (n (length lines))
 	 (res (1+ (* 2 *resolution*)))
@@ -120,9 +134,10 @@
 			  (if (insidep lines p)
 			      (cons (iter (for i from 0 below n)
 					  (when (elt on-off i)
-					    (sum (blend-function lines p i))))
+					    (sum (funcall blend-function lines p i))))
 				    p)
 			      (cons 0 p)))))))
     (write-points2-vtk points filename)))
 
 ;; (write-blends '(60 60 80 120 40) '(t t nil nil nil) "/tmp/blend.vtk")
+;; (write-blends '(60 60 80 120 40) '(t t t nil nil) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
