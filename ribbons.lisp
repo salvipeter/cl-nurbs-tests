@@ -7,13 +7,15 @@
 (defvar *alpha*)
 
 (defun points-from-angles (angles)
-  "For example, for a equilateral triangle give '(120 120 120)."
+  "Gives a list of points on the unit circle, divided by the given angles.
+For example, for a equilateral triangle give '(120 120 120)."
   (iter (for degrees in angles)
 	(for angle = (/ (* degrees pi) 180.0d0))
 	(for alpha first angle then (+ alpha angle))
 	(collect (list (cos alpha) (sin alpha)))))
 
 (defun lines-from-points (points)
+  "List of point pairs (last-first, first-second, second-third, ...)."
   (cons (list (car (last points)) (first points))
 	(iter (for k from 0 below (1- (length points)))
 	      (collect (list (elt points k) (elt points (1+ k)))))))
@@ -28,6 +30,7 @@
   (affine-combine (first line) u (second line)))
 
 (defun insidep (lines p)
+  "Determines if P is inside the polygon defined by LINES."
   (every (lambda (line)
            (> (* (point-line-distance p line t)
                  (point-line-distance '(0 0) line t))
@@ -35,6 +38,7 @@
          lines))
 
 (defun blend (d i)
+  "Used by RIBBON-BLEND."
   (let ((n (length d)))
     (/ (iter (for j from 0 below n)
 	     (when (/= i j)
@@ -45,6 +49,8 @@
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
 (defun ribbon-blend (lines p i)
+  "A blend function that is 1 on the Ith line, 0 on all others.
+This naturally means that we have singularities in the corners."
   (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
     (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (blend d i))
 	  ((< (min (point-distance (first (elt lines i)) p)
@@ -55,6 +61,9 @@
 	  (t 0.0d0))))
 
 (defun corner-blend (lines p i)
+  "Gregory-style blend: 1 in the corner between the Ith and (I+1)th line,
+0 in all other corners, smoothly decreasing along the Ith and (I+1)th line.
+This eliminates the singularity problem in the corners."
   (let ((d (mapcar (lambda (line)
 		     (let ((x (point-line-distance p line)))
 		       (if (< (abs x) *tiny*) 0 x)))
@@ -69,6 +78,8 @@
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
 (defun compute-alpha (lines center)
+  "Computes alpha such that at the center point of the domain the weight of
+the interior surface will be 1/(N+1), where N is the number of lines."
   (let ((c (mapcar (lambda (line) (point-line-distance center line)) lines))
 	(n (length lines)))
     (/ (iter (for k from 0 below n)
@@ -77,9 +88,10 @@
 			  (multiply (expt (elt c j) *exponent*))))))
        (iter (for j from 0 below n)
 	     (multiply (expt (elt c j) *exponent*)))
-       (1- n))))
+       n)))
 
 (defun interior-blend (d i)
+  "Used by INTERIOR-RIBBON-BLEND."
   (let ((n (length d)))
     (/ (if (= i n)
 	   (* *alpha* (iter (for j from 0 below n)
@@ -95,6 +107,7 @@
 			   (multiply (expt (elt d j) *exponent*))))))))
 
 (defun interior-ribbon-blend (lines p i)
+  "When using this blend, an extra on-off parameter should be added at the end."
   (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
     (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (interior-blend d i))
 	  ((= i (length d))
@@ -110,6 +123,7 @@
 
 ;;; triangular mesh
 (defun triangles (n)
+  "Triangles given as vertex index triples to be used along with VERTICES."
   (iter (with result = '())
 	(with inner-start = 0)
 	(with outer-vert = 1)
@@ -135,9 +149,9 @@
 	(setf inner-start outer-start)
 	(finally (return (nreverse result)))))
 
-(defun vertices (angles)
-  (let* ((points (points-from-angles angles))
-	 (lines (lines-from-points points))
+(defun vertices (points)
+  "Sample points for the (convex) polygon defined by POINTS."
+  (let* ((lines (lines-from-points points))
 	 (n (length lines))
 	 (center (v* (reduce #'v+ points) (/ n)))
 	 (result (list center)))
@@ -150,6 +164,9 @@
     (nreverse result)))
 
 (defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend))
+  "Computes samples by a set of blend functions and writes it in a VTK file.
+The ON-OFF parameter declares which blends should be turned on.
+For ANGLES, see POINTS-FROM-ANGLES."
   (let* ((n (length angles))
 	 (points (points-from-angles angles))
 	 (lines (lines-from-points points))
@@ -159,11 +176,12 @@
 					 (when (elt on-off i)
 					   (sum (funcall blend-function lines p i))))
 				   p))
-			   (vertices angles))))
+			   (vertices points))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
 ;;; quadrilateral mesh
 (defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend))
+  "See the documentation of WRITE-BLENDS."
   (let* ((lines (lines-from-points (points-from-angles angles)))
 	 (n (length lines))
 	 (res (1+ (* 2 *resolution*)))
