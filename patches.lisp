@@ -143,6 +143,17 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(setf result (v+ result (v* point blend)))
 	(finally (return result))))
 
+(defun corner-correction (patch d i)
+  (let* ((i-1 (mod (1- i) (length d)))
+	 (di-1 (elt d i-1))
+	 (di (elt d i)))
+    (v+ (elt (elt patch i) 2)
+	(v* (elt (elt patch i) (if (oddp i) 4 3)) di-1 *ribbon-multiplier*)
+	(v* (elt (elt patch i) (if (oddp i) 3 4)) di *ribbon-multiplier*)
+	(v* (elt (elt patch i) 5) di-1 di
+	    *ribbon-multiplier* *ribbon-multiplier*))))
+
+#+nil
 (defun corner-ribbon-evaluate (patch lines p)
   (iter (with n = (length lines))
 	(with d = (uv-parameter lines p))
@@ -151,7 +162,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(for di = (elt d i))
 	(for dj = (elt d (mod (1- i) n)))
 	(for blend = (corner-blend lines p i))
-	(for point = 'todo)
+	(for point = (corner-patch patch d i))
 	(setf result (v+ result (v* point blend)))
 	(finally (return result))))
 
@@ -162,13 +173,15 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(for i from 0 below n)
 	(for di = (elt d i))
 	(for dj = (elt d (mod (1- i) n)))
-	(for blend = (/ (+ (corner-blend lines p (mod (1- i) n))
-			   (corner-blend lines p i))
-			2.0d0))
+	(for blend = (+ (corner-blend lines p (mod (1- i) n))
+			(corner-blend lines p i)))
 	(for q = (bezier (elt (elt patch i) 0) dj))
 	(for point = (v+ q (v* (v- (bezier (elt (elt patch i) 1) dj) q)
 			       3.0d0 di *ribbon-multiplier*)))
-	(setf result (v+ result (v* point blend)))
+	(for correction = (corner-correction patch d i))
+	(for correction-blend = (corner-blend lines p (mod (1- i) n)))
+	(setf result (v+ result (v- (v* point blend)
+				    (v* correction correction-blend))))
 	(finally (return result))))
 
 (defun write-patch (patch filename &optional (fn #'coons-evaluate))
