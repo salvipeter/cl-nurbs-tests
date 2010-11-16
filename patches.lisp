@@ -181,6 +181,20 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 			   parameters)))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
+(defun write-square-patch (patch filename &optional (fn #'coons-evaluate))
+  (assert (= (length patch) 4))
+  (let* ((n (length patch))
+	 (points (points-from-angles '(45 90 90 90)))
+	 (lines (lines-from-points points)))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "~d ~d~%" *resolution* *resolution*)
+      (iter (for ui from 0 below *resolution*)
+	    (for u = (* (sqrt 2.0d0) (- (/ ui (1- *resolution*)) 0.5d0)))
+	    (iter (for vi from 0 below *resolution*)
+		  (for v = (* (sqrt 2.0d0) (- (/ vi (1- *resolution*)) 0.5d0)))
+		  (format s "~{~f~^ ~}~%"
+			  (funcall fn patch lines (list u v))))))))
+
 (defun write-bezier-polygons (curves filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (let ((n (* (length curves) 4)))
