@@ -153,17 +153,23 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(v* (elt (elt patch i) 5) di-1 di
 	    *ribbon-multiplier* *ribbon-multiplier*))))
 
-#+nil
 (defun corner-ribbon-evaluate (patch lines p)
   (iter (with n = (length lines))
 	(with d = (uv-parameter lines p))
 	(with result = '(0 0 0))
 	(for i from 0 below n)
+	(for i-1 = (mod (1- i) n))
 	(for di = (elt d i))
-	(for dj = (elt d (mod (1- i) n)))
-	(for blend = (corner-blend lines p i))
-	(for point = (corner-patch patch d i))
-	(setf result (v+ result (v* point blend)))
+	(for dj = (elt d i-1))
+	(for blend = (corner-blend lines p i-1))
+	(for q1 = (bezier (reverse (elt (elt patch i-1) 0)) di))
+	(for q2 = (bezier (elt (elt patch i) 0) dj))
+	(for point = (v+ q1 (v* (v- (bezier (reverse (elt (elt patch i-1) 1)) di) q1)
+				3.0d0 dj *ribbon-multiplier*)
+			 q2 (v* (v- (bezier (elt (elt patch i) 1) dj) q2)
+				3.0d0 di *ribbon-multiplier*)))
+	(for correction = (corner-correction patch d i))
+	(setf result (v+ result (v* (v- point correction) blend)))
 	(finally (return result))))
 
 (defun double-corner-ribbon-evaluate (patch lines p)
