@@ -59,12 +59,11 @@
 			       (on-line-p p2 p3 x y))
 			   (princ 0 s))
 			  ((and (< current *line-width*)
-				(let ((minimum
-				       (min (mod (parameter (1- x) y) *density*)
-					    (mod (parameter (1+ x) y) *density*)
-					    (mod (parameter x (1- y)) *density*)
-					    (mod (parameter x (1+ y)) *density*))))
-				  (<= current minimum)))
+				(<= (iter (for i from -1 to 1)
+					  (sum (iter (for j from -1 to 1)
+						     (unless (= i j 0)
+						       (count (> current (mod (parameter (+ x i) (+ y j)) *density*)))))))
+				    2))
 			   (princ 1 s))
 			  (t (princ 2 s))))
 	      (terpri s))))))
@@ -85,3 +84,8 @@
 (let ((*density* 0.1d0)
       (*line-width* 0.01d0))
   (kato-test-2 '(160 100) '(220 240) '(420 240) '(460 270) "/tmp/kato.pgm"))
+
+#+nil
+(let ((*density* 0.1d0)
+      (*line-width* 0.01d0))
+  (kato-test-2 '(190 100) '(220 240) '(420 240) '(500 180) "/tmp/kato.pgm"))
