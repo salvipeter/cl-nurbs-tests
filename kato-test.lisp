@@ -3,8 +3,10 @@
 (defparameter *width* 640)
 (defparameter *height* 480)
 (defparameter *line-width* 2.0d0)
+(defparameter *point-size* 3.0d0)
 (defparameter *density* 50.0d0)
 (defparameter *tolerance* 1.0d0)
+(defparameter *epsilon* 1.0d-8)
 
 (defun kato-test (p1 p2 filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -72,6 +74,65 @@
 			  (t (princ 2 s))))
 	      (terpri s))))))
 
+(defun center-line (w0 w2 length center)
+  "Both W0, W2 and CENTER are in local coordinates."
+  (let* ((s (v* (v+ w0 w2) 1/2))
+	 (alpha (/ (second center) (second s))))
+    (list (- (/ (- (* 2 (first center)) length) alpha) (first s)) (second s))))
+
+(defun line-sweep (w0 w1 w2 length p)
+  (let ((a (+ (* length (- (second w2) (second w0)))
+	      (* (second p) (+ (first w2) (* -2 (first w1)) (first w0)))))
+	(b (+ (* length (second w0))
+	      (* (first p) (- (second w0) (second w2)))
+	      (* 2 (second p) (- (first w1) (first w0)))))
+	(c (- (* (second p) (first w0)) (* (first p) (second w0)))))
+    (if (< (abs a) *epsilon*)
+	(- (/ c b))
+	(let ((discr (sqrt (- (* b b) (* 4 a c)))))
+	  (if (complexp discr)
+	      0
+	      (let ((u1 (/ (+ (- b) discr) (* 2 a)))
+		    (u2 (/ (- (- b) discr) (* 2 a))))
+		(if (and (>= u1 0) (or (< u2 0) (< u1 u2))) u1 u2)))))))
+
+(defun central-line-sweep (p0 p1 p2 p3 center filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "P2~%~d ~d~%2~%" *width* *height*)
+    (let* ((base-x (vnormalize (v- p2 p1)))
+	   (base-y (list (second base-x) (- (first base-x))))
+	   (length (point-distance p1 p2))
+	   (w0 (in-system base-x base-y (v- p0 p1)))
+	   (w2 (in-system base-x base-y (v- p3 p2)))
+	   (w1 (center-line w0 w2 length
+			    (in-system base-x base-y (v- center p1)))))
+      (labels ((parameter (x y)
+		 (line-sweep w0 w1 w2 length
+			     (in-system base-x base-y (v- (list x y) p1))))
+	       (better-points (x y base)
+		 (iter (for i from -1 to 1)
+		       (sum (iter (for j from -1 to 1)
+				  (for current =
+				       (mod (parameter (+ x i) (+ y j))
+					    *density*))
+				  (count (< current base)))))))
+	(iter (for y from 0 below *height*)
+	      (iter (for x from 0 below *width*)
+		    (unless (zerop x)
+		      (princ #\Space s))
+		    (for current = (mod (parameter x y) *density*))
+		    (cond ((or (on-segment-p p0 p1 x y)
+			       (on-segment-p p1 p2 x y)
+			       (on-segment-p p2 p3 x y)
+			       (< (point-distance (list x y) center)
+				  *point-size*))
+			   (princ 0 s)) 
+			  ((and (< current *line-width*)
+				(<= (better-points x y current) 2))
+			   (princ 1 s))
+			  (t (princ 2 s))))
+	      (terpri s))))))
+
 ;; (kato-test '(250 240) '(390 240) "/tmp/kato.pgm")
 
 #+nil
@@ -93,3 +154,9 @@
 (let ((*density* 0.03d0)
       (*line-width* 0.01d0))
   (kato-test-2 '(190 100) '(220 240) '(420 240) '(500 180) "/tmp/kato.pgm"))
+
+#+nil
+(let ((*density* 0.025d0)
+      (*line-width* 0.01d0))
+  (central-line-sweep '(190 100) '(220 240) '(420 240) '(500 180) '(380 80)
+		      "/tmp/sweep.pgm"))
