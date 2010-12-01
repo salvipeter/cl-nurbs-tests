@@ -25,7 +25,7 @@
 	    (setf p (v+ p (v* (delta points i derivative)
 			      (bernstein (- 3 derivative) i u))))
 	    (finally (return p)))
-      (/ #.(factorial 3) (factorial (- 3 derivative)))))
+      (/ (factorial 3) (factorial (- 3 derivative)))))
 
 (defun generate-patch (points twists)
   "POINTS : x4=p1 p2 p3 p4=q1 q2 q3 q4=r1 ... x3
@@ -202,8 +202,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 
 (defun write-square-patch (patch filename &optional (fn #'coons-evaluate))
   (assert (= (length patch) 4))
-  (let* ((n (length patch))
-	 (points (points-from-angles '(45 90 90 90)))
+  (let* ((points (points-from-angles '(45 90 90 90)))
 	 (lines (lines-from-points points)))
     (with-open-file (s filename :direction :output :if-exists :supersede)
       (format s "~d ~d~%" *resolution* *resolution*)

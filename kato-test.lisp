@@ -351,6 +351,13 @@
 			  (t (format s (cdr (assoc 'nothing *colors*))))))
 	      (terpri s))))))
 
+(defun distance-function-complete-set (angles directory)
+  (iter (for type in '(perpendicular barycentric chord-based radial line-sweep))
+	(iter (for lines in '((s d) (s s) (d d)))
+	      (for name = (format nil "~(~a~)-~{~(~a~)~}.ppm" type lines))
+	      (for filename = (make-pathname :directory directory :name name))
+	      (distance-function-test angles type lines filename))))
+
 ;; (kato-test '(250 240) '(390 240) "/tmp/kato.pgm")
 
 #+nil
@@ -387,6 +394,7 @@
 #+nil
 (let ((*width* 640) (*height* 480) 
       (*density* 0.05d0)
-      (*line-width* 0.01d0))
-  (distance-function-test '(40 20 60 100 80) 'line-sweep '(d d)
+      (*line-width* 0.01d0)
+      (*point-size* 3.0d0))
+  (distance-function-test '(40 20 60 100 80) 'barycentric '(d d)
 			  "/tmp/distance.ppm"))
