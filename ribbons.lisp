@@ -37,6 +37,30 @@ For example, for a equilateral triangle give '(120 120 120)."
               0))
          lines))
 
+(defun compute-distance (type points p &optional no-tiny-p)
+  (macrolet ((tiny-lambda ((args) &body body)
+	       `(lambda (,args)
+		  (if no-tiny-p
+		      (let ((result (progn ,@body)))
+			(if (< result *tiny*) 0.0d0 result))
+		      (progn ,@body)))))
+    (mapcar (ecase type
+	      (perpendicular (tiny-lambda (lst)
+			       (perpendicular-distance points lst p 'd)))
+	      (barycentric (let ((lines (lines-from-points points)))
+			     (tiny-lambda (lst)
+			       (barycentric-distance lines lst p 'd))))
+	      (chord-based (tiny-lambda (lst)
+			     (chord-based-distance points lst p 'd)))
+	      (radial (tiny-lambda (lst)
+			(radial-distance points lst p 'd)))
+	      (line-sweep (let ((center (central-point points (lines-from-points points) t)))
+			    (tiny-lambda (lst)
+			      (line-sweep-distance center lst p 'd)))))
+	    (iter (for i from -2 below (- (length points) 2))
+		  (collect (iter (for j from 0 below 4)
+				 (collect (elt points (mod (+ i j) (length points))))))))))
+
 (defun blend (d i)
   "Used by RIBBON-BLEND."
   (let ((n (length d)))
@@ -48,27 +72,18 @@ For example, for a equilateral triangle give '(120 120 120)."
 			(when (/= j k)
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
-(defun ribbon-blend (lines p i)
+(defun ribbon-blend (d i)
   "A blend function that is 1 on the Ith line, 0 on all others.
 This naturally means that we have singularities in the corners."
-  (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
-    (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (blend d i))
-	  ((< (min (point-distance (first (elt lines i)) p)
-		   (point-distance (second (elt lines i)) p))
-	      *tiny*)
-	   0.5d0)
-	  ((< (point-line-distance p (elt lines i)) *tiny*) 1.0d0)
-	  (t 0.0d0))))
+  (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (blend d i))
+	((< (elt d i) *tiny*) 1.0d0)
+	(t 0.0d0)))
 
-(defun corner-blend (lines p i)
+(defun corner-blend (d i)
   "Gregory-style blend: 1 in the corner between the Ith and (I+1)th line,
 0 in all other corners, smoothly decreasing along the Ith and (I+1)th line.
 This eliminates the singularity problem in the corners."
-  (let ((d (mapcar (lambda (line)
-		     (let ((x (point-line-distance p line)))
-		       (if (< (abs x) *tiny*) 0 x)))
-		   lines))
-	(n (length lines)))
+  (let ((n (length d)))
     (/ (iter (for j from 0 below n)
 	     (when (and (/= i j) (/= (mod (1+ i) n) j))
 	       (multiply (expt (elt d j) *exponent*))))
@@ -163,7 +178,8 @@ the interior surface will be 1/(N+1), where N is the number of lines."
 		      (push (affine-combine center coeff lp) result))))
     (nreverse result)))
 
-(defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend))
+(defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend)
+		     (distance-type #'perpendicular-distance))
   "Computes samples by a set of blend functions and writes it in a VTK file.
 The ON-OFF parameter declares which blends should be turned on.
 For ANGLES, see POINTS-FROM-ANGLES."
@@ -172,35 +188,154 @@ For ANGLES, see POINTS-FROM-ANGLES."
 	 (lines (lines-from-points points))
 	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
 	 (vertices (mapcar (lambda (p)
-			     (cons (iter (for i from 0 below (length on-off))
-					 (when (elt on-off i)
-					   (sum (funcall blend-function lines p i))))
-				   p))
+			     (let ((d (compute-distance distance-type points p t)))
+			       (cons (iter (for i from 0 below (length on-off))
+					   (when (elt on-off i)
+					     (sum (funcall blend-function d i))))
+				     p)))
 			   (vertices points))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
 ;;; quadrilateral mesh
-(defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend))
+(defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend)
+			  (distance-type #'perpendicular-distance))
   "See the documentation of WRITE-BLENDS."
-  (let* ((lines (lines-from-points (points-from-angles angles)))
+  (let* ((points (points-from-angles angles))
+	 (lines (lines-from-points points))
 	 (n (length lines))
 	 (res (1+ (* 2 *resolution*)))
-	 (points (make-array (list res res))))
+	 (result (make-array (list res res))))
     (flet ((map-coordinates (x y)
 	     (list (/ (- x *resolution*) *resolution*)
 		   (/ (- y *resolution*) *resolution*))))
       (iter (for x from 0 below res)
 	    (iter (for y from 0 below res)
 		  (let ((p (map-coordinates x y)))
-		    (setf (aref points x y)
+		    (setf (aref result x y)
 			  (if (insidep lines p)
-			      (cons (iter (for i from 0 below n)
-					  (when (elt on-off i)
-					    (sum (funcall blend-function lines p i))))
-				    p)
+			      (let ((d (compute-distance distance-type points p t)))
+				(cons (iter (for i from 0 below n)
+					    (when (elt on-off i)
+					      (sum (funcall blend-function d i))))
+				      p))
 			      (cons 0 p)))))))
-    (write-points2-vtk points filename)))
+    (write-points2-vtk result filename)))
 
 ;; (write-blends '(60 60 80 120 40) '(t t nil nil nil) "/tmp/blend.vtk")
 ;; (write-blends '(60 60 80 120 40) '(t t nil nil t) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
 ;; (write-blends '(60 60 80 120 40) '(t t nil nil nil t) "/tmp/interior-blend.vtk" :blend-function #'interior-ribbon-blend)
+
+#+nil
+(write-blends '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend.vtk"
+	      :blend-function #'ribbon-blend :distance-type 'line-sweep)
+
+(defun write-blend-all-types (angles on-off directory)
+  (iter (for blend in (list #'ribbon-blend #'corner-blend))
+	(for blend-name in '(ribbon corner))
+	(iter (for type in '(perpendicular barycentric chord-based radial line-sweep))
+	      (for name = (format nil "~(~a~)-~(~a~)-~d.vtk" blend-name type *exponent*))
+	      (for filename = (make-pathname :directory directory :name name))
+	      (write-blends angles on-off filename :blend-function blend :distance-type type))))
+
+#+nil
+(let ((*exponent* 2)
+      (*resolution* 40))
+  (write-blend-all-types '(40 20 60 100 80) '(t nil nil nil nil) #p"/tmp/"))
+
+(defun write-vtk-polylines (lines filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "# vtk DataFile Version 1.0~
+		 ~%B-spline Surface~
+		 ~%ASCII~
+		 ~%DATASET POLYDATA~
+		 ~%POINTS ~d float~%" (reduce #'+ (mapcar #'length lines)))
+    (dolist (line lines)
+      (dolist (point line)
+	(format s "~{~f~^ ~}~%" point))) 
+    (format s "~%LINES ~d ~d~%" (length lines)
+	    (+ (length lines) (reduce #'+ (mapcar #'length lines))))
+    (let ((i 0))
+      (dolist (line lines)
+	(let ((n (length line)))
+	  (format s "~d" n)
+	  (dotimes (j n)
+	    (format s " ~d" i)
+	    (incf i))
+	  (terpri s))))))
+
+(defun write-blends-uv-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
+				 (distance-type #'perpendicular-distance))
+  "See the documentation of WRITE-BLENDS."
+  (let* ((points (points-from-angles angles))
+	 (lines (lines-from-points points))
+	 (n (length lines))
+	 (res (1+ (* 2 *resolution*))))
+    (flet ((map-coordinates (x y)
+	     (list (/ (- x *resolution*) *resolution*)
+		   (/ (- y *resolution*) *resolution*))))
+      (write-vtk-polylines
+       (iter (for x from 0 below res)
+	     (for line = 
+		  (iter (for y from 0 below res)
+			(let ((p (map-coordinates x y)))
+			  (when (insidep lines p)
+			    (collect
+			     (let ((d (compute-distance distance-type points p t)))
+			       (cons (iter (for i from 0 below n)
+					   (when (elt on-off i)
+					     (sum (funcall blend-function d i))))
+				     p)))))))
+	     (when line (collect line)))
+       filename))))
+
+#+nil
+(write-blends-uv-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend2.vtk"
+			  :blend-function #'ribbon-blend :distance-type 'line-sweep)
+
+(defun spider-lines (n)
+  (iter (with inner-start = 0)
+	(with outer-vert = 1)
+	(for layer from 1 to *resolution*)
+	(for inner-vert = inner-start)
+	(for outer-start = outer-vert)
+	(collect
+	 (iter (for side from 0 below n)
+	       (appending
+		(iter (with vert = 0)
+		      (for next-vert = (if (and (= side (1- n))
+						(= vert (1- layer)))
+					   outer-start
+					   (1+ outer-vert)))
+		      (collect inner-vert)
+		      (incf outer-vert)
+		      (incf vert)
+		      (while (/= vert layer))
+		      (for inner-next = (if (and (= side (1- n))
+						 (= vert (1- layer)))
+					    inner-start
+					    (1+ inner-vert)))
+		      (setf inner-vert inner-next)))))
+	(setf inner-start outer-start)))
+
+(defun write-blends-spider-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
+				     (distance-type #'perpendicular-distance))
+  "See the documentation of WRITE-BLENDS."
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (lines (lines-from-points points))
+	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
+	 (vertices (mapcar (lambda (p)
+			     (let ((d (compute-distance distance-type points p t)))
+			       (cons (iter (for i from 0 below (length on-off))
+					   (when (elt on-off i)
+					     (sum (funcall blend-function d i))))
+				     p)))
+			   (vertices points))))
+    (write-vtk-polylines
+     (mapcar (lambda (lst) (mapcar (lambda (i) (elt vertices i)) lst))
+	     (spider-lines n))
+     filename)))
+
+#+nil
+(write-blends-spider-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend.vtk"
+			      :blend-function #'ribbon-blend :distance-type 'line-sweep)
