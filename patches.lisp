@@ -255,3 +255,75 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
       (0 6 0) (0 4 0) (0 2 0))
     '((2 2 1) (4 2 1) (4 4 1) (2 4 1)))
    "/tmp/coons.vtk" #'coons-evaluate))
+
+
+;;; everything above here is deprecated
+
+(defun generate-coordinates (angles heights)
+  (let ((lines (lines-from-points (points-from-angles angles))))
+    (iter (for line in lines)
+	  (for lst in heights)
+	  (for n = (length lst))
+	  (collect
+	   (iter (for i from 0 below n)
+		 (for x in lst)
+		 (for yz = (affine-combine (first line) (/ i (1- n)) (second line)))
+		 (collect (cons x yz)))))))
+
+;;; (generate-coordinates '(30 120 100) '((1 2 1) (1 3) (3 2 2 1)))
+
+(defun compute-parameter (type points p)
+  (mapcar (ecase type
+	    (perpendicular (lambda (lst) (perpendicular-distance points lst p 's)))
+	    (barycentric (let ((lines (lines-from-points points)))
+			   (lambda (lst) (barycentric-distance lines lst p 's))))
+	    (chord-based (lambda (lst) (chord-based-distance points lst p 's)))
+	    (radial (lambda (lst) (radial-distance points lst p 's)))
+	    (line-sweep (let ((center (central-point points (lines-from-points points) t)))
+			  (lambda (lst) (line-sweep-distance center lst p 's)))))
+	  (iter (for i from -2 below (- (length points) 2))
+		(collect (iter (for j from 0 below 4)
+			       (collect (elt points (mod (+ i j) (length points)))))))))
+
+(defun write-ribbon-blends (angles heights filename &key (distance-type #'perpendicular-distance))
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (generate-patch (generate-coordinates angles heights)))
+	 (vertices (iter (for p in (vertices points))
+			 (for d = (compute-distance distance-type points p t))
+			 (for s = (compute-parameter distance-type points p))
+			 (collect
+			  (iter (for i from 0 below (length patch))
+				(with result = '(0 0 0))
+				(setf result
+				      (v+ result
+					  (v* (ribbon-evaluate patch i s d)
+					      (ribbon-blend d i))))
+				(finally (return result)))))))
+    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+
+(defun write-corner-blends (angles heights filename &key (distance-type #'perpendicular-distance))
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (generate-patch (generate-coordinates angles heights)))
+	 (vertices (iter (for p in (vertices points))
+			 (for d = (compute-distance distance-type points p t))
+			 (for s = (compute-parameter distance-type points p))
+			 (collect
+			  (iter (for i from 0 below (length patch))
+				(with result = '(0 0 0))
+				(setf result
+				      (v+ result
+					  (v* (ribbon-evaluate patch i s d) ; kutykurutty
+					      (corner-blend d i))))
+				(finally (return result)))))))
+    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+
+;;; problemak:
+;;; - korrekcios patchet hogyan ertelmezzuk
+;;; - sarokblendnel hogyan hasznaljuk az s,d-t
+;;; - mi lesz a coons patch kiertekelessel?
+
+;;; todo:
+;;; - generate-patch (n > 4 -re, es tetszolegesen hosszu spline-okra)
+;;; - ribbon-evaluate
