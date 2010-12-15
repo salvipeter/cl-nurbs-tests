@@ -6,13 +6,13 @@
 
 (defvar *alpha*)
 
-(defun points-from-angles (angles)
+(defun points-from-angles (angles &optional (radius 1.0d0))
   "Gives a list of points on the unit circle, divided by the given angles.
 For example, for a equilateral triangle give '(120 120 120)."
   (iter (for degrees in angles)
 	(for angle = (/ (* degrees pi) 180.0d0))
 	(for alpha first angle then (+ alpha angle))
-	(collect (list (cos alpha) (sin alpha)))))
+	(collect (v* (list (cos alpha) (sin alpha)) radius))))
 
 (defun lines-from-points (points)
   "List of point pairs (last-first, first-second, second-third, ...)."
@@ -76,7 +76,10 @@ For example, for a equilateral triangle give '(120 120 120)."
   "A blend function that is 1 on the Ith line, 0 on all others.
 This naturally means that we have singularities in the corners."
   (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (blend d i))
-	((< (elt d i) *tiny*) 1.0d0)
+	((< (elt d i) *tiny*)
+	 (if (= (length (remove-if-not (lambda (di) (< di *tiny*)) d)) 1)
+	     1.0d0
+	     0.5d0))
 	(t 0.0d0)))
 
 (defun corner-blend (d i)

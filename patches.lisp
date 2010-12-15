@@ -10,23 +10,32 @@
 	  (delta points i (1- d)))))
 
 (defun factorial (n)
-  (iter (for i from 1 to n)
-	(multiply i)))
+  (labels ((rec (k acc)
+	     (if (<= k 1)
+		 acc
+		 (rec (1- k) (* k acc)))))
+    (rec n 1)))
 
 (defun combination (n k)
-  (/ (factorial n) (factorial k) (factorial (- n k))))
+  (labels ((rec (n k acc)
+	     (if (= k 0)
+		 acc
+		 (rec (1- n) (1- k) (/ (* n acc) k)))))
+    (rec n k 1)))
 
 (defun bernstein (n i u)
   (* (combination n i) (expt u i) (expt (- 1.0d0 u) (- n i))))
 
 (defun bezier (points u &optional (derivative 0))
-  (v* (iter (with p = '(0 0 0))
-	    (for i from 0 to (- 3 derivative))
-	    (setf p (v+ p (v* (delta points i derivative)
-			      (bernstein (- 3 derivative) i u))))
-	    (finally (return p)))
-      (/ (factorial 3) (factorial (- 3 derivative)))))
+  (let ((n (1- (length points))))
+    (v* (iter (with p = '(0 0 0))
+	      (for i from 0 to (- n derivative))
+	      (setf p (v+ p (v* (delta points i derivative)
+				(bernstein (- n derivative) i u))))
+	      (finally (return p)))
+	(/ (factorial n) (factorial (- n derivative))))))
 
+#+nil
 (defun generate-patch (points twists)
   "POINTS : x4=p1 p2 p3 p4=q1 q2 q3 q4=r1 ... x3
 TWISTS : x3p2 p3q2 q3r2 ... w3x2"
@@ -63,10 +72,12 @@ TWISTS : x3p2 p3q2 q3r2 ... w3x2"
 			       (if (oddp k) du dv)
 			       (twist (* k 3) (elt twists k)))))))))))
 
+#+nil
 (defun uniform-angles (n)
   (let ((angle (/ 360.0d0 n)))
     (loop repeat n collect angle)))
 
+#+nil
 (defun uv-parameter (lines p)
   (let ((edge-length (* 2.0d0 (sin (/ pi (length lines))))))
     (mapcar (lambda (line)
@@ -74,6 +85,7 @@ TWISTS : x3p2 p3q2 q3r2 ... w3x2"
 		 edge-length))
 	    lines)))
 
+#+nil
 (defun coons-evaluate (patch lines p)
   "PATCH is a list of (C1i C2i Ri Rui Rvi Ruvi ...)
 For a 4-sided patch, D is (U V 1-U 1-V)"
@@ -129,6 +141,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		(v* (rc 1 0 'uv) (beta1 u) (beta0 v))
 		(v* (rc 1 1 'uv) (beta1 u) (beta1 v))))))))
 
+#+nil
 (defun classic-ribbon-evaluate (patch lines p)
   (iter (with n = (length lines))
 	(with d = (uv-parameter lines p))
@@ -143,6 +156,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(setf result (v+ result (v* point blend)))
 	(finally (return result))))
 
+#+nil
 (defun corner-correction (patch d i)
   (let* ((i-1 (mod (1- i) (length d)))
 	 (di-1 (elt d i-1))
@@ -153,6 +167,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(v* (elt (elt patch i) 5) di-1 di
 	    *ribbon-multiplier* *ribbon-multiplier*))))
 
+#+nil
 (defun corner-ribbon-evaluate (patch lines p)
   (iter (with n = (length lines))
 	(with d = (uv-parameter lines p))
@@ -172,6 +187,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	(setf result (v+ result (v* (v- point correction) blend)))
 	(finally (return result))))
 
+#+nil
 (defun double-corner-ribbon-evaluate (patch lines p)
   (iter (with n = (length lines))
 	(with d = (uv-parameter lines p))
@@ -190,6 +206,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				    (v* correction correction-blend))))
 	(finally (return result))))
 
+#+nil
 (defun write-patch (patch filename &optional (fn #'coons-evaluate))
   (let* ((n (length patch))
 	 (angles (uniform-angles n))
@@ -200,6 +217,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 			   parameters)))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
+#+nil
 (defun write-square-patch (patch filename &optional (fn #'coons-evaluate))
   (assert (= (length patch) 4))
   (let* ((points (points-from-angles '(45 90 90 90)))
@@ -213,6 +231,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		  (format s "~{~f~^ ~}~%"
 			  (funcall fn patch lines (list u v))))))))
 
+#+nil
 (defun write-bezier-polygons (curves filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (let ((n (* (length curves) 4)))
@@ -257,43 +276,71 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
    "/tmp/coons.vtk" #'coons-evaluate))
 
 
-;;; everything above here is deprecated
+(defun generate-coordinates (lines heights)
+  (iter (for line in lines)
+	(for lst in heights)
+	(for n = (length lst))
+	(collect
+	 (iter (for i from 0 below n)
+	       (for x in lst)
+	       (for yz = (affine-combine (first line) (/ i (1- n)) (second line)))
+	       (collect (cons x yz))))))
 
-(defun generate-coordinates (angles heights)
-  (let ((lines (lines-from-points (points-from-angles angles))))
-    (iter (for line in lines)
-	  (for lst in heights)
-	  (for n = (length lst))
-	  (collect
-	   (iter (for i from 0 below n)
-		 (for x in lst)
-		 (for yz = (affine-combine (first line) (/ i (1- n)) (second line)))
-		 (collect (cons x yz)))))))
+#+nil
+(generate-coordinates (lines-from-points (points-from-angles '(30 120 100)))
+		      '((1 2 1) (1 3) (3 2 2 1)))
 
-;;; (generate-coordinates '(30 120 100) '((1 2 1) (1 3) (3 2 2 1)))
+(defun ribbon-evaluate (patch i s d)
+  "PATCH has two elements: (outer-bezier-points inner-bezier-points)."
+  (let* ((base-point (bezier (elt (first patch) i) (elt s i)))
+	 (inner-point (bezier (elt (second patch) i) (elt s i)))
+	 (derivative (v* (v- inner-point base-point) 3.0d0)))
+    (v+ base-point (v* derivative (elt d i) *ribbon-multiplier*))))
 
-(defun compute-parameter (type points p)
-  (mapcar (ecase type
-	    (perpendicular (lambda (lst) (perpendicular-distance points lst p 's)))
-	    (barycentric (let ((lines (lines-from-points points)))
-			   (lambda (lst) (barycentric-distance lines lst p 's))))
-	    (chord-based (lambda (lst) (chord-based-distance points lst p 's)))
-	    (radial (lambda (lst) (radial-distance points lst p 's)))
-	    (line-sweep (let ((center (central-point points (lines-from-points points) t)))
-			  (lambda (lst) (line-sweep-distance center lst p 's)))))
-	  (iter (for i from -2 below (- (length points) 2))
-		(collect (iter (for j from 0 below 4)
-			       (collect (elt points (mod (+ i j) (length points)))))))))
+(defun compute-parameter (type points p &optional no-tiny-p)
+  (macrolet ((tiny-lambda ((args) &body body)
+	       `(lambda (,args)
+		  (if no-tiny-p
+		      (let ((result (progn ,@body)))
+			(if (< result *tiny*) 0.0d0 result))
+		      (progn ,@body)))))
+    (mapcar (ecase type
+	      (perpendicular (tiny-lambda (lst) (perpendicular-distance points lst p 's)))
+	      (barycentric (let ((lines (lines-from-points points)))
+			     (tiny-lambda (lst) (barycentric-distance lines lst p 's))))
+	      (chord-based (tiny-lambda (lst) (chord-based-distance points lst p 's)))
+	      (radial (tiny-lambda (lst) (radial-distance points lst p 's)))
+	      (line-sweep (let ((center (central-point points (lines-from-points points) t)))
+			    (tiny-lambda (lst) (line-sweep-distance center lst p 's)))))
+	    (iter (for i from -2 below (- (length points) 2))
+		  (collect (iter (for j from 0 below 4)
+				 (collect (elt points (mod (+ i j) (length points))))))))))
 
-(defun write-ribbon-blends (angles heights filename &key (distance-type #'perpendicular-distance))
+(defun generate-patch (outer inner)
+  (let ((n (length outer)))
+    (list outer
+	  (iter (for i from 0 below n)
+		(for previous = (elt outer (mod (1- i) n)))
+		(for next = (elt outer (mod (1+ i) n)))
+		(collect (append (list (elt previous (- (length previous) 2)))
+				 (elt inner i)
+				 (list (elt next 1))))))))
+
+(defun write-ribbon-blends (angles heights derivative-heights filename &key
+			    (distance-type 'perpendicular))
   (let* ((n (length angles))
 	 (points (points-from-angles angles))
-	 (patch (generate-patch (generate-coordinates angles heights)))
-	 (vertices (iter (for p in (vertices points))
+	 (patch (generate-patch
+		 (generate-coordinates (lines-from-points points) heights)
+		 (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
+				       derivative-heights)))
+	 (vertices (iter (for domain-point in (vertices points))
+			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
+					   domain-point))
 			 (for d = (compute-distance distance-type points p t))
-			 (for s = (compute-parameter distance-type points p))
+			 (for s = (compute-parameter distance-type points p t))
 			 (collect
-			  (iter (for i from 0 below (length patch))
+			  (iter (for i from 0 below (length points))
 				(with result = '(0 0 0))
 				(setf result
 				      (v+ result
@@ -302,28 +349,37 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				(finally (return result)))))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
-(defun write-corner-blends (angles heights filename &key (distance-type #'perpendicular-distance))
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
-	 (patch (generate-patch (generate-coordinates angles heights)))
-	 (vertices (iter (for p in (vertices points))
-			 (for d = (compute-distance distance-type points p t))
-			 (for s = (compute-parameter distance-type points p))
-			 (collect
-			  (iter (for i from 0 below (length patch))
-				(with result = '(0 0 0))
-				(setf result
-				      (v+ result
-					  (v* (ribbon-evaluate patch i s d) ; kutykurutty
-					      (corner-blend d i))))
-				(finally (return result)))))))
-    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+#+nil
+(let ((*ribbon-multiplier* 0.5d0))
+  (write-ribbon-blends '(40 20 60 100 80)
+		       '((0 0.1 0.1 0)
+			 (0 0.2 0.3 0.4)
+			 (0.4 0.6 0.6 0.4)
+			 (0.4 0.5 0.6 0.4 0.2 0)
+			 (0 0.2 0.1 0))
+		       '((0.2 0.2)
+			 (0.2 0.5)
+			 (0.5 0.8)
+			 (0.8 0.2)
+			 (0.2 0.2))
+		       "/tmp/patch.vtk"
+		       :distance-type 'line-sweep))
+
+#+nil
+(let ((*ribbon-multiplier* 0.5d0))
+  (write-ribbon-blends '(0.0d0 90 90 90)
+		       '((0.0d0 0.0d0 0.0d0 0.0d0)
+			 (0.0d0 0.0d0 0.0d0 0.0d0)
+			 (0.0d0 0.0d0 0.0d0 0.0d0)
+			 (0.0d0 0.0d0 0.0d0 0.0d0))
+		       '((0.0d0 0.0d0)
+			 (0.0d0 0.0d0)
+			 (0.0d0 0.0d0)
+			 (0.0d0 0.0d0))
+		       "/tmp/patch.vtk"
+		       :distance-type 'line-sweep))
 
 ;;; problemak:
 ;;; - korrekcios patchet hogyan ertelmezzuk
 ;;; - sarokblendnel hogyan hasznaljuk az s,d-t
 ;;; - mi lesz a coons patch kiertekelessel?
-
-;;; todo:
-;;; - generate-patch (n > 4 -re, es tetszolegesen hosszu spline-okra)
-;;; - ribbon-evaluate

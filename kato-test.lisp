@@ -6,7 +6,7 @@
 (defparameter *point-size* 3.0d0)
 (defparameter *density* 50.0d0)
 (defparameter *tolerance* 1.0d0)
-(defparameter *epsilon* 1.0d-8)
+(defparameter *epsilon* 1.0d-5)
 (defparameter *colors*
   '((on-line . (0 0 0))
     (outside . (255 255 255))
@@ -188,7 +188,7 @@
 	   (iter (for q1 in points)
 		 (maximize (iter (for q2 in points)
 				 (maximize (point-distance q1 q2))))))
-	(/ (scalar-product (v- p0 p) (vnormalize (v- p1 p0)))
+	(/ (abs (scalar-product (v- p0 p) (vnormalize (v- p1 p0))))
 	   (point-distance p0 p1)))))
 
 (defun barycentric-distance (lines segments p type)
