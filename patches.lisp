@@ -297,6 +297,30 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (derivative (v* (v- inner-point base-point) 3.0d0)))
     (v+ base-point (v* derivative (elt d i) *ribbon-multiplier*))))
 
+(defun corner-evaluate (patch i s)
+  (let* ((i-1 (mod (1- i) (length s)))
+	 (si-1 (elt s i-1))
+	 (si (elt s i))
+	 (ci-1 (bezier (elt (first patch) i-1) si-1))
+	 (ci (bezier (elt (first patch) i) si))
+	 (di-1 (v* (v- (bezier (elt (second patch) i-1) si-1) ci-1) 3.0d0))
+	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0)))
+    (v+ ci ci-1 (v* di si-1) (v* di-1 si))))
+
+(defun corner-correction (patch i s)
+  (let* ((i-1 (mod (1- i) (length s)))
+	 (si-1 (elt s i-1))
+	 (si (elt s i))
+	 (previous (let ((lst (elt (first patch) i-1)))
+		     (elt lst (- (length lst) 2))))
+	 (corner (first (elt (first patch) i)))
+	 (next (second (elt (first patch) i)))
+	 (twist (second (elt (second patch) i))))
+    (v+ corner
+	(v* (v- previous corner) 3.0d0 si-1)
+	(v* (v- next corner) 3.0d0 si)
+	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 si-1 si))))
+
 (defun compute-parameter (type points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
 	       `(lambda (,args)
@@ -326,14 +350,14 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				 (elt inner i)
 				 (list (elt next 1))))))))
 
-(defun write-ribbon-blends (angles heights derivative-heights filename &key
-			    (distance-type 'perpendicular))
+(defun write-ribbon-blends (angles filename &key heights coords (distance-type 'perpendicular))
   (let* ((n (length angles))
 	 (points (points-from-angles angles))
-	 (patch (generate-patch
-		 (generate-coordinates (lines-from-points points) heights)
-		 (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
-				       derivative-heights)))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
+					   (second heights)))))
 	 (vertices (iter (for domain-point in (vertices points))
 			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
 					   domain-point))
@@ -349,34 +373,76 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				(finally (return result)))))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
+(defun write-corner-blends (angles filename &key heights coords (distance-type 'perpendicular))
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
+					   (second heights)))))
+	 (vertices (iter (for domain-point in (vertices points))
+			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
+					   domain-point))
+			 (for d = (compute-distance distance-type points p t))
+			 (for s = (compute-parameter distance-type points p t))
+			 (collect
+			  (iter (for i from 0 below (length points))
+				(with result = '(0 0 0))
+				(setf result
+				      (v+ result
+					  (v* (v- (corner-evaluate patch (mod (1+ i) n) s)
+						  (corner-correction patch (mod (1+ i) n) s))
+					      (corner-blend d (mod (1- i) n)))))
+				(finally (return result)))))))
+    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+
 #+nil
 (let ((*ribbon-multiplier* 0.5d0))
   (write-ribbon-blends '(40 20 60 100 80)
-		       '((0 0.1 0.1 0)
-			 (0 0.2 0.3 0.4)
-			 (0.4 0.6 0.6 0.4)
-			 (0.4 0.5 0.6 0.4 0.2 0)
-			 (0 0.2 0.1 0))
-		       '((0.2 0.2)
-			 (0.2 0.5)
-			 (0.5 0.8)
-			 (0.8 0.2)
-			 (0.2 0.2))
 		       "/tmp/patch.vtk"
+		       :heights
+		       '(((0 0.1 0.1 0)
+			  (0 0.2 0.3 0.4)
+			  (0.4 0.6 0.6 0.4)
+			  (0.4 0.5 0.6 0.4 0.2 0)
+			  (0 0.2 0.1 0))
+			 ((0.2 0.2)
+			  (0.2 0.5)
+			  (0.5 0.8)
+			  (0.8 0.2)
+			  (0.2 0.2)))
 		       :distance-type 'line-sweep))
+
+#+nil
+(write-corner-blends '(40 20 60 100 80)
+		     "/tmp/patch.vtk"
+		     :heights
+		     '(((0 0.1 0.1 0)
+			(0 0.2 0.3 0.4)
+			(0.4 0.6 0.6 0.4)
+			(0.4 0.5 0.6 0.4 0.2 0)
+			(0 0.2 0.1 0))
+		       ((0.2 0.2)
+			(0.2 0.5)
+			(0.5 0.8)
+			(0.8 0.2)
+			(0.2 0.2)))
+		     :distance-type 'line-sweep)
 
 #+nil
 (let ((*ribbon-multiplier* 0.5d0))
   (write-ribbon-blends '(0.0d0 90 90 90)
-		       '((0.0d0 0.0d0 0.0d0 0.0d0)
-			 (0.0d0 0.0d0 0.0d0 0.0d0)
-			 (0.0d0 0.0d0 0.0d0 0.0d0)
-			 (0.0d0 0.0d0 0.0d0 0.0d0))
-		       '((0.0d0 0.0d0)
-			 (0.0d0 0.0d0)
-			 (0.0d0 0.0d0)
-			 (0.0d0 0.0d0))
 		       "/tmp/patch.vtk"
+		       :heights
+		       '(((0.0d0 0.0d0 0.0d0 0.0d0)
+			  (0.0d0 0.0d0 0.0d0 0.0d0)
+			  (0.0d0 0.0d0 0.0d0 0.0d0)
+			  (0.0d0 0.0d0 0.0d0 0.0d0))
+			 ((0.0d0 0.0d0)
+			  (0.0d0 0.0d0)
+			  (0.0d0 0.0d0)
+			  (0.0d0 0.0d0)))
 		       :distance-type 'line-sweep))
 
 ;;; problemak:
