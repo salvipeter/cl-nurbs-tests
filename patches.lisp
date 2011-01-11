@@ -305,7 +305,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (ci (bezier (elt (first patch) i) si))
 	 (di-1 (v* (v- (bezier (elt (second patch) i-1) si-1) ci-1) 3.0d0))
 	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0)))
-    (v+ ci ci-1 (v* di si-1) (v* di-1 si))))
+    (v+ ci ci-1 (v* di (- 1.0d0 si-1)) (v* di-1 si))))
 
 (defun corner-correction (patch i s)
   (let* ((i-1 (mod (1- i) (length s)))
@@ -317,9 +317,9 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (next (second (elt (first patch) i)))
 	 (twist (second (elt (second patch) i))))
     (v+ corner
-	(v* (v- previous corner) 3.0d0 si-1)
+	(v* (v- previous corner) 3.0d0 (- 1.0d0 si-1))
 	(v* (v- next corner) 3.0d0 si)
-	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 si-1 si))))
+	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 (- 1.0d0 si-1) si))))
 
 (defun compute-parameter (type points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
@@ -391,8 +391,8 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				(with result = '(0 0 0))
 				(setf result
 				      (v+ result
-					  (v* (v- (corner-evaluate patch (mod (1+ i) n) s)
-						  (corner-correction patch (mod (1+ i) n) s))
+					  (v* (v- (corner-evaluate patch i s)
+						  (corner-correction patch i s))
 					      (corner-blend d (mod (1- i) n)))))
 				(finally (return result)))))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
