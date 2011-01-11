@@ -397,6 +397,32 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				(finally (return result)))))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
+(defun write-hybrid-blends (angles filename &key heights coords (distance-type 'perpendicular))
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
+					   (second heights)))))
+	 (vertices (iter (for domain-point in (vertices points))
+			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
+					   domain-point))
+			 (for d = (compute-distance distance-type points p t))
+			 (for s = (compute-parameter distance-type points p t))
+			 (collect
+			  (iter (for i from 0 below (length points))
+				(with result = '(0 0 0))
+				(setf result
+				      (v+ result
+					  (v- (v* (ribbon-evaluate patch i s d)
+						  (+ (corner-blend d (mod (1- i) n))
+						     (corner-blend d i)))
+					      (v* (corner-correction patch i s)
+						  (corner-blend d (mod (1- i) n))))))
+				(finally (return result)))))))
+    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+
 #+nil
 (let ((*ribbon-multiplier* 0.5d0))
   (write-ribbon-blends '(40 20 60 100 80)
@@ -431,21 +457,20 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		     :distance-type 'line-sweep)
 
 #+nil
-(let ((*ribbon-multiplier* 0.5d0))
-  (write-ribbon-blends '(0.0d0 90 90 90)
-		       "/tmp/patch.vtk"
-		       :heights
-		       '(((0.0d0 0.0d0 0.0d0 0.0d0)
-			  (0.0d0 0.0d0 0.0d0 0.0d0)
-			  (0.0d0 0.0d0 0.0d0 0.0d0)
-			  (0.0d0 0.0d0 0.0d0 0.0d0))
-			 ((0.0d0 0.0d0)
-			  (0.0d0 0.0d0)
-			  (0.0d0 0.0d0)
-			  (0.0d0 0.0d0)))
-		       :distance-type 'line-sweep))
+(write-hybrid-blends '(40 20 60 100 80)
+		     "/tmp/patch.vtk"
+		     :heights
+		     '(((0 0.1 0.1 0)
+			(0 0.2 0.3 0.4)
+			(0.4 0.6 0.6 0.4)
+			(0.4 0.5 0.6 0.4 0.2 0)
+			(0 0.2 0.1 0))
+		       ((0.2 0.2)
+			(0.2 0.5)
+			(0.5 0.8)
+			(0.8 0.2)
+			(0.2 0.2)))
+		     :distance-type 'line-sweep)
 
 ;;; problemak:
-;;; - korrekcios patchet hogyan ertelmezzuk
-;;; - sarokblendnel hogyan hasznaljuk az s,d-t
 ;;; - mi lesz a coons patch kiertekelessel?
