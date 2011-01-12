@@ -359,7 +359,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
 		    (generate-patch
 		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.7d0))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
 					   (second heights)))))
 	 (vertices (iter (for domain-point in (vertices points))
 			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
@@ -403,5 +403,98 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		  (0.2 0.2)))
 	       :distance-type 'line-sweep))
 
+#+nil
+(let ((*ribbon-multiplier* 0.5d0)
+      (*resolution* 20))
+  (write-patch '(50 20 50 240)
+	       'ribbon
+	       "/tmp/patch.vtk"
+	       :heights
+	       '(((0 0.2 0.2 0)
+		  (0 0.4 0.4 0)
+		  (0 0.2 0.2 0)
+		  (0 0.4 0.4 0))
+		 ((0.6 0.6)
+		  (0.6 0.6)
+		  (0.6 0.6)
+		  (0.6 0.6)))
+	       :distance-type 'line-sweep))
+
 ;;; problemak:
 ;;; - mi lesz a coons patch kiertekelessel?
+
+(defun write-vtk-curves (curves filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (let* ((lengths (mapcar #'length curves))
+	   (n (reduce #'+ lengths)))
+      (format s "# vtk DataFile Version 1.0~
+		 ~%Control Curves~
+		 ~%ASCII~
+		 ~%DATASET POLYDATA~%~
+		 ~%POINTS ~d float~%" n)
+      (iter (for point in (reduce #'append curves))
+	    (format s "~{~f ~}~%" point))
+      (let ((nlines (- n (length curves))))
+	(format s "~%LINES ~d ~d~%" nlines (* 3 nlines)))
+      (iter (for k first 0 then (+ k d))
+	    (for d in lengths)
+	    (iter (for i from k below (+ k d -1))
+		  (format s "2 ~d ~d~%" i (1+ i)))))))
+
+(defun write-constraint-ribbons (angles filename &key (resolution 100) heights coords)
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
+					   (second heights)))))
+	 (curves (iter (for curve1 in (first patch))
+		       (for curve2 in (second patch))
+		       (for points1 =
+			    (iter (for u from 0 to 1 by (/ resolution))
+				  (collect (bezier curve1 u))))
+		       (for points2 =
+			    (iter (for u from 0 to 1 by (/ resolution))
+				  (collect (bezier curve2 u))))
+		       (appending (append (list points1 points2)
+					  (mapcar #'list points1 points2))))))
+    (write-vtk-curves curves filename)))
+
+(defun write-constraint-grid (angles filename &key (resolution 100) heights coords)
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
+					   (second heights))))))
+    (write-vtk-curves (append (first patch) (second patch)) filename)))
+
+#+nil
+(write-constraint-grid
+ '(50 20 50 240)
+ "/tmp/grid.vtk"
+ :heights
+ '(((0 0.2 0.2 0)
+    (0 0.4 0.4 0)
+    (0 0.2 0.2 0)
+    (0 0.4 0.4 0))
+   ((0.6 0.6)
+    (0.6 0.6)
+    (0.6 0.6)
+    (0.6 0.6))))
+
+#+nil
+(write-constraint-ribbons
+ '(90 90 90 90)
+ "/tmp/grid.vtk"
+ :heights
+ '(((0 0.2 0.2 0)
+    (0 0.4 0.4 0)
+    (0 0.2 0.2 0)
+    (0 0.4 0.4 0))
+   ((0.6 0.6)
+    (0.6 0.6)
+    (0.6 0.6)
+    (0.6 0.6))))
