@@ -421,3 +421,13 @@
       (*tolerance* 1.0d0))
   (distance-function-test '(40 20 60 100 80) 'chord-based '(s d)
 			  "/tmp/distance.ppm"))
+
+(defun connect-points (points)
+  (let* ((n (length points))
+	 (matrix (iter (for i from 0 below n)
+		       (appending
+			(iter (for j from (1+ i) below n)
+			      (collect
+			       (list i j (point-distance (elt points i) (elt points j))))))))
+	 (sorted (sort (copy-list matrix) #'< :key #'third)))
+    'todo))

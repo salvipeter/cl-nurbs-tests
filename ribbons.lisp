@@ -182,7 +182,7 @@ the interior surface will be 1/(N+1), where N is the number of lines."
     (nreverse result)))
 
 (defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend)
-		     (distance-type #'perpendicular-distance))
+		     (distance-type 'perpendicular))
   "Computes samples by a set of blend functions and writes it in a VTK file.
 The ON-OFF parameter declares which blends should be turned on.
 For ANGLES, see POINTS-FROM-ANGLES."
@@ -201,7 +201,7 @@ For ANGLES, see POINTS-FROM-ANGLES."
 
 ;;; quadrilateral mesh
 (defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend)
-			  (distance-type #'perpendicular-distance))
+			  (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
   (let* ((points (points-from-angles angles))
 	 (lines (lines-from-points points))
@@ -267,7 +267,7 @@ For ANGLES, see POINTS-FROM-ANGLES."
 	  (terpri s))))))
 
 (defun write-blends-uv-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
-				 (distance-type #'perpendicular-distance))
+				 (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
   (let* ((points (points-from-angles angles))
 	 (lines (lines-from-points points))
@@ -321,7 +321,7 @@ For ANGLES, see POINTS-FROM-ANGLES."
 	(setf inner-start outer-start)))
 
 (defun write-blends-spider-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
-				     (distance-type #'perpendicular-distance))
+				     (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
   (let* ((n (length angles))
 	 (points (points-from-angles angles))
@@ -342,3 +342,75 @@ For ANGLES, see POINTS-FROM-ANGLES."
 #+nil
 (write-blends-spider-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend.vtk"
 			      :blend-function #'ribbon-blend :distance-type 'line-sweep)
+
+(defun generate-colors (n)
+  (assert (<= n 6) (n) "Only N <= 6 is supported.")
+  (subseq '((255 0 0) (0 255 0) (0 0 255)
+            (255 255 0) (255 0 255) (0 255 255))
+          0 n))
+
+(defun write-color-blend-test (angles filename r &key (blend-function #'ribbon-blend)
+			       (distance-type 'perpendicular) (trim '(0.89d0 0.91d0)))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length angles))
+	   (points (points-from-angles angles))
+	   (lines (lines-from-points points))
+	   (colors (generate-colors n)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let* ((d (compute-distance distance-type points p t)) 
+			 (blends (iter (for i from 0 below n)
+				       (collect (funcall blend-function d i)))))
+                    (if (and trim (some (lambda (x) (< (first trim) x (second trim))) blends))
+			(format s "0 0 0~%")
+			(format s "~{~d~^ ~}~%"
+				(mapcar #'round
+					(reduce (lambda (x y) (mapcar #'+ x y))
+						(mapcar #'v* colors blends))))))
+                  (format s "255 255 255~%")))))))))
+
+;;; Display only the si=... lines
+(defun write-si-line-test (angles filename r &key (distance-type 'perpendicular)
+			   (trim '(0.495d0 0.505d0)))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length angles))
+	   (points (points-from-angles angles))
+	   (lines (lines-from-points points))
+	   (colors (generate-colors n)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (acond
+	       ((not (insidep lines p)) (format s "255 255 255~%"))
+	       ((iter (for line in lines)
+		      (for i upfrom 0)
+		      (when (< (point-line-distance p line) 0.01d0)
+			(leave (elt colors i))))
+		(format s "~{~d~^ ~}~%" it))
+	       (t
+		(let* ((sp (compute-parameter distance-type points p t))
+		       (on (and trim (some (lambda (x)
+					     (and (< (first trim) x (second trim)) x))
+					   sp))))
+		  (if on
+		      (format s "~{~d~^ ~}~%" (elt colors (position on sp)))
+		      (format s "127 127 127~%"))))))))))))
+
+#+nil
+(write-color-blend-test '(40 20 60 100 80) "/tmp/blend.ppm" 200
+			:blend-function #'ribbon-blend
+			:distance-type 'chord-based
+			:trim '(0.495d0 0.505d0))
+
+#+nil
+(write-si-line-test '(40 20 60 100 80) "/tmp/blend.ppm" 200
+			:distance-type 'line-sweep
+			:trim '(0.495d0 0.505d0))

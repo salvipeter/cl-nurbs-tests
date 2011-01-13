@@ -386,16 +386,16 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
 #+nil
-(let ((*ribbon-multiplier* 0.5d0))
+(let ((*ribbon-multiplier* 1.0d0))
   (write-patch '(40 20 60 100 80)
 	       'corner
 	       "/tmp/patch.vtk"
 	       :heights
-	       '(((0 0.1 0.1 0)
-		  (0 0.2 0.3 0.4)
-		  (0.4 0.6 0.6 0.4)
-		  (0.4 0.5 0.6 0.4 0.2 0)
-		  (0 0.2 0.1 0))
+	       '(((0.0d0 0.1d0 0.1d0 0.0d0)
+		  (0.0d0 0.2d0 0.3d0 0.4d0)
+		  (0.4d0 0.6d0 0.6d0 0.4d0)
+		  (0.4d0 0.5d0 0.6d0 0.4d0 0.2d0 0.0d0)
+		  (0.0d0 0.2d0 0.1d0 0.0d0))
 		 ((0.2 0.2)
 		  (0.2 0.5)
 		  (0.5 0.8)
