@@ -416,12 +416,86 @@
   (distance-function-test '(40 20 60 100 80) 'chord-based '(s d)
 			  "/tmp/distance.ppm"))
 
-(defun connect-points (points)
-  (let* ((n (length points))
-	 (matrix (iter (for i from 0 below n)
-		       (appending
-			(iter (for j from (1+ i) below n)
-			      (collect
-			       (list i j (point-distance (elt points i) (elt points j))))))))
-	 (sorted (sort (copy-list matrix) #'< :key #'third)))
-    sorted))
+(defun trace-parameter (points i distance-type type parameter resolution)
+  (let ((fn (if (eq type 's) #'compute-parameter #'compute-distance))
+	(lines (lines-from-points points)))
+    (labels ((query (p) (abs (- (elt (funcall fn distance-type points p t) i) parameter)))
+	     ;; (between (p1 v1 p2 v2) (affine-combine p1 (/ v2 (- v2 v1)) p2))
+	     (get-start (line)
+	       (let ((k (/ (point-distance (first line) (second line)) resolution)))
+		 (iter (repeat (1+ (floor k)))
+		       (with d = (v* (v- (second line) (first line)) (/ k)))
+		       (for p first (first line) then (v+ p d))
+		       (collect (cons (query p) p) into tests)
+		       (finally (return (rest (first (sort tests #'< :key #'first))))))))
+	     (best-three (actual)
+	       (iter (for xi from -1 to 1)
+		     (for x = (+ (first actual) (* xi resolution)))
+		     (appending
+		      (iter (for yi from -1 to 1)
+			    (unless (= xi yi 0)
+			      (for y = (+ (second actual) (* yi resolution)))
+			      (collect (list (query (list x y)) x y))))
+		      into lst)
+		     (finally (return (subseq (mapcar #'rest (sort lst #'< :key #'first)) 0 3)))))
+	     (best-one (prev actual)
+	       (first (remove-if (lambda (p)
+				   (or (not (insidep lines p))
+				       (and prev
+					    (> (scalar-product (v- prev actual) (v- p actual)) 0))))
+				 (best-three actual)))))
+      (let ((start (get-start (elt lines (if (eq type 's) i (mod (1- i) (length lines)))))))
+	(cons start
+	      (iter (for pprev first nil then prev)
+		    (for prev first start then next)
+		    (for next = (best-one pprev prev))
+		    (while next)
+		    (collect next)))))))
+
+(defun vectorized-distance-function-test (angles line-types filename &key (resolution 0.1d0)
+					  (density 4) (distance-type 'perpendicular))
+  "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
+  (flet ((map-point (p)
+	   (list (* (+ (first p) 1.0d0) 200)
+		 (* (+ (second p) 1.0d0) 200))))
+    (let* ((n (length angles))
+	   (points (points-from-angles angles))
+	   (lines (lines-from-points points))
+	   (colors (generate-colors n))
+	   (center (central-point points lines t)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+	(format s "%!PS~%")
+	(format s "~{~f ~}3 0 360 arc fill~%" (map-point center))
+	(iter (for i from 0 below n)
+	      (for color in colors)
+	      (for line in lines)
+	      (for line-type in line-types)
+	      (format t "Segment: ~a~%" i)
+	      (format s "~{~d ~}setrgbcolor~%" color)
+	      (format s "2 setlinewidth~%~
+                         newpath~%~
+                         ~{~f ~}moveto~%~
+                         ~{~f ~}lineto~%~
+                         stroke~%~
+                         1 setlinewidth~%"
+		      (map-point (first line))
+		      (map-point (second line)))
+	      (iter (for type in (case line-type (s '(s)) (d '(d)) (sd '(s d))))
+		    (format t "Type: ~a~%" type)
+		    (iter (with d = (/ density))
+			  (for parameter from d below 1 by d)
+			  (format t "Parameter: ~a~%" parameter)
+			  (for trace =
+			       (trace-parameter points i distance-type type parameter resolution))
+			  (format s "newpath~%")
+			  (format s "~{~f ~}moveto~%~
+                                     ~{~{~f ~}lineto~%~}"
+				  (map-point (first trace))
+				  (mapcar #'map-point (rest trace)))
+			  (format s "stroke~%"))))
+	(format s "showpage~%")))))
+
+#+nil
+(vectorized-distance-function-test
+ '(40 20 60 100 80) '(d nil nil nil nil) "/tmp/params.ps"
+ :resolution 0.001d0 :density 4 :distance-type 'line-sweep)
