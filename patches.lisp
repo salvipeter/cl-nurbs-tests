@@ -442,8 +442,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		  (format s "2 ~d ~d~%" i (1+ i)))))))
 
 (defun write-constraint-ribbons (angles filename &key (resolution 100) heights coords)
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+  (let* ((points (points-from-angles angles))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
 		    (generate-patch
 		     (generate-coordinates (lines-from-points points) (first heights))
@@ -461,9 +460,8 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 					  (mapcar #'list points1 points2))))))
     (write-vtk-curves curves filename)))
 
-(defun write-constraint-grid (angles filename &key (resolution 100) heights coords)
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+(defun write-constraint-grid (angles filename &key heights coords)
+  (let* ((points (points-from-angles angles))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
 		    (generate-patch
 		     (generate-coordinates (lines-from-points points) (first heights))

@@ -290,16 +290,6 @@
     (flet ((aliasing (x) (floor (+ (* alpha x) (* 1-alpha 255)))))
       (format stream "~{~d~^ ~}" (mapcar #'aliasing (cdr (assoc type *colors*)))))))
 
-(defmacro acond (&rest clauses)
-  (if (null clauses)
-      nil
-      (let ((cl1 (car clauses))
-            (sym (gensym)))
-        `(let ((,sym ,(car cl1)))
-           (if ,sym
-               (let ((it ,sym)) ,@(cdr cl1))
-               (acond ,@(cdr clauses)))))))
-
 (defun distance-function-test (angles distance-type line-type filename)
   (let* ((points (mapcar (lambda (p)
 			   (list (/ (+ *width* (* *width* (first p))) 2)
@@ -352,7 +342,9 @@
 				  (and (< center-error *point-size*)
 				       (/ center-error *point-size*))))
 			    (write-color s 'on-line it))
-			   ((outsidep x y) (write-color s 'outside))
+			   ((outsidep x y)
+			    (declare (ignore it))
+			    (write-color s 'outside))
 			   ((on-parameter-line (subseq points 0 4)
 					       (first line-type) x y) 
 			    (if (eq (first line-type) 's)
@@ -370,7 +362,9 @@
 			    (if (eq (second line-type) 's)
 				(write-color s 'si it)
 				(write-color s 'di it)))
-			   (t (write-color s 'nothing))))
+			   (t
+			    (declare (ignore it))
+			    (write-color s 'nothing))))
 	      (terpri s))))))
 
 (defun distance-function-complete-set (angles directory)
@@ -430,4 +424,4 @@
 			      (collect
 			       (list i j (point-distance (elt points i) (elt points j))))))))
 	 (sorted (sort (copy-list matrix) #'< :key #'third)))
-    'todo))
+    sorted))

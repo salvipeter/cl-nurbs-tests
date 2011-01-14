@@ -389,13 +389,16 @@ For ANGLES, see POINTS-FROM-ANGLES."
           (dotimes (y wh)
             (let ((p (map-coordinates x y)))
               (acond
-	       ((not (insidep lines p)) (format s "255 255 255~%"))
+	       ((not (insidep lines p))
+		(declare (ignore it))
+		(format s "255 255 255~%"))
 	       ((iter (for line in lines)
 		      (for i upfrom 0)
 		      (when (< (point-line-distance p line) 0.01d0)
 			(leave (elt colors i))))
 		(format s "~{~d~^ ~}~%" it))
 	       (t
+		(declare (ignore it))
 		(let* ((sp (compute-parameter distance-type points p t))
 		       (on (and trim (some (lambda (x)
 					     (and (< (first trim) x (second trim)) x))
