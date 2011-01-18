@@ -416,6 +416,57 @@
   (distance-function-test '(40 20 60 100 80) 'chord-based '(s d)
 			  "/tmp/distance.ppm"))
 
+(defun trace-parameter-buggy (points i distance-type type parameter resolution)
+  (let ((fn (if (eq type 's) #'compute-parameter #'compute-distance))
+	(lines (lines-from-points points)))
+    (labels ((query (p) (- (elt (funcall fn distance-type points p t) i) parameter))
+	     (between (p1 p2)
+	       (when p2
+		 (affine-combine (rest p1) (/ (first p2) (- (first p2) (first p1))) (rest p2))))
+	     (get-start (line)
+	       (let ((k (/ (point-distance (first line) (second line)) resolution)))
+		 (iter (repeat (1+ (floor k)))
+		       (with d = (v* (v- (second line) (first line)) (/ k)))
+		       (for p first (first line) then (v+ p d))
+		       (collect (cons (abs (query p)) p) into tests)
+		       (finally (return (rest (first (sort tests #'< :key #'first))))))))
+	     (best-few (actual value)
+	       (iter (for xi from -1 to 1)
+		     (for x = (+ (first actual) (* xi resolution)))
+		     (appending
+		      (iter (for yi from -1 to 1)
+			    (unless (= xi yi 0)
+			      (for y = (+ (second actual) (* yi resolution)))
+			      (collect (list (query (list x y)) x y))))
+		      into lst)
+		     (finally (return (sort (mapcar (lambda (x)
+						      (cons (abs (first x)) (rest x)))
+						    (remove-if (lambda (x)
+								 (> (* (first x) value) 0))
+							       lst))
+					    #'< :key #'first)))))
+	     (best-one (prev actual)
+	       (let ((value (query actual)))
+		 (between
+		  (cons value actual)
+		  (first (remove-if (lambda (point)
+				      (let ((p (rest point)))
+					(or (not (insidep lines p))
+					    (and prev
+						 (> (scalar-product (v- prev actual) (v- p actual))
+						    0)))))
+				    (best-few actual value)))))))
+      (let ((start (get-start (elt lines (case type
+					   (s i)
+					   (d1 (mod (1- i) (length lines)))
+					   (d2 (mod (1+ i) (length lines))))))))
+	(cons start
+	      (iter (for pprev first nil then prev)
+		    (for prev first start then next)
+		    (for next = (best-one pprev prev))
+		    (while next)
+		    (collect next)))))))
+
 (defun trace-parameter (points i distance-type type parameter resolution)
   (let ((fn (if (eq type 's) #'compute-parameter #'compute-distance))
 	(lines (lines-from-points points)))
@@ -470,7 +521,7 @@
 	      (for color in colors)
 	      (for line in lines)
 	      (for line-type in line-types)
-	      (format t "Segment: ~a~%" i)
+	      (format s "% Segment: ~a~%" i)
 	      (format s "~{~d ~}setrgbcolor~%" color)
 	      (format s "2 setlinewidth~%~
                          newpath~%~
@@ -480,11 +531,11 @@
                          1 setlinewidth~%"
 		      (map-point (first line))
 		      (map-point (second line)))
-	      (iter (for type in (case line-type (s '(s)) (d '(d)) (sd '(s d))))
-		    (format t "Type: ~a~%" type)
+	      (iter (for type in (case line-type (s '(s)) (d '(d1 d2)) (sd '(s d1 d2))))
+		    (format s "% Type: ~a~%" type)
 		    (iter (with d = (/ density))
 			  (for parameter from d below 1 by d)
-			  (format t "Parameter: ~a~%" parameter)
+			  (format s "% Parameter: ~a~%" parameter)
 			  (for trace =
 			       (trace-parameter points i distance-type type parameter resolution))
 			  (format s "newpath~%")
@@ -497,5 +548,5 @@
 
 #+nil
 (vectorized-distance-function-test
- '(40 20 60 100 80) '(d nil nil nil nil) "/tmp/params.ps"
- :resolution 0.001d0 :density 4 :distance-type 'line-sweep)
+ '(40 20 60 100 80) '(sd nil nil nil sd) "/tmp/params.ps"
+ :resolution 0.1d0 :density 4 :distance-type 'chord-based)
