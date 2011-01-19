@@ -12,7 +12,7 @@
                (acond ,@(cdr clauses)))))))
 
 ;;; Modules
-(load "blends")
-(load "ribbons")
-(load "kato-test")
-(load "patches")
+(load (compile-file "blends"))
+(load (compile-file "ribbons"))
+(load (compile-file "kato-test"))
+(load (compile-file "patches"))
