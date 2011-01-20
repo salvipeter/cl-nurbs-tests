@@ -1,8 +1,8 @@
 ;;; Parameters for Figures 1-3
 (defparameter *p0* '(0.3 0.5))
-(defparameter *t0* '(0.2 0.9))
+(defparameter *t0* '(0.8 0.0))
 (defparameter *p1* '(0.8 0.5))
-(defparameter *t1* '(-0.1 -0.5))
+(defparameter *t1* '(-1.0 1.0))
 
 
 ;;; Figure 1
@@ -143,11 +143,36 @@
 			:blend-function #'corner-blend
 			:distance-type 'radial
 			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09a3-corner-barycentric.ppm" 400
+			:blend-function #'corner-blend
+			:distance-type 'barycentric
+			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09a4-corner-chord.ppm" 400
+			:blend-function #'corner-blend
+			:distance-type 'chord-based
+			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09a5-corner-sweep.ppm" 400
+			:blend-function #'corner-blend
+			:distance-type 'line-sweep
+			:trim '(0.89d0 0.91d0))
+
 (write-color-blend-test *angles* "n-sided-paper/09b1-side-perpendicular.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'perpendicular
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09b2-side-sweep.ppm" 400
+(write-color-blend-test *angles* "n-sided-paper/09b2-side-radial.ppm" 400
+			:blend-function #'ribbon-blend
+			:distance-type 'radial
+			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09b3-side-barycentric.ppm" 400
+			:blend-function #'ribbon-blend
+			:distance-type 'barycentric
+			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09b4-side-chord.ppm" 400
+			:blend-function #'ribbon-blend
+			:distance-type 'chord-based
+			:trim '(0.89d0 0.91d0))
+(write-color-blend-test *angles* "n-sided-paper/09b5-side-sweep.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'line-sweep
 			:trim '(0.89d0 0.91d0))
