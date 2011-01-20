@@ -504,7 +504,8 @@
 		    (collect next)))))))
 
 (defun vectorized-distance-function-test (angles line-types filename &key (resolution 0.1d0)
-					  (density 4) (distance-type 'perpendicular))
+					  (density 4) (distance-type 'perpendicular)
+					  (color t))
   "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
   (flet ((map-point (p)
 	   (list (* (+ (first p) 1.0d0) 200)
@@ -512,7 +513,8 @@
     (let* ((n (length angles))
 	   (points (points-from-angles angles))
 	   (lines (lines-from-points points))
-	   (colors (generate-colors n))
+	   (colors (or (and color (generate-colors n))
+		       (iter (repeat n) (collect '(0 0 0)))))
 	   (center (central-point points lines t)))
       (with-open-file (s filename :direction :output :if-exists :supersede)
 	(format s "%!PS~%")
