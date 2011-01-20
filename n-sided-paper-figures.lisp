@@ -1,7 +1,7 @@
 ;;; Parameters for Figures 1-3
 (defparameter *p0* '(0.3 0.5))
-(defparameter *t0* '(0.8 0.0))
-(defparameter *p1* '(0.8 0.5))
+(defparameter *t0* '(0.2 0.5))
+(defparameter *p1* '(0.2 0.5))
 (defparameter *t1* '(-1.0 1.0))
 
 
@@ -38,6 +38,36 @@
       (*ribbon-multiplier-end* 0.5)
       (*exponent* 2))
   (write-tomi *p0* *t0* *p1* *t1* "n-sided-paper/03-ribbon.ps"))
+
+;;; proba
+(let ((*resolution* 200)
+      (*curvature-comb-scale* 0.01)
+      (*ribbon-multiplier-start* 0.5)
+      (*ribbon-multiplier-end* 0.5)
+      (*exponent* 2)
+      (filename "n-sided-paper/proba.ps")
+      (type #'hermite)
+      (color *green*))
+  (let (curve derivative)
+    (iter (for i from 0 below *resolution*)
+	  (for u = (/ i (1- *resolution*)))
+	  (with curve-fn = (lambda (x d) (funcall type *p0* *t0* *p1* *t1* x :derivative d)))
+	  (for p = (funcall curve-fn u 0))
+	  (collect p into tcurve)
+	  (collect (funcall curve-fn u 1) into tderivative)
+	  (finally (setf curve tcurve derivative tderivative)))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "%!PS~%")
+      ;; Curve
+      (polyline s curve :window 3)
+      (format s "0.1 setlinewidth~%")
+      (iter (for start in curve)
+	    (for vec in derivative)
+	    (for end = (v+ start (v* vec 1/10)))
+	    (for i upfrom 0)
+	    (when (zerop (mod i 20))
+	      (polyline s (list start end) :window 3 :color color)))
+      (format s "showpage~%"))))
 
 
 ;;; Figure 7
