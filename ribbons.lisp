@@ -417,3 +417,32 @@ For ANGLES, see POINTS-FROM-ANGLES."
 (write-si-line-test '(40 20 60 100 80) "/tmp/blend.ppm" 200
 			:distance-type 'line-sweep
 			:trim '(0.495d0 0.505d0))
+
+(defun write-blend-voronoi (angles filename r &key (blend-function #'ribbon-blend)
+			    (distance-type 'perpendicular) (threshold 0.01d0))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length angles))
+	   (points (points-from-angles angles))
+	   (lines (lines-from-points points)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let* ((d (compute-distance distance-type points p t)) 
+			 (blends (iter (for i from 0 below n)
+				       (collect (funcall blend-function d i)))))
+                    (if (destructuring-bind (a b)
+			    (subseq (sort blends #'>) 0 2)
+			  (< (- a b) threshold))
+			(format s "0 0 0~%")
+			(format s "127 127 127~%")))
+                  (format s "255 255 255~%")))))))))
+
+#+nil
+(write-blend-voronoi '(40 20 60 100 80) "/tmp/blend2.ppm" 200
+			:blend-function #'ribbon-blend
+			:distance-type 'line-sweep
+			:threshold 0.03d0)

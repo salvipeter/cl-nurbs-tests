@@ -70,6 +70,41 @@
       (format s "showpage~%"))))
 
 
+;;; Figure 6
+
+;;; Patch using regular and irregular domain
+(defparameter *angles* '(15 35 70 80 80 80))
+(defparameter *coords*
+  (list (generate-coordinates (lines-from-points (points-from-angles *angles*))
+			      '((0.0d0 0.04d0 0.04d0 0.0d0)
+				(0.0d0 0.08d0 0.08d0 0.0d0)
+				(0.0d0 0.1d0 0.1d0 0.0d0)
+				(0.0d0 0.1d0 0.1d0 0.0d0)
+				(0.0d0 0.1d0 0.1d0 0.0d0)
+				(0.0d0 0.1d0 0.1d0 0.0d0)))
+	(generate-coordinates (lines-from-points (points-from-angles *angles* 0.6d0))
+			      '((0.25d0 0.25d0)
+				(0.25d0 0.3d0)
+				(0.3d0 0.35d0)
+				(0.35d0 0.35d0)
+				(0.35d0 0.35d0)
+				(0.35d0 0.25d0)))))
+
+;;; (write-constraint-grid *angles* "n-sided-paper/06x-grid.vtk" :coords *coords*)
+;;; (write-constraint-ribbons *angles* "n-sided-paper/06x-ribbons.vtk" :coords *coords*)
+
+#+nil
+(let ((*resolution* 40))
+  (write-patch '(60 60 60 60 60 60) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
+	       :distance-type 'perpendicular))
+
+#+nil
+(let ((*resolution* 40)
+      (*ribbon-multiplier* 0.5d0))
+  (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
+	       :distance-type 'line-sweep))
+
+
 ;;; Figure 7
 
 ;;; The three blend functions using several visualization methods (slicing/gradient/uv/spider)
