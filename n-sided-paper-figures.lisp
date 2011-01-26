@@ -73,34 +73,53 @@
 ;;; Figure 6
 
 ;;; Patch using regular and irregular domain
-(defparameter *angles* '(15 35 70 80 80 80))
+(defparameter *angles* '(60 20 110 60 110))
 (defparameter *coords*
-  (list (generate-coordinates (lines-from-points (points-from-angles *angles*))
-			      '((0.0d0 0.04d0 0.04d0 0.0d0)
-				(0.0d0 0.08d0 0.08d0 0.0d0)
-				(0.0d0 0.1d0 0.1d0 0.0d0)
-				(0.0d0 0.1d0 0.1d0 0.0d0)
-				(0.0d0 0.1d0 0.1d0 0.0d0)
-				(0.0d0 0.1d0 0.1d0 0.0d0)))
-	(generate-coordinates (lines-from-points (points-from-angles *angles* 0.6d0))
-			      '((0.25d0 0.25d0)
-				(0.25d0 0.3d0)
-				(0.3d0 0.35d0)
-				(0.35d0 0.35d0)
-				(0.35d0 0.35d0)
-				(0.35d0 0.25d0)))))
+  '((((0.0d0 0.0d0 0.0d0)
+      (1.0d0 0.0d0 1.0d0)
+      (2.0d0 0.0d0 1.0d0)
+      (2.4d0 0.0d0 0.3d0))
+     ((2.4d0 0.0d0 0.3d0)
+      (2.6d0 0.2d0 0.4d0)
+      (2.8d0 0.4d0 0.4d0)
+      (3.0d0 0.6d0 0.3d0))
+     ((3.0d0 0.6d0 0.3d0)
+      (3.0d0 2.0d0 1.0d0)
+      (3.0d0 4.0d0 1.0d0)
+      (3.0d0 6.0d0 0.0d0))
+     ((3.0d0 6.0d0 0.0d0)
+      (2.0d0 6.0d0 1.0d0)
+      (1.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 2.0d0 1.2d0)
+      (2.2d0 0.4d0 1.2d0))
+     ((2.2d0 0.4d0 1.2d0)
+      (2.8d0 1.8d0 1.1d0))
+     ((2.8d0 1.8d0 1.1d0)
+      (2.0d0 4.0d0 1.2d0))
+     ((2.0d0 4.0d0 1.2d0)
+      (1.0d0 4.0d0 1.2d0))
+     ((1.0d0 4.0d0 1.2d0)
+      (1.0d0 2.0d0 1.2d0)))))
 
 ;;; (write-constraint-grid *angles* "n-sided-paper/06x-grid.vtk" :coords *coords*)
-;;; (write-constraint-ribbons *angles* "n-sided-paper/06x-ribbons.vtk" :coords *coords*)
+#+nil
+(write-constraint-ribbons *angles* "n-sided-paper/06x-ribbons.vtk" :coords *coords*
+			  :resolution 20)
 
 #+nil
-(let ((*resolution* 40))
-  (write-patch '(60 60 60 60 60 60) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
-	       :distance-type 'perpendicular))
-
-#+nil
-(let ((*resolution* 40)
+(let ((*resolution* 80)
       (*ribbon-multiplier* 0.5d0))
+  (write-patch '(21 72 72 72 72) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
+	       :distance-type 'line-sweep))
+
+#+nil
+(let ((*resolution* 80)
+      (*ribbon-multiplier* 1.0d0))
   (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
 

@@ -256,6 +256,7 @@
      a))
 
 (defun line-sweep-distance (center segments p type)
+  "BUG: does not work if the base segment is parallel to the Y axis."
   (let* ((p0 (first segments))
 	 (p1 (second segments))
 	 (p2 (third segments))

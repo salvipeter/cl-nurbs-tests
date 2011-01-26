@@ -35,8 +35,7 @@
 	      (finally (return p)))
 	(/ (factorial n) (factorial (- n derivative))))))
 
-#+nil
-(defun generate-patch (points twists)
+(defun generate-coons-patch (points twists)
   "POINTS : x4=p1 p2 p3 p4=q1 q2 q3 q4=r1 ... x3
 TWISTS : x3p2 p3q2 q3r2 ... w3x2"
   (let ((n (length points)))
@@ -72,12 +71,10 @@ TWISTS : x3p2 p3q2 q3r2 ... w3x2"
 			       (if (oddp k) du dv)
 			       (twist (* k 3) (elt twists k)))))))))))
 
-#+nil
 (defun uniform-angles (n)
   (let ((angle (/ 360.0d0 n)))
     (loop repeat n collect angle)))
 
-#+nil
 (defun uv-parameter (lines p)
   (let ((edge-length (* 2.0d0 (sin (/ pi (length lines))))))
     (mapcar (lambda (line)
@@ -85,7 +82,6 @@ TWISTS : x3p2 p3q2 q3r2 ... w3x2"
 		 edge-length))
 	    lines)))
 
-#+nil
 (defun coons-evaluate (patch lines p)
   "PATCH is a list of (C1i C2i Ri Rui Rvi Ruvi ...)
 For a 4-sided patch, D is (U V 1-U 1-V)"
@@ -141,78 +137,12 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		(v* (rc 1 0 'uv) (beta1 u) (beta0 v))
 		(v* (rc 1 1 'uv) (beta1 u) (beta1 v))))))))
 
-#+nil
-(defun classic-ribbon-evaluate (patch lines p)
-  (iter (with n = (length lines))
-	(with d = (uv-parameter lines p))
-	(with result = '(0 0 0))
-	(for i from 0 below n)
-	(for di = (elt d i))
-	(for dj = (elt d (mod (1- i) n)))
-	(for blend = (ribbon-blend lines p i))
-	(for q = (bezier (elt (elt patch i) 0) dj))
-	(for point = (v+ q (v* (v- (bezier (elt (elt patch i) 1) dj) q)
-			       3.0d0 di *ribbon-multiplier*)))
-	(setf result (v+ result (v* point blend)))
-	(finally (return result))))
-
-#+nil
-(defun corner-correction (patch d i)
-  (let* ((i-1 (mod (1- i) (length d)))
-	 (di-1 (elt d i-1))
-	 (di (elt d i)))
-    (v+ (elt (elt patch i) 2)
-	(v* (elt (elt patch i) (if (oddp i) 4 3)) di-1 *ribbon-multiplier*)
-	(v* (elt (elt patch i) (if (oddp i) 3 4)) di *ribbon-multiplier*)
-	(v* (elt (elt patch i) 5) di-1 di
-	    *ribbon-multiplier* *ribbon-multiplier*))))
-
-#+nil
-(defun corner-ribbon-evaluate (patch lines p)
-  (iter (with n = (length lines))
-	(with d = (uv-parameter lines p))
-	(with result = '(0 0 0))
-	(for i from 0 below n)
-	(for i-1 = (mod (1- i) n))
-	(for di = (elt d i))
-	(for dj = (elt d i-1))
-	(for blend = (corner-blend lines p i-1))
-	(for q1 = (bezier (reverse (elt (elt patch i-1) 0)) di))
-	(for q2 = (bezier (elt (elt patch i) 0) dj))
-	(for point = (v+ q1 (v* (v- (bezier (reverse (elt (elt patch i-1) 1)) di) q1)
-				3.0d0 dj *ribbon-multiplier*)
-			 q2 (v* (v- (bezier (elt (elt patch i) 1) dj) q2)
-				3.0d0 di *ribbon-multiplier*)))
-	(for correction = (corner-correction patch d i))
-	(setf result (v+ result (v* (v- point correction) blend)))
-	(finally (return result))))
-
-#+nil
-(defun double-corner-ribbon-evaluate (patch lines p)
-  (iter (with n = (length lines))
-	(with d = (uv-parameter lines p))
-	(with result = '(0 0 0))
-	(for i from 0 below n)
-	(for di = (elt d i))
-	(for dj = (elt d (mod (1- i) n)))
-	(for blend = (+ (corner-blend lines p (mod (1- i) n))
-			(corner-blend lines p i)))
-	(for q = (bezier (elt (elt patch i) 0) dj))
-	(for point = (v+ q (v* (v- (bezier (elt (elt patch i) 1) dj) q)
-			       3.0d0 di *ribbon-multiplier*)))
-	(for correction = (corner-correction patch d i))
-	(for correction-blend = (corner-blend lines p (mod (1- i) n)))
-	(setf result (v+ result (v- (v* point blend)
-				    (v* correction correction-blend))))
-	(finally (return result))))
-
-#+nil
-(defun write-patch (patch filename &optional (fn #'coons-evaluate))
+(defun write-coons-patch (patch filename &optional (fn #'coons-evaluate))
   (let* ((n (length patch))
 	 (angles (uniform-angles n))
 	 (points (points-from-angles angles))
 	 (lines (lines-from-points points))
-	 (parameters (vertices angles))
+	 (parameters (vertices points))
 	 (vertices (mapcar (lambda (p) (funcall fn patch lines p))
 			   parameters)))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
@@ -231,49 +161,6 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		  (format s "~{~f~^ ~}~%"
 			  (funcall fn patch lines (list u v))))))))
 
-#+nil
-(defun write-bezier-polygons (curves filename)
-  (with-open-file (s filename :direction :output :if-exists :supersede)
-    (let ((n (* (length curves) 4)))
-      (format s "# vtk DataFile Version 1.0~%~
-               Bezier control polygons~%~
-               ASCII~%~
-               DATASET POLYDATA~%~%~
-               POINTS ~d float~%" n)
-      (iter (for p in (reduce #'append curves))
-	    (format s "~{~f~^ ~}~%" p))
-      (format s "~%LINES 1 ~d~%~d " (+ n 2) (1+ n))
-      (iter (for i from 0 below n)
-	    (format s "~d " i))
-      (format s "0~%"))))
-
-#+nil
-(let ((*hermite* nil)
-      (*ribbon-multiplier* 0.5d0)
-      (*exponent* 2)
-      (*resolution* 40))
-  (write-patch
-   (generate-patch
-    '((0 0 0) (2 0 1) (4 0 1)
-      (6 0 0) (6 2 2) (7 4 1)
-      (8 6 0) (6 7 1) (3 7 1)
-      (1 6 0) (0 4 1) (0 2 2))
-    '((2 2 1) (4 2 1) (5 5 2) (2 5 2)))
-   "/tmp/coons.vtk" #'coons-evaluate))
-
-#+nil
-(let ((*hermite* nil)
-      (*ribbon-multiplier* 0.5d0)
-      (*exponent* 2)
-      (*resolution* 40))
-  (write-patch
-   (generate-patch
-    '((0 0 0) (2 0 0) (4 0 0)
-      (6 0 0) (6 2 0) (6 4 0)
-      (6 6 0) (4 6 0) (2 6 0)
-      (0 6 0) (0 4 0) (0 2 0))
-    '((2 2 1) (4 2 1) (4 4 1) (2 4 1)))
-   "/tmp/coons.vtk" #'coons-evaluate))
 
 
 (defun generate-coordinates (lines heights)
@@ -367,7 +254,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 			 (for d = (compute-distance distance-type points p t))
 			 (for s = (compute-parameter distance-type points p t))
 			 (collect
-			  (iter (for i from 0 below (length points))
+			  (iter (for i from 0 below n)
 				(with result = '(0 0 0))
 				(setf result
 				      (v+ result
@@ -496,3 +383,44 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
     (0.6 0.6)
     (0.6 0.6)
     (0.6 0.6))))
+
+;;; Coons patch example
+
+#+nil
+(let ((*hermite* nil)
+      (*resolution* 80))
+  (write-coons-patch
+   (generate-coons-patch
+    '((0 0 0) (2 0 1) (4 0 1)
+      (6 0 0) (6 2 2) (7 4 1)
+      (8 6 0) (6 7 1) (3 7 1)
+      (1 6 0) (0 4 1) (0 2 2))
+    '((2 2 1) (4 2 1) (5 5 2) (2 5 2)))
+   "n-sided-paper/coons.vtk" #'coons-evaluate))
+
+#+nil
+(write-constraint-grid
+ '(50 20 50 240)
+ "n-sided-paper/coons-grid.vtk"
+ :coords '((((0 0 0) (2 0 1) (4 0 1) (6 0 0))
+	    ((6 0 0) (6 2 2) (7 4 1) (8 6 0))
+	    ((8 6 0) (6 7 1) (3 7 1) (1 6 0))
+	    ((1 6 0) (0 4 1) (0 2 2) (0 0 0)))
+	   (((2 2 1) (4 2 1))
+	    ((4 2 1) (5 5 2))
+	    ((5 5 2) (2 5 2))
+	    ((2 5 2) (2 2 1)))))
+
+#+nil
+(write-constraint-ribbons
+ '(50 20 50 240)
+ "n-sided-paper/coons-ribbons.vtk"
+ :coords '((((0 0 0) (2 0 1) (4 0 1) (6 0 0))
+	    ((6 0 0) (6 2 2) (7 4 1) (8 6 0))
+	    ((8 6 0) (6 7 1) (3 7 1) (1 6 0))
+	    ((1 6 0) (0 4 1) (0 2 2) (0 0 0)))
+	   (((2 2 1) (4 2 1))
+	    ((4 2 1) (5 5 2))
+	    ((5 5 2) (2 5 2))
+	    ((2 5 2) (2 2 1))))
+ :resolution 20)
