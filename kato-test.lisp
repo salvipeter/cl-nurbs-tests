@@ -188,8 +188,9 @@
 	   (iter (for q1 in points)
 		 (maximize (iter (for q2 in points)
 				 (maximize (point-distance q1 q2))))))
-	(/ (abs (scalar-product (v- p0 p) (vnormalize (v- p1 p0))))
-	   (point-distance p0 p1)))))
+	(let ((di-1 (point-line-distance p (list (elt segments 0) p0)))
+	      (di+1 (point-line-distance p (list p1 (elt segments 3)))))
+	  (/ di-1 (+ di-1 di+1))))))
 
 (defun barycentric-distance (lines segments p type)
   (flet ((area (segment)

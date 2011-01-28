@@ -112,16 +112,71 @@
 			  :resolution 20)
 
 #+nil
-(let ((*resolution* 80)
-      (*ribbon-multiplier* 0.5d0))
-  (write-patch '(21 72 72 72 72) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
+(let ((*resolution* 30)
+      (*ribbon-multiplier* 1.0d0))
+  (write-patch (uniform-angles 5) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
 
 #+nil
-(let ((*resolution* 80)
+(let ((*resolution* 30)
       (*ribbon-multiplier* 1.0d0))
   (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
+
+(defparameter *coords*
+  '((((0.0d0 0.0d0 0.0d0)
+      (10.0d0 0.0d0 1.0d0)
+      (20.0d0 0.0d0 1.0d0)
+      (30.0d0 0.0d0 0.0d0))
+     ((30.0d0 0.0d0 0.0d0)
+      (30.0d0 2.0d0 1.0d0)
+      (30.0d0 4.0d0 1.0d0)
+      (30.0d0 6.0d0 0.0d0))
+     ((30.0d0 6.0d0 0.0d0)
+      (20.0d0 6.0d0 1.0d0)
+      (10.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((10.0d0 2.0d0 1.2d0)
+      (20.0d0 2.0d0 1.2d0))
+     ((20.0d0 2.0d0 1.2d0)
+      (20.0d0 4.0d0 1.2d0))
+     ((20.0d0 4.0d0 1.2d0)
+      (10.0d0 4.0d0 1.2d0))
+     ((10.0d0 4.0d0 1.2d0)
+      (10.0d0 2.0d0 1.2d0)))))
+
+(defparameter *coords*
+  '((((3 0 0)
+      (2 1 1)
+      (1 2 1)
+      (0 3 0))
+     ((0 3 0)
+      (-5 2 1)
+      (-10 1 1)
+      (-15 0 0))
+     ((-15 0 0)
+      (-10 -1 1)
+      (-5 -2 1)
+      (0 -3 0))
+     ((0 -3 0)
+      (1 -2 1)
+      (2 -1 1)
+      (3 0 0)))
+    (((1 0 1.1)
+      (0 1 1.1))
+     ((0 1 1.1)
+      (-10 0 1.1))
+     ((-10 0 1.1)
+      (0 -1 1.1))
+     ((0 -1 1.1)
+      (1 0 1.1)))))
+(defparameter *angles*
+  (angles-from-points
+   '((3 0) (0 3) (-15 0) (0 -3))))
 
 
 ;;; Figure 7

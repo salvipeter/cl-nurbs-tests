@@ -20,6 +20,14 @@ For example, for a equilateral triangle give '(120 120 120)."
 	(iter (for k from 0 below (1- (length points)))
 	      (collect (list (elt points k) (elt points (1+ k)))))))
 
+(defun angles-from-points (points)
+  (let ((sum (+ (iter (for p in points)
+		      (for q in (append (last points) points))
+		      (sum (point-distance p q))))))
+    (cons 0 (iter (for p in points)
+		  (for q in (rest points))
+		  (collect (* 360.0d0(/ (point-distance p q) sum)))))))
+
 (defun point-line-distance (p line &optional signedp)
   (let* ((v (v- (second line) (first line)))
          (d (scalar-product (vnormalize (list (second v) (- (first v))))
@@ -171,7 +179,7 @@ the interior surface will be 1/(N+1), where N is the number of lines."
   "Sample points for the (convex) polygon defined by POINTS."
   (let* ((lines (lines-from-points points))
 	 (n (length lines))
-	 (center (v* (reduce #'v+ points) (/ n)))
+	 (center (central-point points lines t))
 	 (result (list center)))
     (iter (for j from 1 to *resolution*)
 	  (for coeff = (/ j *resolution*))
