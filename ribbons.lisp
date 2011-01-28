@@ -303,7 +303,7 @@ For ANGLES, see POINTS-FROM-ANGLES."
 (write-blends-uv-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend2.vtk"
 			  :blend-function #'ribbon-blend :distance-type 'line-sweep)
 
-(defun spider-lines (n)
+(defun spider-uv-lines (n)
   (iter (with inner-start = 0)
 	(with outer-vert = 1)
 	(for layer from 1 to *resolution*)
@@ -344,7 +344,7 @@ For ANGLES, see POINTS-FROM-ANGLES."
 			   (vertices points))))
     (write-vtk-polylines
      (mapcar (lambda (lst) (mapcar (lambda (i) (elt vertices i)) lst))
-	     (spider-lines n))
+	     (spider-uv-lines n))
      filename)))
 
 #+nil
@@ -455,17 +455,21 @@ For ANGLES, see POINTS-FROM-ANGLES."
 			:distance-type 'line-sweep
 			:threshold 0.03d0)
 
-(defun spider-vertices (points)
+(defun spider-lines (points)
   (let* ((lines (lines-from-points points))
 	 (n (length lines))
 	 (center (central-point points lines t))
-	 (step (floor *resolution* 4)))
-    (iter (for j from 0 to *resolution*)
-	  (for coeff = (/ j *resolution*))
-	  (for next = '())
-	  (iter (for k from 0 below n)
-		(iter (for i from 0 below step)
-		      (for lp = (line-point (elt lines k) (/ i step)))
-		      (push (affine-combine center coeff lp) next)))
-	  (push (first next) next)
-	  (collect (nreverse next)))))
+	 (step (floor *resolution* 4))
+	 (polylines (iter (for j from 0 to *resolution*)
+			  (for coeff = (/ j *resolution*))
+			  (for next = '())
+			  (iter (for k from 0 below n)
+				(iter (for i from 0 to step)
+				      (for lp = (line-point (elt lines k) (/ i step)))
+				      (push (affine-combine center coeff lp) next)))
+			  (push (first next) next)
+			  (collect (nreverse next)))))
+    (append polylines
+	    (iter (for i from 0 below (* (1+ step) n))
+		  (collect (iter (for line in polylines)
+				 (collect (elt line i))))))))

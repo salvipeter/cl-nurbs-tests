@@ -115,13 +115,13 @@
 (let ((*resolution* 30)
       (*ribbon-multiplier* 1.0d0))
   (write-patch '(21 72 72 72 72) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
-	       :distance-type 'line-sweep))
+	       :distance-type 'perpendicular))
 
 #+nil
 (let ((*resolution* 30)
       (*ribbon-multiplier* 1.0d0))
-  (write-patch *angles* 'sketches "n-sided-paper/06b-irregular.vtk" :coords *coords*
-	       :distance-type 'line-sweep))
+  (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
+	       :distance-type 'perpendicular :spider t))
 
 (defparameter *coords*
   '((((0.0d0 0.0d0 0.0d0)
