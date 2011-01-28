@@ -176,7 +176,7 @@
       (1 0 1.1)))))
 (defparameter *angles*
   (angles-from-points
-   '((3 0) (0 3) (-15 0) (0 -3))))
+   '((0 3) (-15 0) (0 -3) (3 0))))
 
 
 ;;; Figure 7
