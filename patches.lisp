@@ -185,6 +185,8 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
     (v+ base-point (v* derivative (elt d i) *ribbon-multiplier*))))
 
 (defun corner-evaluate (patch i s)
+  "The corner defined by segments I-1 and I,
+thus containing point I-1 (NOT point I)."
   (let* ((i-1 (mod (1- i) (length s)))
 	 (si-1 (elt s i-1))
 	 (si (elt s i))
@@ -197,6 +199,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
     (v+ ci ci-1 (v* di (- 1.0d0 si-1)) (v* di-1 si))))
 
 (defun corner-correction (patch i s)
+  "Correction for the same corner as explained in CORNER-EVALUATE."
   (let* ((i-1 (mod (1- i) (length s)))
 	 (si-1 (elt s i-1))
 	 (si (elt s i))
@@ -241,6 +244,40 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 				 (list (elt next 1))))))))
 
 (defun write-patch (angles type filename &key heights coords (distance-type 'perpendicular))
+  (if (eq type 'sketches)
+      (write-sketches-patch angles filename :heights heights :coords coords)
+      (let* ((n (length angles))
+	     (points (points-from-angles angles))
+	     (patch (or (and coords (generate-patch (first coords) (second coords)))
+			(generate-patch
+			 (generate-coordinates (lines-from-points points) (first heights))
+			 (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
+					       (second heights)))))
+	     (vertices (iter (for domain-point in (vertices points))
+			     (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
+					      domain-point))
+			     (for d = (compute-distance distance-type points p t))
+			     (for s = (compute-parameter distance-type points p t))
+			     (collect
+			      (iter (for i from 0 below n)
+				    (with result = '(0 0 0))
+				    (setf result
+					  (v+ result
+					      (case type
+						(ribbon (v* (ribbon-evaluate patch i s d)
+							    (ribbon-blend d i)))
+						(corner (v* (v- (corner-evaluate patch i s)
+								(corner-correction patch i s))
+							    (corner-blend d (mod (1- i) n))))
+						(hybrid (v- (v* (ribbon-evaluate patch i s d)
+								(+ (corner-blend d (mod (1- i) n))
+								   (corner-blend d i)))
+							    (v* (corner-correction patch i s)
+								(corner-blend d (mod (1- i) n))))))))
+				    (finally (return result)))))))
+	(write-vtk-indexed-mesh vertices (triangles n) filename))))
+
+(defun write-sketches-patch (angles filename &key heights coords)
   (let* ((n (length angles))
 	 (points (points-from-angles angles))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
@@ -251,24 +288,16 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (vertices (iter (for domain-point in (vertices points))
 			 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
 					   domain-point))
-			 (for d = (compute-distance distance-type points p t))
-			 (for s = (compute-parameter distance-type points p t))
+			 (for d = (compute-distance 'line-sweep points p t))
+			 (for s = (compute-parameter 'line-sweep points p t))
+			 (for b = (compute-distance 'perpendicular points p t))
 			 (collect
 			  (iter (for i from 0 below n)
 				(with result = '(0 0 0))
 				(setf result
 				      (v+ result
-					  (case type
-					    (ribbon (v* (ribbon-evaluate patch i s d)
-							(ribbon-blend d i)))
-					    (corner (v* (v- (corner-evaluate patch i s)
-							    (corner-correction patch i s))
-							(corner-blend d (mod (1- i) n))))
-					    (hybrid (v- (v* (ribbon-evaluate patch i s d)
-							    (+ (corner-blend d (mod (1- i) n))
-							       (corner-blend d i)))
-							(v* (corner-correction patch i s)
-							    (corner-blend d (mod (1- i) n))))))))
+					  (v* (ribbon-evaluate patch i s d)
+					      (ribbon-blend b i))))
 				(finally (return result)))))))
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 

@@ -454,3 +454,18 @@ For ANGLES, see POINTS-FROM-ANGLES."
 			:blend-function #'ribbon-blend
 			:distance-type 'line-sweep
 			:threshold 0.03d0)
+
+(defun spider-vertices (points)
+  (let* ((lines (lines-from-points points))
+	 (n (length lines))
+	 (center (central-point points lines t))
+	 (step (floor *resolution* 4)))
+    (iter (for j from 0 to *resolution*)
+	  (for coeff = (/ j *resolution*))
+	  (for next = '())
+	  (iter (for k from 0 below n)
+		(iter (for i from 0 below step)
+		      (for lp = (line-point (elt lines k) (/ i step)))
+		      (push (affine-combine center coeff lp) next)))
+	  (push (first next) next)
+	  (collect (nreverse next)))))
