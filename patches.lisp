@@ -228,7 +228,7 @@ thus containing point I-1 (NOT point I)."
 	      (chord-based (tiny-lambda (lst) (chord-based-distance points lst p 's)))
 	      (radial (tiny-lambda (lst) (radial-distance points lst p 's)))
 	      (line-sweep (let ((center (central-point points (lines-from-points points) t)))
-			    (tiny-lambda (lst) (line-sweep-distance center lst p 's)))))
+			    (tiny-lambda (lst) (line-sweep-distance center points lst p 's)))))
 	    (iter (for i from -2 below (- (length points) 2))
 		  (collect (iter (for j from 0 below 4)
 				 (collect (elt points (mod (+ i j) (length points))))))))))

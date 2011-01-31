@@ -64,7 +64,7 @@ For example, for a equilateral triangle give '(120 120 120)."
 			(radial-distance points lst p 'd)))
 	      (line-sweep (let ((center (central-point points (lines-from-points points) t)))
 			    (tiny-lambda (lst)
-			      (line-sweep-distance center lst p 'd)))))
+			      (line-sweep-distance center points lst p 'd)))))
 	    (iter (for i from -2 below (- (length points) 2))
 		  (collect (iter (for j from 0 below 4)
 				 (collect (elt points (mod (+ i j) (length points))))))))))

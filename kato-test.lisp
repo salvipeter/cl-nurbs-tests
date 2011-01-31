@@ -256,7 +256,8 @@
      (* x (+ (* -3 a) (* 4 b) (- c)))
      a))
 
-(defun line-sweep-distance (center segments p type)
+(defparameter *centralized-line-sweep* nil)
+(defun line-sweep-distance (center points segments p type)
   "BUG: does not work if the base segment is parallel to the Y axis."
   (let* ((p0 (first segments))
 	 (p1 (second segments))
@@ -273,9 +274,13 @@
 	 (s (line-sweep w0 w1 w2 length p)))
     (if (eq type 'd)
 	(/ (point-distance p (list (* s length) 0))
-	   (blend3 s (vlength w0)
-		   (* 2 (point-distance center (list (/ length 2) 0)))
-		   (vlength w2)))
+	   (if *centralized-line-sweep*
+	       (blend3 s (vlength w0)
+		       (* 2 (point-distance center (list (/ length 2) 0)))
+		       (vlength w2))
+	       (iter (for q1 in points)
+		     (maximize (iter (for q2 in points)
+				     (maximize (point-distance q1 q2)))))))
 	s)))
 
 (defun central-point (points lines weightedp)

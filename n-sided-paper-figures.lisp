@@ -72,39 +72,22 @@
 
 ;;; Figure 6
 
-;;; Patch using regular and irregular domain
-(defparameter *angles* '(60 20 110 60 110))
 (defparameter *coords*
-  '((((0.0d0 0.0d0 0.0d0)
-      (1.0d0 0.0d0 1.0d0)
-      (2.0d0 0.0d0 1.0d0)
-      (2.4d0 0.0d0 0.3d0))
-     ((2.4d0 0.0d0 0.3d0)
-      (2.6d0 0.2d0 0.4d0)
-      (2.8d0 0.4d0 0.4d0)
-      (3.0d0 0.6d0 0.3d0))
-     ((3.0d0 0.6d0 0.3d0)
-      (3.0d0 2.0d0 1.0d0)
-      (3.0d0 4.0d0 1.0d0)
-      (3.0d0 6.0d0 0.0d0))
-     ((3.0d0 6.0d0 0.0d0)
-      (2.0d0 6.0d0 1.0d0)
-      (1.0d0 6.0d0 1.0d0)
-      (0.0d0 6.0d0 0.0d0))
-     ((0.0d0 6.0d0 0.0d0)
-      (0.0d0 4.0d0 1.0d0)
-      (0.0d0 2.0d0 1.0d0)
-      (0.0d0 0.0d0 0.0d0)))
-    (((1.0d0 2.0d0 1.2d0)
-      (2.2d0 0.4d0 1.2d0))
-     ((2.2d0 0.4d0 1.2d0)
-      (2.8d0 1.8d0 1.1d0))
-     ((2.8d0 1.8d0 1.1d0)
-      (2.0d0 4.0d0 1.2d0))
-     ((2.0d0 4.0d0 1.2d0)
-      (1.0d0 4.0d0 1.2d0))
-     ((1.0d0 4.0d0 1.2d0)
-      (1.0d0 2.0d0 1.2d0)))))
+  '((((-3 -25.8 0) (-1 -25.8 0) (1 -25.8 0) (3 -25.8 0))
+     ((3 -25.8 0) (12 -17.2 0) (21 -8.6 0) (30 0 0))
+     ((30 0 0) (25 8.6 0) (20 17.2 0) (15 25.8 0))
+     ((15 25.8 0) (5 25.8 0) (-5 25.8 0) (-15 25.8 0))
+     ((-15 25.8 0) (-20 17.2 0) (-25 8.6 0) (-30 0 0))
+     ((-30 0 0) (-21 -8.6 0) (-12 -17.2 0) (-3 -25.8 0)))
+    (((-4 -17.2 0) (4 -17.2 0))
+     ((4 -17.2 0) (18 0 0))
+     ((18 0 0) (10 17.2 0))
+     ((10 17.2 0) (-10 17.2 0))
+     ((-10 17.2 0) (-18 0 0))
+     ((-18 0 0) (-4 -17.2 0)))))
+(defparameter *angles*
+  (angles-from-points
+   '((3 -25.8 0) (30 0 0) (15 25.8 0) (-15 25.8 0) (-30 0 0) (-3 -25.8 0))))
 
 ;;; (write-constraint-grid *angles* "n-sided-paper/06x-grid.vtk" :coords *coords*)
 #+nil
@@ -113,13 +96,15 @@
 
 #+nil
 (let ((*resolution* 30)
-      (*ribbon-multiplier* 1.0d0))
-  (write-patch '(21 72 72 72 72) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
-	       :distance-type 'perpendicular))
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 2.5d0))
+  (write-patch (uniform-angles 6) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
+	       :distance-type 'perpendicular :spider t))
 
 #+nil
 (let ((*resolution* 30)
-      (*ribbon-multiplier* 1.0d0))
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 2.5d0))
   (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
 	       :distance-type 'perpendicular :spider t))
 
@@ -388,3 +373,58 @@
 			:blend-function #'ribbon-blend
 			:distance-type 'line-sweep
 			:trim '(0.89d0 0.91d0))
+
+
+;;; Figure 11 - three approaches
+
+;;; Otoldalu:
+(defparameter *angles* '(60 20 110 60 110))
+(defparameter *coords*
+  '((((0.0d0 0.0d0 0.0d0)
+      (1.0d0 0.0d0 1.0d0)
+      (2.0d0 0.0d0 1.0d0)
+      (2.4d0 0.0d0 0.3d0))
+     ((2.4d0 0.0d0 0.3d0)
+      (2.6d0 0.2d0 0.4d0)
+      (2.8d0 0.4d0 0.4d0)
+      (3.0d0 0.6d0 0.3d0))
+     ((3.0d0 0.6d0 0.3d0)
+      (3.0d0 2.0d0 1.0d0)
+      (3.0d0 4.0d0 1.0d0)
+      (3.0d0 6.0d0 0.0d0))
+     ((3.0d0 6.0d0 0.0d0)
+      (2.0d0 6.0d0 1.0d0)
+      (1.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 2.0d0 1.2d0)
+      (2.2d0 0.7d0 1.2d0))
+     ((2.2d0 0.7d0 1.2d0)
+      (2.8d0 1.8d0 1.1d0))
+     ((2.8d0 1.8d0 1.1d0)
+      (2.0d0 4.0d0 1.2d0))
+     ((2.0d0 4.0d0 1.2d0)
+      (1.0d0 4.0d0 1.2d0))
+     ((1.0d0 4.0d0 1.2d0)
+      (1.0d0 2.0d0 1.2d0)))))
+
+#+nil
+(let ((*resolution* 20)
+      (*ribbon-multiplier* 1.0d0))
+  (write-patch *angles* 'hybrid "n-sided-paper/11a-side.vtk" :coords *coords*
+	       :distance-type 'perpendicular))
+
+#+nil
+(let ((*resolution* 80)
+      (*ribbon-multiplier* 1.0d0))
+  (write-patch *angles* 'corner "n-sided-paper/11b-corner.vtk" :coords *coords*
+	       :distance-type 'perpendicular))
+
+#+nil
+(let ((*resolution* 80)
+      (*ribbon-multiplier* 1.0d0))
+  (write-patch *angles* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
+	       :distance-type 'perpendicular))
