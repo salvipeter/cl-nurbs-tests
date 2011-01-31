@@ -455,21 +455,35 @@ For ANGLES, see POINTS-FROM-ANGLES."
 			:distance-type 'line-sweep
 			:threshold 0.03d0)
 
+(defparameter *spider-density* 4)
+(defparameter *spider-lines* 3)
 (defun spider-lines (points)
+  "Every polyline is computed according to *RESOLUTION*,
+but the number of actual lines is also affected by two parameters:
+*SPIDER-DENSITY* : draw only every ~th loop
+*SPIDER-LINES*   : the number of `vertical' lines on one side."
   (let* ((lines (lines-from-points points))
 	 (n (length lines))
 	 (center (central-point points lines t))
-	 (step (floor *resolution* 4))
 	 (polylines (iter (for j from 0 to *resolution*)
 			  (for coeff = (/ j *resolution*))
 			  (for next = '())
 			  (iter (for k from 0 below n)
-				(iter (for i from 0 to step)
-				      (for lp = (line-point (elt lines k) (/ i step)))
+				(iter (for i from 0 to *resolution*)
+				      (for lp = (line-point (elt lines k) (/ i *resolution*)))
 				      (push (affine-combine center coeff lp) next)))
 			  (push (first next) next)
 			  (collect (nreverse next)))))
-    (append polylines
-	    (iter (for i from 0 below (* (1+ step) n))
-		  (collect (iter (for line in polylines)
-				 (collect (elt line i))))))))
+    (append (iter (for line in (reverse polylines))
+		  (for i upfrom 0)
+		  (when (zerop (mod i *spider-density*))
+		    (collect line)))
+	    (iter (with gap = (floor (1+ *resolution*) (1+ *spider-lines*)))
+		  (with indices = (cons 0 (iter (for j from 1 to *spider-lines*)
+						   (collect (* j gap)))))
+		  (for side from 0 below n)
+		  (appending
+		   (iter (for i in indices)
+			 (for j = (+ (* side (1+ *resolution*)) i))
+			 (collect (iter (for line in polylines)
+					(collect (elt line j))))))))))
