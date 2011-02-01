@@ -442,3 +442,39 @@ thus containing point I-1 (NOT point I)."
 	    ((5 5 2) (2 5 2))
 	    ((2 5 2) (2 2 2))))
  :resolution 20)
+
+(defun check-patch (angles type &key heights coords (distance-type 'perpendicular))
+  "Only side interpolation checking for now."
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (lines (lines-from-points points))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
+					   (second heights))))))
+    (iter (for side from 0 below n)
+	  (for line in lines)
+	  (maximize
+	   (iter (for i from 0 below *resolution*)
+		 (for u = (/ i (1- *resolution*)))
+		 (for domain-point = (line-point line u))
+		 (maximize (point-distance
+			    (patch-evaluate patch points type distance-type domain-point)
+			    (bezier (elt (first patch) side) u))))))))
+
+#+nil
+(let ((*resolution* 50)
+      (*ribbon-multiplier* 1.0d0)
+      (*centralized-line-sweep* t))
+  (iter (for type in '(ribbon corner hybrid sketches))
+	(iter (for distance in (if (eq type 'sketches)
+				   '(perpendicular)
+				   '(perpendicular barycentric radial chord-based line-sweep)))
+	      (format t "Maximal deviation using ~a with ~a: ~f~%"
+		      type distance
+		      (check-patch *angles* type :coords *coords* :distance-type distance)))))
+
+;;; -> line-sweep/radial eseten megmarad az eredeti (bezier) parameterezes a szeleken, mashol nem
+;;; -> majd newton-raphson-t kene alkalmazni, hogy megtudjuk a gorbetol valo tavolsagot
+;;; -> utana pedig johet a tangens ellenorzes
