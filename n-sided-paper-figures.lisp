@@ -278,19 +278,19 @@
 (defparameter *angles* '(40 20 60 100 80))
 
 (vectorized-distance-function-test
- *angles* '(sd nil nil nil nil) "n-sided-paper/08a1-perpendicular-sd.ps"
+ *angles* '(nil sd nil nil nil) "n-sided-paper/08a1-perpendicular-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'perpendicular :color nil)
 (vectorized-distance-function-test
- *angles* '(sd nil nil nil nil) "n-sided-paper/08b1-barycentric-sd.ps"
+ *angles* '(nil sd nil nil nil) "n-sided-paper/08b1-barycentric-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'barycentric :color nil)
 (vectorized-distance-function-test
- *angles* '(sd nil nil nil nil) "n-sided-paper/08c1-radial-sd.ps"
+ *angles* '(nil sd nil nil nil) "n-sided-paper/08c1-radial-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'radial :color nil)
 (vectorized-distance-function-test
- *angles* '(sd nil nil nil nil) "n-sided-paper/08d1-chord-sd.ps"
+ *angles* '(nil sd nil nil nil) "n-sided-paper/08d1-chord-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'chord-based :color nil)
 (vectorized-distance-function-test
- *angles* '(sd nil nil nil nil) "n-sided-paper/08e1-sweep-sd.ps"
+ *angles* '(nil sd nil nil nil) "n-sided-paper/08e1-sweep-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
 
 (vectorized-distance-function-test
@@ -310,19 +310,19 @@
  :resolution 0.001d0 :density 2 :distance-type 'line-sweep)
 
 (vectorized-distance-function-test
- *angles* '(s nil nil nil s) "n-sided-paper/08a3-perpendicular-ss.ps"
+ *angles* '(s s nil nil nil) "n-sided-paper/08a3-perpendicular-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'perpendicular :color nil)
 (vectorized-distance-function-test
- *angles* '(s nil nil nil s) "n-sided-paper/08b3-barycentric-ss.ps"
+ *angles* '(s s nil nil nil) "n-sided-paper/08b3-barycentric-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'barycentric :color nil)
 (vectorized-distance-function-test
- *angles* '(s nil nil nil s) "n-sided-paper/08c3-radial-ss.ps"
+ *angles* '(s s nil nil nil) "n-sided-paper/08c3-radial-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'radial :color nil)
 (vectorized-distance-function-test
- *angles* '(s nil nil nil s) "n-sided-paper/08d3-chord-ss.ps"
+ *angles* '(s s nil nil nil) "n-sided-paper/08d3-chord-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'chord-based :color nil)
 (vectorized-distance-function-test
- *angles* '(s nil nil nil s) "n-sided-paper/08e3-sweep-ss.ps"
+ *angles* '(s s nil nil nil) "n-sided-paper/08e3-sweep-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
 
 
@@ -413,18 +413,21 @@
 
 #+nil
 (let ((*resolution* 20)
-      (*ribbon-multiplier* 1.0d0))
+      (*ribbon-multiplier* 1.0d0)
+      (*centralized-line-sweep* t))
   (write-patch *angles* 'hybrid "n-sided-paper/11a-side.vtk" :coords *coords*
-	       :distance-type 'perpendicular))
+	       :distance-type 'line-sweep))
 
 #+nil
 (let ((*resolution* 80)
-      (*ribbon-multiplier* 1.0d0))
+      (*ribbon-multiplier* 1.0d0)
+      (*centralized-line-sweep* t))
   (write-patch *angles* 'corner "n-sided-paper/11b-corner.vtk" :coords *coords*
-	       :distance-type 'perpendicular))
+	       :distance-type 'line-sweep))
 
 #+nil
 (let ((*resolution* 80)
-      (*ribbon-multiplier* 1.0d0))
+      (*ribbon-multiplier* 1.0d0)
+      (*centralized-line-sweep* t))
   (write-patch *angles* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
-	       :distance-type 'perpendicular))
+	       :distance-type 'line-sweep))
