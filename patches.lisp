@@ -443,6 +443,39 @@ thus containing point I-1 (NOT point I)."
 	    ((2 5 2) (2 2 2))))
  :resolution 20)
 
+(defun bezier-projection-starting-value (curve point res)
+  (iter (for i from 0 below res)
+	(for u = (/ i (1- res)))
+	(finding u minimizing (vlength (v- point (bezier curve u))))))
+
+(defun bezier-project-point (curve point iterations search-resolution &optional
+			     (distance-tolerance 0.0) (cosine-tolerance 0.0))
+  "Returns the parameter of CURVE's closest point to POINT.
+
+The function uses the Newton-Raphson method. (NURBS Book, pp. 230-232)
+SEARCH-RESOLUTION parameters are checked for a suitable initial value."
+  (let ((u0 (bezier-projection-starting-value curve point search-resolution)))
+    (iter (repeat iterations)
+	  (for last first nil then u)
+	  (for u first u0 then
+	       (min (max (- u (/ (scalar-product d deviation)
+				 (+ (scalar-product d2 deviation)
+				    (scalar-product d d))))
+			 0)
+		    1))
+	  (for p = (bezier curve u))
+	  (for d = (bezier curve u 1))
+	  (for d2 = (bezier curve u 2))
+	  (for deviation = (v- p point))
+	  (when (or (<= (vlength deviation) distance-tolerance)
+		    (<= (/ (abs (scalar-product d deviation))
+			   (* (vlength d) (vlength deviation)))
+			cosine-tolerance)
+		    (and last
+			 (<= (vlength (v* d (- u last))) distance-tolerance)))
+	    (leave (values u (vlength deviation))))
+	  (finally (return (values u (vlength deviation)))))))
+
 (defun check-patch (angles type &key heights coords (distance-type 'perpendicular))
   "Only side interpolation checking for now."
   (let* ((n (length angles))
@@ -454,27 +487,117 @@ thus containing point I-1 (NOT point I)."
 		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
 					   (second heights))))))
     (iter (for side from 0 below n)
+	  (for curve in (first patch))
 	  (for line in lines)
 	  (maximize
 	   (iter (for i from 0 below *resolution*)
 		 (for u = (/ i (1- *resolution*)))
 		 (for domain-point = (line-point line u))
-		 (maximize (point-distance
-			    (patch-evaluate patch points type distance-type domain-point)
-			    (bezier (elt (first patch) side) u))))))))
+		 (for p = (patch-evaluate patch points type distance-type domain-point))
+		 (for v = (bezier-project-point curve p 10 *resolution*))
+		 (maximize (point-distance p (bezier curve v))))))))
+
+(defun check-patch-tangents (angles type &key heights coords (distance-type 'perpendicular)
+			     (step 0.1d-3))
+  "Only side interpolation checking for now."
+  (let* ((n (length angles))
+	 (points (points-from-angles angles))
+	 (lines (lines-from-points points))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch
+		     (generate-coordinates (lines-from-points points) (first heights))
+		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
+					   (second heights))))))
+    (iter (for side from 0 below n)
+	  (for curve in (first patch))
+	  (for inner-curve in (second patch))
+	  (for line in lines)
+	  (for direction = (v- (second line) (first line)))
+	  (for normal = (vnormalize (list (- (second direction)) (first direction))))
+	  (with center = (central-point points lines t))
+	  (when (< (scalar-product (v- center (first line)) normal) 0)
+	    (setf normal (v* normal -1)))
+	  (maximize
+	   (iter (for i from 0 below *resolution*)
+		 (for u = (/ i (1- *resolution*)))
+		 (for domain-point = (line-point line u))
+		 (for inner-domain-point = (v+ domain-point (v* normal step)))
+		 (for p = (patch-evaluate patch points type distance-type domain-point))
+		 (for q = (patch-evaluate patch points type distance-type inner-domain-point))
+		 (for v = (bezier-project-point curve p 10 *resolution*))
+		 (for derivative = (vnormalize (bezier curve v 1)))
+		 (maximize (vlength
+			    (cross-product
+			     (vnormalize (cross-product derivative (v- q p)))
+			     (vnormalize (cross-product derivative
+							(v- (bezier inner-curve v)
+							    (bezier curve v))))))))))))
 
 #+nil
-(let ((*resolution* 50)
+(let ((*resolution* 100)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* t))
+  (format t "Centralized line sweep is ~:[OFF~;ON~]~%" *centralized-line-sweep*)
   (iter (for type in '(ribbon corner hybrid sketches))
 	(iter (for distance in (if (eq type 'sketches)
 				   '(perpendicular)
 				   '(perpendicular barycentric radial chord-based line-sweep)))
-	      (format t "Maximal deviation using ~a with ~a: ~f~%"
+	      (format t "Maximal  point  deviation using ~a with ~a: ~f~%"
 		      type distance
-		      (check-patch *angles* type :coords *coords* :distance-type distance)))))
+		      (check-patch *angles* type :coords *coords* :distance-type distance))
+	      (format t "Maximal tangent deviation using ~a with ~a: ~f~%"
+		      type distance
+		      (check-patch-tangents *angles* type :coords *coords* :distance-type distance
+					    :step 1.0d-4)))))
 
-;;; -> line-sweep/radial eseten megmarad az eredeti (bezier) parameterezes a szeleken, mashol nem
-;;; -> majd newton-raphson-t kene alkalmazni, hogy megtudjuk a gorbetol valo tavolsagot
-;;; -> utana pedig johet a tangens ellenorzes
+;; Centralized line sweep is ON
+;; Maximal  point  deviation using RIBBON with PERPENDICULAR: 0.000000000000002737549743767154
+;; Maximal tangent deviation using RIBBON with PERPENDICULAR: 0.0006094788868459588
+;; Maximal  point  deviation using RIBBON with BARYCENTRIC: 0.000000000000002817430187029739
+;; Maximal tangent deviation using RIBBON with BARYCENTRIC: 0.001242037224292269
+;; Maximal  point  deviation using RIBBON with RADIAL: 0.0000000000000027577367830154345
+;; Maximal tangent deviation using RIBBON with RADIAL: 0.0008624970038566559
+;; Maximal  point  deviation using RIBBON with CHORD-BASED: 0.000000000000003575193960459936
+;; Maximal tangent deviation using RIBBON with CHORD-BASED: 0.9805759386872815
+;; Maximal  point  deviation using RIBBON with LINE-SWEEP: 0.0000000000000026852712547870858
+;; Maximal tangent deviation using RIBBON with LINE-SWEEP: 0.002059602313486452
+;; Maximal  point  deviation using CORNER with PERPENDICULAR: 0.0000000000000019389211565826713
+;; Maximal tangent deviation using CORNER with PERPENDICULAR: 0.00040396101106856175
+;; Maximal  point  deviation using CORNER with BARYCENTRIC: 0.00000009080625653904613
+;; Maximal tangent deviation using CORNER with BARYCENTRIC: 0.00037085771283083065
+;; Maximal  point  deviation using CORNER with RADIAL: 0.0000000000000045124795972965204
+;; Maximal tangent deviation using CORNER with RADIAL: 0.0005765992792941358
+;; Maximal  point  deviation using CORNER with CHORD-BASED: 0.000000000000003575193960459936
+;; Maximal tangent deviation using CORNER with CHORD-BASED: 0.999986997783648
+;; Maximal  point  deviation using CORNER with LINE-SWEEP: 0.00000000000003879258363621679
+;; Maximal tangent deviation using CORNER with LINE-SWEEP: 0.0005762084466185979
+;; Maximal  point  deviation using HYBRID with PERPENDICULAR: 0.749579458685565
+;; Maximal tangent deviation using HYBRID with PERPENDICULAR: 0.9999779540452253
+;; Maximal  point  deviation using HYBRID with BARYCENTRIC: 0.8472146626182875
+;; Maximal tangent deviation using HYBRID with BARYCENTRIC: 0.5405037327175598
+;; Maximal  point  deviation using HYBRID with RADIAL: 0.746717342966125
+;; Maximal tangent deviation using HYBRID with RADIAL: 0.9997339367321527
+;; Maximal  point  deviation using HYBRID with CHORD-BASED: 0.5724445094370448
+;; Maximal tangent deviation using HYBRID with CHORD-BASED: 0.9805570318055594
+;; Maximal  point  deviation using HYBRID with LINE-SWEEP: 0.000000000000003611319317287327
+;; Maximal tangent deviation using HYBRID with LINE-SWEEP: 0.6858708327932557
+;; Maximal  point  deviation using SKETCHES with PERPENDICULAR: 0.0000000000000026852712547870858
+;; Maximal tangent deviation using SKETCHES with PERPENDICULAR: 0.0005292372078123327
+
+;;; So HYBRID does not work, even for centralized line sweeps.
+
+;;; As for CHORD-BASED, the derivatives seem to be OK for step=0.1
+;;; (the normal vector deviates 4-5 degrees, comparable to other methods),
+;;; but since it has very similar d parameter values near the sides,
+;;; a small step like 1.0d-3 would lead to too similar (s,d) parameters,
+;;; resulting in very large numerical computation errors.
+#+nil
+(let ((*resolution* 100))
+  (format t "ribbon: ~f~%corner: ~f~%"
+	  (check-patch-tangents *angles* 'ribbon :coords *coords* :distance-type 'chord-based
+				:step 1.0d-2)
+	  (check-patch-tangents *angles* 'corner :coords *coords* :distance-type 'chord-based
+				:step 1.0d-2)))
+
+(defun derivative-error-to-angle (err)
+  (/ (* (asin err) 180) pi))
