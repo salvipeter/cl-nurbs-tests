@@ -85,27 +85,28 @@
      ((10 17.2 0) (-10 17.2 0))
      ((-10 17.2 0) (-18 0 0))
      ((-18 0 0) (-4 -17.2 0)))))
-(defparameter *angles*
-  (angles-from-points
-   '((3 -25.8 0) (30 0 0) (15 25.8 0) (-15 25.8 0) (-30 0 0) (-3 -25.8 0))))
+(defparameter *points*
+  (points-from-angles
+   (angles-from-points
+    '((3 -25.8 0) (30 0 0) (15 25.8 0) (-15 25.8 0) (-30 0 0) (-3 -25.8 0)))))
 
-;;; (write-constraint-grid *angles* "n-sided-paper/06x-grid.vtk" :coords *coords*)
+;;; (write-constraint-grid *points* "n-sided-paper/06x-grid.vtk" :coords *coords*)
 #+nil
-(write-constraint-ribbons *angles* "n-sided-paper/06x-ribbons.vtk" :coords *coords*
+(write-constraint-ribbons *points* "n-sided-paper/06x-ribbons.vtk" :coords *coords*
 			  :resolution 20)
 
 #+nil
 (let ((*resolution* 30)
       (*centralized-line-sweep* nil)
       (*ribbon-multiplier* 2.5d0))
-  (write-patch (uniform-angles 6) 'ribbon "n-sided-paper/06a-regular.vtk" :coords *coords*
-	       :distance-type 'perpendicular :spider t))
+  (write-patch (points-from-angles (uniform-angles 6)) 'ribbon "n-sided-paper/06a-regular.vtk"
+	       :coords *coords* :distance-type 'perpendicular :spider t))
 
 #+nil
 (let ((*resolution* 30)
       (*centralized-line-sweep* nil)
       (*ribbon-multiplier* 2.5d0))
-  (write-patch *angles* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
+  (write-patch *points* 'ribbon "n-sided-paper/06b-irregular.vtk" :coords *coords*
 	       :distance-type 'perpendicular :spider t))
 
 (defparameter *coords*
@@ -159,9 +160,10 @@
       (0 -1 1.1))
      ((0 -1 1.1)
       (1 0 1.1)))))
-(defparameter *angles*
-  (angles-from-points
-   '((0 3) (-15 0) (0 -3) (3 0))))
+(defparameter *points*
+  (points-from-angles
+   (angles-from-points
+    '((0 3) (-15 0) (0 -3) (3 0)))))
 
 ;;; Sketches rombusz:
 (defparameter *coords*
@@ -189,12 +191,13 @@
       (205.954d0 -8.0374d0 -10.5976d0))
      ((205.954d0 -8.0374d0 -10.5976d0)
       (164.961d0 -50.4667d0 20.407d0)))))
-(defparameter *angles*
-  (angles-from-points
-   '((-146.776 37.1868 -22.987)
-     (200.335 67.0522 -63.9375)
-     (237.86 -12.5697 -9.64074)
-     (174.683 -79.2657 39.9866))))
+(defparameter *points*
+  (points-from-angles
+   (angles-from-points
+    '((-146.776 37.1868 -22.987)
+      (200.335 67.0522 -63.9375)
+      (237.86 -12.5697 -9.64074)
+      (174.683 -79.2657 39.9866)))))
 
 ;;; levagott negyzet:
 (defparameter *coords*
@@ -228,13 +231,14 @@
       (-5.0d0  0.0d0 0.0d0))
      ((-5.0d0  0.0d0 0.0d0)
       (-0.5d0 -5.3d0 0.0d0)))))
-(defparameter *angles*
-  (angles-from-points
-   '(( 0.5d0 -6.0d0 0.0d0)
-     ( 6.0d0  0.0d0 0.0d0)
-     ( 0.0d0  6.0d0 0.0d0)
-     (-6.0d0  0.0d0 0.0d0)
-     (-0.5d0 -6.0d0 0.0d0))))
+(defparameter *points*
+  (points-from-angles
+   (angles-from-points
+    '(( 0.5d0 -6.0d0 0.0d0)
+      ( 6.0d0  0.0d0 0.0d0)
+      ( 0.0d0  6.0d0 0.0d0)
+      (-6.0d0  0.0d0 0.0d0)
+      (-0.5d0 -6.0d0 0.0d0)))))
 
 
 ;;; Figure 7
@@ -243,30 +247,30 @@
 
 (let ((*exponent* 2)
       (*resolution* 40)
-      (angles '(50 60 70 60 70 50))
+      (points (points-from-angles '(50 60 70 60 70 50)))
       (distance-type 'line-sweep))
-  (write-blends angles '(t nil nil nil nil t) "n-sided-paper/07a-side-blend.vtk"
+  (write-blends points '(t nil nil nil nil t) "n-sided-paper/07a-side-blend.vtk"
 		:blend-function #'corner-blend :distance-type distance-type)
-  (write-blends angles '(t nil nil nil nil nil) "n-sided-paper/07b-corner-blend.vtk"
+  (write-blends points '(t nil nil nil nil nil) "n-sided-paper/07b-corner-blend.vtk"
 		:blend-function #'corner-blend :distance-type distance-type)
-  (write-blends angles '(t nil nil nil nil nil) "n-sided-paper/07c-special-side-blend.vtk"
+  (write-blends points '(t nil nil nil nil nil) "n-sided-paper/07c-special-side-blend.vtk"
 		:blend-function #'ribbon-blend :distance-type distance-type)
-  (write-blends-uv-polyline angles '(t nil nil nil nil t)
+  (write-blends-uv-polyline points '(t nil nil nil nil t)
 			    "n-sided-paper/07a-side-blend-uv.vtk"
 			    :blend-function #'corner-blend :distance-type distance-type)
-  (write-blends-uv-polyline angles '(t nil nil nil nil nil)
+  (write-blends-uv-polyline points '(t nil nil nil nil nil)
 			    "n-sided-paper/07b-corner-blend-uv.vtk"
 			    :blend-function #'corner-blend :distance-type distance-type)
-  (write-blends-uv-polyline angles '(t nil nil nil nil nil)
+  (write-blends-uv-polyline points '(t nil nil nil nil nil)
 			    "n-sided-paper/07c-special-side-blend-uv.vtk"
 			    :blend-function #'ribbon-blend :distance-type distance-type)
-  (write-blends-spider-polyline angles '(t nil nil nil nil t)
+  (write-blends-spider-polyline points '(t nil nil nil nil t)
 				"n-sided-paper/07a-side-blend-spider.vtk"
 				:blend-function #'corner-blend :distance-type distance-type)
-  (write-blends-spider-polyline angles '(t nil nil nil nil nil)
+  (write-blends-spider-polyline points '(t nil nil nil nil nil)
 				"n-sided-paper/07b-corner-blend-spider.vtk"
 				:blend-function #'corner-blend :distance-type distance-type)
-  (write-blends-spider-polyline angles '(t nil nil nil nil nil)
+  (write-blends-spider-polyline points '(t nil nil nil nil nil)
 				"n-sided-paper/07c-special-side-blend-spider.vtk"
 				:blend-function #'ribbon-blend :distance-type distance-type))
 
@@ -275,54 +279,54 @@
 
 ;;; Parameterizations
 
-(defparameter *angles* '(40 20 60 100 80))
+(defparameter *points* (points-from-angles '(40 20 60 100 80)))
 
 (vectorized-distance-function-test
- *angles* '(nil sd nil nil nil) "n-sided-paper/08a1-perpendicular-sd.ps"
+ *points* '(nil sd nil nil nil) "n-sided-paper/08a1-perpendicular-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'perpendicular :color nil)
 (vectorized-distance-function-test
- *angles* '(nil sd nil nil nil) "n-sided-paper/08b1-barycentric-sd.ps"
+ *points* '(nil sd nil nil nil) "n-sided-paper/08b1-barycentric-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'barycentric :color nil)
 (vectorized-distance-function-test
- *angles* '(nil sd nil nil nil) "n-sided-paper/08c1-radial-sd.ps"
+ *points* '(nil sd nil nil nil) "n-sided-paper/08c1-radial-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'radial :color nil)
 (vectorized-distance-function-test
- *angles* '(nil sd nil nil nil) "n-sided-paper/08d1-chord-sd.ps"
+ *points* '(nil sd nil nil nil) "n-sided-paper/08d1-chord-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'chord-based :color nil)
 (vectorized-distance-function-test
- *angles* '(nil sd nil nil nil) "n-sided-paper/08e1-sweep-sd.ps"
+ *points* '(nil sd nil nil nil) "n-sided-paper/08e1-sweep-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
 
 (vectorized-distance-function-test
- *angles* '(s s s s s) "n-sided-paper/08a2-perpendicular-center.ps"
+ *points* '(s s s s s) "n-sided-paper/08a2-perpendicular-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'perpendicular)
 (vectorized-distance-function-test
- *angles* '(s s s s s) "n-sided-paper/08b2-barycentric-center.ps"
+ *points* '(s s s s s) "n-sided-paper/08b2-barycentric-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'barycentric)
 (vectorized-distance-function-test
- *angles* '(s s s s s) "n-sided-paper/08c2-radial-center.ps"
+ *points* '(s s s s s) "n-sided-paper/08c2-radial-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'radial)
 (vectorized-distance-function-test
- *angles* '(s s s s s) "n-sided-paper/08d2-chord-center.ps"
+ *points* '(s s s s s) "n-sided-paper/08d2-chord-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'chord-based)
 (vectorized-distance-function-test
- *angles* '(s s s s s) "n-sided-paper/08e2-sweep-center.ps"
+ *points* '(s s s s s) "n-sided-paper/08e2-sweep-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'line-sweep)
 
 (vectorized-distance-function-test
- *angles* '(s s nil nil nil) "n-sided-paper/08a3-perpendicular-ss.ps"
+ *points* '(s s nil nil nil) "n-sided-paper/08a3-perpendicular-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'perpendicular :color nil)
 (vectorized-distance-function-test
- *angles* '(s s nil nil nil) "n-sided-paper/08b3-barycentric-ss.ps"
+ *points* '(s s nil nil nil) "n-sided-paper/08b3-barycentric-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'barycentric :color nil)
 (vectorized-distance-function-test
- *angles* '(s s nil nil nil) "n-sided-paper/08c3-radial-ss.ps"
+ *points* '(s s nil nil nil) "n-sided-paper/08c3-radial-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'radial :color nil)
 (vectorized-distance-function-test
- *angles* '(s s nil nil nil) "n-sided-paper/08d3-chord-ss.ps"
+ *points* '(s s nil nil nil) "n-sided-paper/08d3-chord-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'chord-based :color nil)
 (vectorized-distance-function-test
- *angles* '(s s nil nil nil) "n-sided-paper/08e3-sweep-ss.ps"
+ *points* '(s s nil nil nil) "n-sided-paper/08e3-sweep-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
 
 
@@ -330,46 +334,46 @@
 
 ;;; Blend territories
 
-(defparameter *angles* '(40 20 60 100 80))
+(defparameter *points* (points-from-angles '(40 20 60 100 80)))
 
-(write-color-blend-test *angles* "n-sided-paper/09a1-corner-perpendicular.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09a1-corner-perpendicular.ppm" 400
 			:blend-function #'corner-blend
 			:distance-type 'perpendicular
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09a2-corner-radial.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09a2-corner-radial.ppm" 400
 			:blend-function #'corner-blend
 			:distance-type 'radial
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09a3-corner-barycentric.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09a3-corner-barycentric.ppm" 400
 			:blend-function #'corner-blend
 			:distance-type 'barycentric
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09a4-corner-chord.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09a4-corner-chord.ppm" 400
 			:blend-function #'corner-blend
 			:distance-type 'chord-based
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09a5-corner-sweep.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09a5-corner-sweep.ppm" 400
 			:blend-function #'corner-blend
 			:distance-type 'line-sweep
 			:trim '(0.89d0 0.91d0))
 
-(write-color-blend-test *angles* "n-sided-paper/09b1-side-perpendicular.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09b1-side-perpendicular.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'perpendicular
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09b2-side-radial.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09b2-side-radial.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'radial
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09b3-side-barycentric.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09b3-side-barycentric.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'barycentric
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09b4-side-chord.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09b4-side-chord.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'chord-based
 			:trim '(0.89d0 0.91d0))
-(write-color-blend-test *angles* "n-sided-paper/09b5-side-sweep.ppm" 400
+(write-color-blend-test *points* "n-sided-paper/09b5-side-sweep.ppm" 400
 			:blend-function #'ribbon-blend
 			:distance-type 'line-sweep
 			:trim '(0.89d0 0.91d0))
@@ -378,7 +382,7 @@
 ;;; Figure 11 - three approaches
 
 ;;; Otoldalu:
-(defparameter *angles* '(60 20 110 60 110))
+(defparameter *points* (points-from-angles '(60 20 110 60 110)))
 (defparameter *coords*
   '((((0.0d0 0.0d0 0.0d0)
       (1.0d0 0.0d0 1.0d0)
@@ -415,19 +419,19 @@
 (let ((*resolution* 20)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* t))
-  (write-patch *angles* 'hybrid "n-sided-paper/11a-side.vtk" :coords *coords*
+  (write-patch *points* 'hybrid "n-sided-paper/11a-side.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
 
 #+nil
 (let ((*resolution* 80)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* t))
-  (write-patch *angles* 'corner "n-sided-paper/11b-corner.vtk" :coords *coords*
+  (write-patch *points* 'corner "n-sided-paper/11b-corner.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
 
 #+nil
 (let ((*resolution* 80)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* t))
-  (write-patch *angles* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
+  (write-patch *points* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
 	       :distance-type 'line-sweep))

@@ -138,6 +138,7 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 		(v* (rc 1 1 'uv) (beta1 u) (beta1 v))))))))
 
 (defun write-coons-patch (patch filename &optional (fn #'coons-evaluate))
+  (assert (= (length patch) 4))
   (let* ((n (length patch))
 	 (angles (uniform-angles n))
 	 (points (points-from-angles angles))
@@ -270,14 +271,16 @@ thus containing point I-1 (NOT point I)."
 				    (ribbon-blend b i))))))
 	  (finally (return result)))))
 
-(defun write-patch (angles type filename &key heights coords (distance-type 'perpendicular) spider)
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+(defun generate-patch-from-heights (points inner-points heights)
+  (generate-patch
+   (generate-coordinates (lines-from-points points) (first heights))
+   (generate-coordinates (lines-from-points inner-points) (second heights))))
+
+(defun write-patch (points type filename &key inner-points heights coords
+		    (distance-type 'perpendicular) spider)
+  (let* ((n (length points))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
-		    (generate-patch
-		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
-					   (second heights))))))
+		    (generate-patch-from-heights points inner-points heights))))
     (if spider
 	(write-vtk-polylines
 	 (iter (for line in (spider-lines points))
@@ -292,9 +295,10 @@ thus containing point I-1 (NOT point I)."
 
 #+nil
 (let ((*ribbon-multiplier* 1.0d0))
-  (write-patch '(40 20 60 100 80)
+  (write-patch (points-from-angles '(40 20 60 100 80))
 	       'corner
 	       "/tmp/patch.vtk"
+	       :inner-points (points-from-angles '(40 20 60 100 80) 0.5d0)
 	       :heights
 	       '(((0.0d0 0.1d0 0.1d0 0.0d0)
 		  (0.0d0 0.2d0 0.3d0 0.4d0)
@@ -311,9 +315,10 @@ thus containing point I-1 (NOT point I)."
 #+nil
 (let ((*ribbon-multiplier* 0.5d0)
       (*resolution* 20))
-  (write-patch '(50 20 50 240)
+  (write-patch (points-from-angles '(50 20 50 240))
 	       'ribbon
 	       "/tmp/patch.vtk"
+	       :inner-points (points-from-angles '(50 20 50 240) 0.5d0)
 	       :heights
 	       '(((0 0.2 0.2 0)
 		  (0 0.4 0.4 0)
@@ -346,13 +351,9 @@ thus containing point I-1 (NOT point I)."
 	    (iter (for i from k below (+ k d -1))
 		  (format s "2 ~d ~d~%" i (1+ i)))))))
 
-(defun write-constraint-ribbons (angles filename &key (resolution 100) heights coords)
-  (let* ((points (points-from-angles angles))
-	 (patch (or (and coords (generate-patch (first coords) (second coords)))
-		    (generate-patch
-		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
-					   (second heights)))))
+(defun write-constraint-ribbons (points filename &key (resolution 100) inner-points heights coords)
+  (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights)))
 	 (curves (iter (for curve1 in (first patch))
 		       (for curve2 in (second patch))
 		       (for points1 =
@@ -365,19 +366,16 @@ thus containing point I-1 (NOT point I)."
 					  (mapcar #'list points1 points2))))))
     (write-vtk-curves curves filename)))
 
-(defun write-constraint-grid (angles filename &key heights coords)
-  (let* ((points (points-from-angles angles))
-	 (patch (or (and coords (generate-patch (first coords) (second coords)))
-		    (generate-patch
-		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
-					   (second heights))))))
+(defun write-constraint-grid (points filename &key inner-points heights coords)
+  (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights))))
     (write-vtk-curves (append (first patch) (second patch)) filename)))
 
 #+nil
 (write-constraint-grid
- '(50 20 50 240)
+ (points-from-angles '(50 20 50 240))
  "/tmp/grid.vtk"
+ :inner-points (points-from-angles '(50 20 50 240) 0.5d0)
  :heights
  '(((0 0.2 0.2 0)
     (0 0.4 0.4 0)
@@ -390,8 +388,9 @@ thus containing point I-1 (NOT point I)."
 
 #+nil
 (write-constraint-ribbons
- '(90 90 90 90)
+ (points-from-angles '(90 90 90 90))
  "/tmp/grid.vtk"
+ :inner-points (points-from-angles '(90 90 90 90) 0.5d0)
  :heights
  '(((0 0.2 0.2 0)
     (0 0.4 0.4 0)
@@ -418,7 +417,7 @@ thus containing point I-1 (NOT point I)."
 
 #+nil
 (write-constraint-grid
- '(50 20 50 240)
+ (points-from-angles '(50 20 50 240))
  "n-sided-paper/coons-grid.vtk"
  :coords '((((0 0 0) (2 0 1) (4 0 1) (6 0 0))
 	    ((6 0 0) (6 2 2) (7 4 1) (8 6 0))
@@ -431,7 +430,7 @@ thus containing point I-1 (NOT point I)."
 
 #+nil
 (write-constraint-ribbons
- '(50 20 50 240)
+ (points-from-angles '(50 20 50 240))
  "n-sided-paper/coons-ribbons.vtk"
  :coords '((((0 0 0) (2 0 1) (4 0 1) (6 0 0))
 	    ((6 0 0) (6 2 2) (7 4 1) (8 6 0))
@@ -476,16 +475,12 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 	    (leave (values u (vlength deviation))))
 	  (finally (return (values u (vlength deviation)))))))
 
-(defun check-patch (angles type &key heights coords (distance-type 'perpendicular))
+(defun check-patch (points type &key inner-points heights coords (distance-type 'perpendicular))
   "Only side interpolation checking for now."
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+  (let* ((n (length points))
 	 (lines (lines-from-points points))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
-		    (generate-patch
-		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
-					   (second heights))))))
+		    (generate-patch-from-heights points inner-points heights))))
     (iter (for side from 0 below n)
 	  (for curve in (first patch))
 	  (for line in lines)
@@ -497,17 +492,13 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for v = (bezier-project-point curve p 10 *resolution*))
 		 (maximize (point-distance p (bezier curve v))))))))
 
-(defun check-patch-tangents (angles type &key heights coords (distance-type 'perpendicular)
-			     (step 0.1d-3))
+(defun check-patch-tangents (points type &key inner-points heights coords
+			     (distance-type 'perpendicular) (step 0.1d-3))
   "Only side interpolation checking for now."
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+  (let* ((n (length points))
 	 (lines (lines-from-points points))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
-		    (generate-patch
-		     (generate-coordinates (lines-from-points points) (first heights))
-		     (generate-coordinates (lines-from-points (points-from-angles angles 0.5d0))
-					   (second heights))))))
+		    (generate-patch-from-heights points inner-points heights))))
     (iter (for side from 0 below n)
 	  (for curve in (first patch))
 	  (for inner-curve in (second patch))
@@ -544,10 +535,10 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 				   '(perpendicular barycentric radial chord-based line-sweep)))
 	      (format t "Maximal  point  deviation using ~a with ~a: ~f~%"
 		      type distance
-		      (check-patch *angles* type :coords *coords* :distance-type distance))
+		      (check-patch *points* type :coords *coords* :distance-type distance))
 	      (format t "Maximal tangent deviation using ~a with ~a: ~f~%"
 		      type distance
-		      (check-patch-tangents *angles* type :coords *coords* :distance-type distance
+		      (check-patch-tangents *points* type :coords *coords* :distance-type distance
 					    :step 1.0d-4)))))
 
 ;; Centralized line sweep is ON

@@ -189,13 +189,11 @@ the interior surface will be 1/(N+1), where N is the number of lines."
 		      (push (affine-combine center coeff lp) result))))
     (nreverse result)))
 
-(defun write-blends (angles on-off filename &key (blend-function #'ribbon-blend)
+(defun write-blends (points on-off filename &key (blend-function #'ribbon-blend)
 		     (distance-type 'perpendicular))
   "Computes samples by a set of blend functions and writes it in a VTK file.
-The ON-OFF parameter declares which blends should be turned on.
-For ANGLES, see POINTS-FROM-ANGLES."
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+The ON-OFF parameter declares which blends should be turned on."
+  (let* ((n (length points))
 	 (lines (lines-from-points points))
 	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
 	 (vertices (mapcar (lambda (p)
@@ -208,11 +206,10 @@ For ANGLES, see POINTS-FROM-ANGLES."
     (write-vtk-indexed-mesh vertices (triangles n) filename)))
 
 ;;; quadrilateral mesh
-(defun write-blends-quad (angles on-off filename &key (blend-function #'ribbon-blend)
+(defun write-blends-quad (points on-off filename &key (blend-function #'ribbon-blend)
 			  (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
-  (let* ((points (points-from-angles angles))
-	 (lines (lines-from-points points))
+  (let* ((lines (lines-from-points points))
 	 (n (length lines))
 	 (res (1+ (* 2 *resolution*)))
 	 (result (make-array (list res res))))
@@ -232,26 +229,26 @@ For ANGLES, see POINTS-FROM-ANGLES."
 			      (cons 0 p)))))))
     (write-points2-vtk result filename)))
 
-;; (write-blends '(60 60 80 120 40) '(t t nil nil nil) "/tmp/blend.vtk")
-;; (write-blends '(60 60 80 120 40) '(t t nil nil t) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
-;; (write-blends '(60 60 80 120 40) '(t t nil nil nil t) "/tmp/interior-blend.vtk" :blend-function #'interior-ribbon-blend)
+;; (write-blends (points-from-angles '(60 60 80 120 40)) '(t t nil nil nil) "/tmp/blend.vtk")
+;; (write-blends (points-from-angles '(60 60 80 120 40)) '(t t nil nil t) "/tmp/corner-blend.vtk" :blend-function #'corner-blend)
+;; (write-blends (points-from-angles '(60 60 80 120 40)) '(t t nil nil nil t) "/tmp/interior-blend.vtk" :blend-function #'interior-ribbon-blend)
 
 #+nil
-(write-blends '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend.vtk"
+(write-blends (points-from-angles '(40 20 60 100 80)) '(t nil nil nil nil) "/tmp/blend.vtk"
 	      :blend-function #'ribbon-blend :distance-type 'line-sweep)
 
-(defun write-blend-all-types (angles on-off directory)
+(defun write-blend-all-types (points on-off directory)
   (iter (for blend in (list #'ribbon-blend #'corner-blend))
 	(for blend-name in '(ribbon corner))
 	(iter (for type in '(perpendicular barycentric chord-based radial line-sweep))
 	      (for name = (format nil "~(~a~)-~(~a~)-~d.vtk" blend-name type *exponent*))
 	      (for filename = (make-pathname :directory directory :name name))
-	      (write-blends angles on-off filename :blend-function blend :distance-type type))))
+	      (write-blends points on-off filename :blend-function blend :distance-type type))))
 
 #+nil
 (let ((*exponent* 2)
       (*resolution* 40))
-  (write-blend-all-types '(40 20 60 100 80) '(t nil nil nil nil) #p"/tmp/"))
+  (write-blend-all-types (points-from-angles '(40 20 60 100 80)) '(t nil nil nil nil) #p"/tmp/"))
 
 (defun write-vtk-polylines (lines filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -274,11 +271,10 @@ For ANGLES, see POINTS-FROM-ANGLES."
 	    (incf i))
 	  (terpri s))))))
 
-(defun write-blends-uv-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
+(defun write-blends-uv-polyline (points on-off filename &key (blend-function #'ribbon-blend)
 				 (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
-  (let* ((points (points-from-angles angles))
-	 (lines (lines-from-points points))
+  (let* ((lines (lines-from-points points))
 	 (n (length lines))
 	 (res (1+ (* 2 *resolution*))))
     (flet ((map-coordinates (x y)
@@ -300,8 +296,9 @@ For ANGLES, see POINTS-FROM-ANGLES."
        filename))))
 
 #+nil
-(write-blends-uv-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend2.vtk"
-			  :blend-function #'ribbon-blend :distance-type 'line-sweep)
+(write-blends-uv-polyline (points-from-angles '(40 20 60 100 80)) '(t nil nil nil nil)
+			  "/tmp/blend2.vtk" :blend-function #'ribbon-blend
+			  :distance-type 'line-sweep)
 
 (defun spider-uv-lines (n)
   (iter (with inner-start = 0)
@@ -328,11 +325,10 @@ For ANGLES, see POINTS-FROM-ANGLES."
 		      (setf inner-vert inner-next)))))
 	(setf inner-start outer-start)))
 
-(defun write-blends-spider-polyline (angles on-off filename &key (blend-function #'ribbon-blend)
+(defun write-blends-spider-polyline (points on-off filename &key (blend-function #'ribbon-blend)
 				     (distance-type 'perpendicular))
   "See the documentation of WRITE-BLENDS."
-  (let* ((n (length angles))
-	 (points (points-from-angles angles))
+  (let* ((n (length points)) 
 	 (lines (lines-from-points points))
 	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
 	 (vertices (mapcar (lambda (p)
@@ -348,8 +344,9 @@ For ANGLES, see POINTS-FROM-ANGLES."
      filename)))
 
 #+nil
-(write-blends-spider-polyline '(40 20 60 100 80) '(t nil nil nil nil) "/tmp/blend.vtk"
-			      :blend-function #'ribbon-blend :distance-type 'line-sweep)
+(write-blends-spider-polyline (points-from-angles '(40 20 60 100 80)) '(t nil nil nil nil)
+			      "/tmp/blend.vtk" :blend-function #'ribbon-blend
+			      :distance-type 'line-sweep)
 
 (defun generate-colors (n)
   (assert (<= n 6) (n) "Only N <= 6 is supported.")
@@ -357,12 +354,11 @@ For ANGLES, see POINTS-FROM-ANGLES."
             (255 255 0) (255 0 255) (0 255 255))
           0 n))
 
-(defun write-color-blend-test (angles filename r &key (blend-function #'ribbon-blend)
+(defun write-color-blend-test (points filename r &key (blend-function #'ribbon-blend)
 			       (distance-type 'perpendicular) (trim '(0.89d0 0.91d0)))
   (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
     (let* ((wh (1+ (* 2 r)))
-	   (n (length angles))
-	   (points (points-from-angles angles))
+	   (n (length points))
 	   (lines (lines-from-points points))
 	   (colors (generate-colors n)))
       (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -383,12 +379,11 @@ For ANGLES, see POINTS-FROM-ANGLES."
                   (format s "255 255 255~%")))))))))
 
 ;;; Display only the si=... lines
-(defun write-si-line-test (angles filename r &key (distance-type 'perpendicular)
+(defun write-si-line-test (points filename r &key (distance-type 'perpendicular)
 			   (trim '(0.495d0 0.505d0)))
   (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
     (let* ((wh (1+ (* 2 r)))
-	   (n (length angles))
-	   (points (points-from-angles angles))
+	   (n (length points))
 	   (lines (lines-from-points points))
 	   (colors (generate-colors n)))
       (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -416,22 +411,21 @@ For ANGLES, see POINTS-FROM-ANGLES."
 		      (format s "127 127 127~%"))))))))))))
 
 #+nil
-(write-color-blend-test '(40 20 60 100 80) "/tmp/blend.ppm" 200
+(write-color-blend-test (points-from-angles '(40 20 60 100 80)) "/tmp/blend.ppm" 200
 			:blend-function #'ribbon-blend
 			:distance-type 'chord-based
 			:trim '(0.495d0 0.505d0))
 
 #+nil
-(write-si-line-test '(40 20 60 100 80) "/tmp/blend.ppm" 200
-			:distance-type 'line-sweep
-			:trim '(0.495d0 0.505d0))
+(write-si-line-test (points-from-angles '(40 20 60 100 80)) "/tmp/blend.ppm" 200
+		    :distance-type 'line-sweep
+		    :trim '(0.495d0 0.505d0))
 
-(defun write-blend-voronoi (angles filename r &key (blend-function #'ribbon-blend)
+(defun write-blend-voronoi (points filename r &key (blend-function #'ribbon-blend)
 			    (distance-type 'perpendicular) (threshold 0.01d0))
   (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
     (let* ((wh (1+ (* 2 r)))
-	   (n (length angles))
-	   (points (points-from-angles angles))
+	   (n (length points))
 	   (lines (lines-from-points points)))
       (with-open-file (s filename :direction :output :if-exists :supersede)
         (format s "P3~%~d ~d~%255~%" wh wh)
@@ -450,10 +444,10 @@ For ANGLES, see POINTS-FROM-ANGLES."
                   (format s "255 255 255~%")))))))))
 
 #+nil
-(write-blend-voronoi '(40 20 60 100 80) "/tmp/blend2.ppm" 200
-			:blend-function #'ribbon-blend
-			:distance-type 'line-sweep
-			:threshold 0.03d0)
+(write-blend-voronoi (points-from-angles '(40 20 60 100 80)) "/tmp/blend2.ppm" 200
+		     :blend-function #'ribbon-blend
+		     :distance-type 'line-sweep
+		     :threshold 0.03d0)
 
 (defparameter *spider-density* 4)
 (defparameter *spider-lines* 3)

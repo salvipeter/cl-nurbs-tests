@@ -298,11 +298,11 @@
     (flet ((aliasing (x) (floor (+ (* alpha x) (* 1-alpha 255)))))
       (format stream "~{~d~^ ~}" (mapcar #'aliasing (cdr (assoc type *colors*)))))))
 
-(defun distance-function-test (angles distance-type line-type filename)
+(defun distance-function-test (points distance-type line-type filename)
   (let* ((points (mapcar (lambda (p)
 			   (list (/ (+ *width* (* *width* (first p))) 2)
 				 (/ (+ *height* (* *height* (second p))) 2)))
-			 (points-from-angles angles)))
+			 points))
 	 (lines (lines-from-points points))
 	 (center (central-point points lines t)))
     (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -318,7 +318,7 @@
 		   (radial
 		    (radial-distance points lst (list x y) type))
 		   (line-sweep
-		    (line-sweep-distance center lst (list x y) type))))
+		    (line-sweep-distance center points lst (list x y) type))))
 	       (outsidep (x y)
 		 (some (lambda (line)
 			 (< (* (point-line-distance (list x y) line t)
@@ -375,12 +375,12 @@
 			    (write-color s 'nothing))))
 	      (terpri s))))))
 
-(defun distance-function-complete-set (angles directory)
+(defun distance-function-complete-set (points directory)
   (iter (for type in '(perpendicular barycentric chord-based radial line-sweep))
 	(iter (for lines in '((s d) (s s) (d d)))
 	      (for name = (format nil "~(~a~)-~{~(~a~)~}.ppm" type lines))
 	      (for filename = (make-pathname :directory directory :name name))
-	      (distance-function-test angles type lines filename))))
+	      (distance-function-test points type lines filename))))
 
 ;; (kato-test '(250 240) '(390 240) "/tmp/kato.pgm")
 
@@ -421,7 +421,7 @@
       (*line-width* 0.01d0)
       (*point-size* 3.0d0)
       (*tolerance* 1.0d0))
-  (distance-function-test '(40 20 60 100 80) 'chord-based '(s d)
+  (distance-function-test (points-from-angles '(40 20 60 100 80)) 'chord-based '(s d)
 			  "/tmp/distance.ppm"))
 
 (defun trace-parameter-buggy (points i distance-type type parameter resolution)
@@ -517,15 +517,14 @@
 		    (while next)
 		    (collect next)))))))
 
-(defun vectorized-distance-function-test (angles line-types filename &key (resolution 0.1d0)
+(defun vectorized-distance-function-test (points line-types filename &key (resolution 0.1d0)
 					  (density 4) (distance-type 'perpendicular)
 					  (color t))
   "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
   (flet ((map-point (p)
 	   (list (* (+ (first p) 1.0d0) 200)
 		 (* (+ (second p) 1.0d0) 200))))
-    (let* ((n (length angles))
-	   (points (points-from-angles angles))
+    (let* ((n (length points)) 
 	   (lines (lines-from-points points))
 	   (colors (or (and color (generate-colors n))
 		       (iter (repeat n) (collect '(0 0 0)))))
@@ -564,5 +563,5 @@
 
 #+nil
 (vectorized-distance-function-test
- '(40 20 60 100 80) '(sd nil nil nil sd) "/tmp/params.ps"
+ (points-from-angles '(40 20 60 100 80)) '(sd nil nil nil sd) "/tmp/params.ps"
  :resolution 0.1d0 :density 4 :distance-type 'chord-based)
