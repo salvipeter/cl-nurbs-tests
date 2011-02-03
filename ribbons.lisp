@@ -28,10 +28,9 @@ For example, for a equilateral triangle give '(120 120 120)."
 		  (for q in (rest points))
 		  (collect (* 360.0d0(/ (point-distance p q) sum)))))))
 
-(defun domain-from-points (points)
-  "TODO: same, but using angles between Bezier curves and arc lengths."
-  (labels ((angle (p-1 p0 p+1)
-	     (acos (scalar-product (vnormalize (v- p0 p-1)) (vnormalize (v- p+1 p0)))))
+(defun domain-from-points (curves)
+  (labels ((angle (c1 c2)
+	     (acos (scalar-product (vnormalize (bezier c1 1 1)) (vnormalize (bezier c2 0 1)))))
 	   (rescale (lst)
 	     (let* ((min (list (reduce #'min (mapcar #'first lst))
 			       (reduce #'min (mapcar #'second lst))))
@@ -39,9 +38,8 @@ For example, for a equilateral triangle give '(120 120 120)."
 			       (reduce #'max (mapcar #'second lst))))
 		    (length (max (- (first max) (first min)) (- (second max) (second min)))))
 	       (mapcar (lambda (p) (v+ (v* (v- p min) (/ 2.0d0 length)) '(-1 -1))) lst))))
-    (let* ((angles (mapcar #'angle (append (last points) points) points
-			   (append (rest points) (list (first points)))))
-	   (lengths (mapcar #'point-distance (append (last points) points) points))
+    (let* ((angles (mapcar #'angle curves (append (rest curves) (list (first curves)))))
+	   (lengths (mapcar #'bezier-arc-length curves))
 	   (length-sum (reduce #'+ lengths))
 	   (vertices (iter (for prev first '(0 0) then next)
 			   (for length in lengths)
@@ -52,8 +50,10 @@ For example, for a equilateral triangle give '(120 120 120)."
 	   (difference (v* (car (last vertices)) -1)))
       (rescale
        (cons '(0 0)
-	     (butlast (mapcar (lambda (v l) (v+ v (v* difference (/ l length-sum))))
-			      vertices lengths)))))))
+	     (iter (for length in (butlast lengths))
+		   (for accumulated first length then (+ accumulated length))
+		   (for vertex in vertices)
+		   (collect (v+ vertex (v* difference (/ accumulated length-sum))))))))))
 
 (defun point-line-distance (p line &optional signedp)
   (let* ((v (v- (second line) (first line)))

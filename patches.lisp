@@ -35,6 +35,12 @@
 	      (finally (return p)))
 	(/ (factorial n) (factorial (- n derivative))))))
 
+(defun bezier-arc-length (points &key (from 0.0d0) (to 1.0d0))
+  (iter (for gauss in cl-nurbs::+gaussian-quadrature+)
+	(for u = (/ (+ (* (- to from) (first gauss)) from to) 2.0))
+	(for dn = (vlength (bezier points u 1)))
+	(sum (* dn (second gauss) (- to from) 0.5))))
+
 (defun generate-coons-patch (points twists)
   "POINTS : x4=p1 p2 p3 p4=q1 q2 q3 q4=r1 ... x3
 TWISTS : x3p2 p3q2 q3r2 ... w3x2"
