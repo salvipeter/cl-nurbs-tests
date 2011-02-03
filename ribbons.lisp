@@ -28,6 +28,33 @@ For example, for a equilateral triangle give '(120 120 120)."
 		  (for q in (rest points))
 		  (collect (* 360.0d0(/ (point-distance p q) sum)))))))
 
+(defun domain-from-points (points)
+  "TODO: same, but using angles between Bezier curves and arc lengths."
+  (labels ((angle (p-1 p0 p+1)
+	     (acos (scalar-product (vnormalize (v- p0 p-1)) (vnormalize (v- p+1 p0)))))
+	   (rescale (lst)
+	     (let* ((min (list (reduce #'min (mapcar #'first lst))
+			       (reduce #'min (mapcar #'second lst))))
+		    (max (list (reduce #'max (mapcar #'first lst))
+			       (reduce #'max (mapcar #'second lst))))
+		    (length (max (- (first max) (first min)) (- (second max) (second min)))))
+	       (mapcar (lambda (p) (v+ (v* (v- p min) (/ 2.0d0 length)) '(-1 -1))) lst))))
+    (let* ((angles (mapcar #'angle (append (last points) points) points
+			   (append (rest points) (list (first points)))))
+	   (lengths (mapcar #'point-distance (append (last points) points) points))
+	   (length-sum (reduce #'+ lengths))
+	   (vertices (iter (for prev first '(0 0) then next)
+			   (for length in lengths)
+			   (for dir first 0 then (+ dir angle))
+			   (for angle in angles)
+			   (for next = (v+ prev (v* (list (cos dir) (sin dir)) length)))
+			   (collect next)))
+	   (difference (v* (car (last vertices)) -1)))
+      (rescale
+       (cons '(0 0)
+	     (butlast (mapcar (lambda (v l) (v+ v (v* difference (/ l length-sum))))
+			      vertices lengths)))))))
+
 (defun point-line-distance (p line &optional signedp)
   (let* ((v (v- (second line) (first line)))
          (d (scalar-product (vnormalize (list (second v) (- (first v))))

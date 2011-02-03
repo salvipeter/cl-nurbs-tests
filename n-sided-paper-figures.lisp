@@ -435,3 +435,24 @@
       (*centralized-line-sweep* t))
   (write-patch *points* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
 	       :distance-type 'line-sweep))
+
+
+;;; Torzitas teszt
+(defparameter *coords*
+  '((((3 0 0.0d0) (2 1 0.0d0) (1 2 0.0d0) (0 3 0.0d0))
+     ((0 3 0.0d0) (-5 2 0.0d0) (-10 1 0.0d0) (-15 0 0.0d0))
+     ((-15 0 0.0d0) (-10 -1 0.0d0) (-5 -2 0.0d0) (0 -3 0.0d0))
+     ((0 -3 0.0d0) (1 -2 0.0d0) (2 -1 0.0d0) (3 0 0.0d0)))
+    (((1 0 0.0d0) (0 1 0.0d0)) ((0 1 0.0d0) (-10 0 0.0d0))
+     ((-10 0 0.0d0) (0 -1 0.0d0)) ((0 -1 0.0d0) (1 0 0.0d0)))))
+(defparameter *points*
+  (points-from-angles
+   (angles-from-points
+    '((0 1/5) (-1 0) (0 -1/5) (1/5 0)))))
+; (defparameter *points* (domain-from-points (first *coords*)))
+#+nil
+(let ((*resolution* 30)
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 1.0d0))
+  (write-patch *points* 'ribbon "n-sided-paper/rombusz1.vtk" :coords *coords*
+	       :distance-type 'perpendicular :spider t))
