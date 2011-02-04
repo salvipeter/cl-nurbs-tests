@@ -26,9 +26,14 @@ For example, for a equilateral triangle give '(120 120 120)."
 		      (sum (point-distance p q))))))
     (cons 0 (iter (for p in points)
 		  (for q in (rest points))
-		  (collect (* 360.0d0(/ (point-distance p q) sum)))))))
+		  (collect (* 360.0d0 (/ (point-distance p q) sum)))))))
 
-(defun domain-from-points (curves)
+(defun angles-from-curves (curves)
+  (let ((sum (reduce #'+ (mapcar #'bezier-arc-length curves))))
+    (iter (for curve in curves)
+	  (collect (* 360.0d0 (/ (bezier-arc-length curve) sum))))))
+
+(defun domain-from-curves-angular (curves)
   (labels ((angle (c1 c2)
 	     (acos (scalar-product (vnormalize (bezier c1 1 1)) (vnormalize (bezier c2 0 1)))))
 	   (rescale (lst)
@@ -49,11 +54,18 @@ For example, for a equilateral triangle give '(120 120 120)."
 			   (collect next)))
 	   (difference (v* (car (last vertices)) -1)))
       (rescale
-       (cons '(0 0)
-	     (iter (for length in (butlast lengths))
-		   (for accumulated first length then (+ accumulated length))
-		   (for vertex in vertices)
-		   (collect (v+ vertex (v* difference (/ accumulated length-sum))))))))))
+       (append (iter (for length in (butlast lengths))
+		     (for accumulated first length then (+ accumulated length))
+		     (for vertex in vertices)
+		     (collect (v+ vertex (v* difference (/ accumulated length-sum)))))
+	       '((0 0)))))))
+
+(defun domain-from-curves (curves &optional (type 'angular))
+  (ecase type
+    (regular (let ((n (length curves)))
+	       (points-from-angles (cons 13 (iter (repeat (1- n)) (collect (/ 360 n)))))))
+    (circular (points-from-angles (angles-from-curves curves)))
+    (angular (domain-from-curves-angular curves))))
 
 (defun point-line-distance (p line &optional signedp)
   (let* ((v (v- (second line) (first line)))
@@ -66,11 +78,12 @@ For example, for a equilateral triangle give '(120 120 120)."
 
 (defun insidep (lines p)
   "Determines if P is inside the polygon defined by LINES."
-  (every (lambda (line)
-           (> (* (point-line-distance p line t)
-                 (point-line-distance '(0 0) line t))
-              0))
-         lines))
+  (let ((center (central-point (mapcar #'second lines) lines t)))
+    (every (lambda (line)
+	     (> (* (point-line-distance p line t)
+		   (point-line-distance center line t))
+		0))
+	   lines)))
 
 (defun compute-distance (type points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)

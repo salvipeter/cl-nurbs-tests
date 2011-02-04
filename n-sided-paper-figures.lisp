@@ -449,7 +449,7 @@
   (points-from-angles
    (angles-from-points
     '((0 1/5) (-1 0) (0 -1/5) (1/5 0)))))
-(defparameter *points* (domain-from-points (first *coords*)))
+(defparameter *points* (domain-from-curves (first *coords*)))
 #+nil
 (let ((*resolution* 30)
       (*centralized-line-sweep* nil)
@@ -459,7 +459,7 @@
 
 ;;; Teglalap
 #+nil
-(domain-from-points
+(domain-from-curves
  '(((0 0 0) (6 0 0) (12 0 0))
    ((12 0 0) (12 1 0) (12 2 0))
    ((12 2 0) (6 2 8) (0 2 0))
