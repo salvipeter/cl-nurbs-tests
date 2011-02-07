@@ -221,7 +221,7 @@ thus containing point I-1 (NOT point I)."
 	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0
 	    (- 1.0d0 si-1) si *ribbon-multiplier* *ribbon-multiplier*))))
 
-(defun compute-parameter (type points p &optional no-tiny-p)
+(defun compute-parameter (type dir points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
 	       `(lambda (,args)
 		  (if no-tiny-p
@@ -229,13 +229,11 @@ thus containing point I-1 (NOT point I)."
 			(if (< result *tiny*) 0.0d0 result))
 		      (progn ,@body)))))
     (mapcar (ecase type
-	      (perpendicular (tiny-lambda (lst) (perpendicular-distance points lst p 's)))
-	      (barycentric (let ((lines (lines-from-points points)))
-			     (tiny-lambda (lst) (barycentric-distance lines lst p 's))))
-	      (chord-based (tiny-lambda (lst) (chord-based-distance points lst p 's)))
-	      (radial (tiny-lambda (lst) (radial-distance points lst p 's)))
-	      (line-sweep (let ((center (central-point points (lines-from-points points) t)))
-			    (tiny-lambda (lst) (line-sweep-distance center points lst p 's)))))
+	      (perpendicular (tiny-lambda (lst) (perpendicular-distance points lst p dir)))
+	      (barycentric (tiny-lambda (lst) (barycentric-distance points lst p dir)))
+	      (chord-based (tiny-lambda (lst) (chord-based-distance points lst p dir)))
+	      (radial (tiny-lambda (lst) (radial-distance points lst p dir)))
+	      (line-sweep (tiny-lambda (lst) (line-sweep-distance points lst p dir))))
 	    (iter (for i from -2 below (- (length points) 2))
 		  (collect (iter (for j from 0 below 4)
 				 (collect (elt points (mod (+ i j) (length points))))))))))
@@ -255,9 +253,9 @@ thus containing point I-1 (NOT point I)."
     (setf distance-type 'line-sweep))
   (let* ((n (length points))
 	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
-	 (d (compute-distance distance-type points p t))
-	 (s (compute-parameter distance-type points p t))
-	 (b (and (eq type 'sketches) (compute-distance 'perpendicular points p t))))
+	 (d (compute-parameter distance-type 'd points p t))
+	 (s (compute-parameter distance-type 's points p t))
+	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t))))
     (iter (for i from 0 below n)
 	  (with result = '(0 0 0))
 	  (setf result
