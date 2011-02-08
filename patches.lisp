@@ -228,12 +228,7 @@ thus containing point I-1 (NOT point I)."
 		      (let ((result (progn ,@body)))
 			(if (< result *tiny*) 0.0d0 result))
 		      (progn ,@body)))))
-    (mapcar (ecase type
-	      (perpendicular (tiny-lambda (lst) (perpendicular-distance points lst p dir)))
-	      (barycentric (tiny-lambda (lst) (barycentric-distance points lst p dir)))
-	      (chord-based (tiny-lambda (lst) (chord-based-distance points lst p dir)))
-	      (radial (tiny-lambda (lst) (radial-distance points lst p dir)))
-	      (line-sweep (tiny-lambda (lst) (line-sweep-distance points lst p dir))))
+    (mapcar (tiny-lambda (lst) (compute-distance type points lst p dir))
 	    (iter (for i from -2 below (- (length points) 2))
 		  (collect (iter (for j from 0 below 4)
 				 (collect (elt points (mod (+ i j) (length points))))))))))

@@ -180,10 +180,12 @@
 			  (t (princ 2 s))))
 	      (terpri s))))))
 
-(defun perpendicular-distance (points segments p type)
+(defgeneric compute-distance (type points segments p dir))
+
+(defmethod compute-distance ((type (eql 'perpendicular)) points segments p dir)
   (let ((p0 (elt segments 1))
 	(p1 (elt segments 2)))
-    (if (eq type 'd)
+    (if (eq dir 'd)
 	(/ (point-line-distance p (list p0 p1))
 	   (iter (for q1 in points)
 		 (maximize (iter (for q2 in points)
@@ -192,7 +194,7 @@
 	      (di+1 (point-line-distance p (list p1 (elt segments 3)))))
 	  (/ di-1 (+ di-1 di+1))))))
 
-(defun barycentric-distance (points segments p type)
+(defmethod compute-distance ((type (eql 'barycentric)) points segments p dir)
   (let ((lines (lines-from-points points)))
     (flet ((area (segment)
 	     (let* ((a (point-distance p (first segment)))
@@ -200,7 +202,7 @@
 		    (c (apply #'point-distance segment))
 		    (s (/ (+ a b c) 2)))
 	       (sqrt (max 0 (* s (- s a) (- s b) (- s c)))))))
-      (if (eq type 'd)
+      (if (eq dir 'd)
 	  (* (/ (area (subseq segments 1 3))
 		(reduce #'+ (mapcar #'area lines)))
 	     (/ (length lines) 2))
@@ -208,8 +210,8 @@
 		(di+1 (area (subseq segments 2))))
 	    (/ di-1 (+ di-1 di+1)))))))
 
-(defun chord-based-distance (points segments p type)
-  (if (eq type 'd)
+(defmethod compute-distance ((type (eql 'chord-based)) points segments p dir)
+  (if (eq dir 'd)
       (let* ((length (point-distance (second segments) (third segments)))
 	     (p1d (point-distance p (second segments)))
 	     (p2d (point-distance p (third segments))))
@@ -227,7 +229,7 @@
 	     (distance2 (+ p2d p3d (- length2))))
 	(/ distance1 (+ distance1 distance2)))))
 
-(defun radial-distance (points segments p type)
+(defmethod compute-distance ((type (eql 'radial)) points segments p dir)
   (let* ((p0 (first segments))
 	 (p1 (second segments))
 	 (p2 (third segments))
@@ -239,13 +241,13 @@
 	 (length (point-distance p1 p2))
 	 (axby-aybx (- (* (first a) (second b)) (* (second a) (first b)))))
     (if (zerop axby-aybx)
-	(perpendicular-distance points segments p type)
+	(compute-distance 'perpendicular points segments p dir)
 	(let ((laxby-div (/ (* length (first a) (second b)) axby-aybx))
 	      (layby-div (/ (* length (second a) (second b)) axby-aybx)))
 	  (destructuring-bind (x y)
 	      (in-system base-x base-y (v- p p1))
 	    (let ((x0 (+ x (* (/ y (- y layby-div)) (- laxby-div x)))))
-	      (if (eq type 'd)
+	      (if (eq dir 'd)
 		  (/ (point-distance p (v+ p1 (v* base-x x0)))
 		     (iter (for q1 in points)
 			   (maximize (iter (for q2 in points)
@@ -259,7 +261,7 @@
      a))
 
 (defparameter *centralized-line-sweep* nil)
-(defun line-sweep-distance (points segments p type)
+(defmethod compute-distance ((type (eql 'line-sweep)) points segments p dir)
   "BUG: does not work if the base segment is parallel to the Y axis."
   (let* ((c (central-point points (lines-from-points points) t))
 	 (p0 (first segments))
@@ -275,7 +277,7 @@
 	 (w2 (in-system base-x base-y (v- p3 p2)))
 	 (w1 (center-line w0 w2 length center))
 	 (s (line-sweep w0 w1 w2 length p)))
-    (if (eq type 'd)
+    (if (eq dir 'd)
 	(/ (point-distance p (list (* s length) 0))
 	   (if *centralized-line-sweep*
 	       (blend3 s (vlength w0)
@@ -310,17 +312,7 @@
     (with-open-file (s filename :direction :output :if-exists :supersede)
       (format s "P3~%~d ~d~%255~%" *width* *height*)
       (labels ((parameter (lst type x y)
-		 (ecase distance-type
-		   (perpendicular
-		    (perpendicular-distance points lst (list x y) type))
-		   (barycentric
-		    (barycentric-distance points lst (list x y) type))
-		   (chord-based
-		    (chord-based-distance points lst (list x y) type))
-		   (radial
-		    (radial-distance points lst (list x y) type))
-		   (line-sweep
-		    (line-sweep-distance points lst (list x y) type))))
+		 (compute-distance distance-type points lst (list x y) type))
 	       (outsidep (x y)
 		 (some (lambda (line)
 			 (< (* (point-line-distance (list x y) line t)
