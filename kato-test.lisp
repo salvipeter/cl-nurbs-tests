@@ -510,6 +510,19 @@
 		    (while next)
 		    (collect next)))))))
 
+(defun trace-biquadratic (points i type parameter resolution)
+  (let* ((n (length points))
+	 (segments (list (elt points (mod (- i 2) n))
+			 (elt points (mod (1- i) n))
+			 (elt points (mod i n))
+			 (elt points (mod (1+ i) n))))
+	 (net (biquadratic-net points segments)))
+    (iter (for x from 0 to 1 by resolution)
+	  (collect (biquadratic-point net
+				      (if (eq type 's)
+					  (list parameter x)
+					  (list x parameter)))))))
+
 (defun vectorized-distance-function-test (points line-types filename &key (resolution 0.1d0)
 					  (density 4) (distance-type 'perpendicular)
 					  (color t))
@@ -545,7 +558,10 @@
 			  (for parameter from d below 1 by d)
 			  (format s "% Parameter: ~a~%" parameter)
 			  (for trace =
-			       (trace-parameter points i distance-type type parameter resolution))
+			       (if (eq distance-type 'biquadratic)
+				   (trace-biquadratic points i type parameter resolution)
+				   (trace-parameter points i distance-type type
+						    parameter resolution)))
 			  (format s "newpath~%")
 			  (format s "~{~f ~}moveto~%~
                                      ~{~{~f ~}lineto~%~}"
@@ -558,3 +574,139 @@
 (vectorized-distance-function-test
  (points-from-angles '(40 20 60 100 80)) '(sd nil nil nil sd) "/tmp/params.ps"
  :resolution 0.1d0 :density 4 :distance-type 'chord-based)
+
+(defun biquadratic-net (points segments)
+  (let ((net (make-array '(3 3)))
+	(n (length points)))
+    (setf (aref net 0 0) (second segments)
+	  (aref net 0 1) (affine-combine (second segments) 1/2 (third segments))
+	  (aref net 0 2) (third segments)
+	  (aref net 1 0) (affine-combine (first segments) 1/2 (second segments))
+	  (aref net 1 1) (central-point points (lines-from-points points) t)
+	  (aref net 2 0) (first segments))
+    (if (= n 3)
+	(setf (aref net 1 2) (affine-combine (third segments) 1/4 (fourth segments))
+	      (aref net 2 1) (affine-combine (third segments) 3/4 (fourth segments))
+	      (aref net 2 2) (affine-combine (third segments) 1/2 (fourth segments)))
+	(setf (aref net 1 2) (affine-combine (third segments) 1/2 (fourth segments))
+	      (aref net 2 1) (let ((i (position (second segments) points :test #'equal))
+				   (k (ceiling n 2)))
+			       (affine-combine (elt points (mod (+ i (- 1 k)) n))
+					       1/2
+					       (elt points (mod (+ i k) n))))
+	      (aref net 2 2) (fourth segments)))
+    net))
+
+(defun biquadratic-point (net uv &optional derivative)
+  (let ((u (first uv))
+	(v (second uv)))
+    (flet ((sqr (x) (* x x)))
+      (let (u0 u1 u2 v0 v1 v2)
+	(ecase derivative
+	  ((nil)
+	   (setf u0 (sqr (- 1 u)) u1 (* 2 u (- 1 u)) u2 (sqr u)
+		 v0 (sqr (- 1 v)) v1 (* 2 v (- 1 v)) v2 (sqr v)))
+	  (u
+	   (setf u0 (* 2 (- u 1)) u1 (* 2 (- 1 (* 2 u))) u2 (* 2 u)
+		 v0 (sqr (- 1 v)) v1 (* 2 v (- 1 v)) v2 (sqr v)))
+	  (v
+	   (setf u0 (sqr (- 1 u)) u1 (* 2 u (- 1 u)) u2 (sqr u)
+		 v0 (* 2 (- v 1)) v1 (* 2 (- 1 (* 2 v))) v2 (* 2 v)))
+	  (u2
+	   (setf u0 2 u1 -4 u2 2
+		 v0 (sqr (- 1 v)) v1 (* 2 v (- 1 v)) v2 (sqr v)))
+	  (uv
+	   (setf u0 (* 2 (- u 1)) u1 (* 2 (- 1 (* 2 u))) u2 (* 2 u)
+		 v0 (* 2 (- v 1)) v1 (* 2 (- 1 (* 2 v))) v2 (* 2 v)))
+	  (v2
+	   (setf u0 (sqr (- 1 u)) u1 (* 2 u (- 1 u)) u2 (sqr u)
+		 v0 2 v1 -4 v2 2)))
+	(v+ (v* (v+ (v* (aref net 0 0) u0)
+		    (v* (aref net 0 1) u1)
+		    (v* (aref net 0 2) u2))
+		v0)
+	    (v* (v+ (v* (aref net 1 0) u0)
+		    (v* (aref net 1 1) u1)
+		    (v* (aref net 1 2) u2))
+		v1)
+	    (v* (v+ (v* (aref net 2 0) u0)
+		    (v* (aref net 2 1) u1)
+		    (v* (aref net 2 2) u2))
+		v2))))))
+
+;;; Newton-Raphson algorithm
+;;; adapted from BSS-PROJECT-POINT & friends (projection.lisp)
+
+(defun bq-projection-starting-value (net point res)
+  (iter (with lower = '(0.0d0 0.0d0))
+	(with upper = '(1.0d0 1.0d0))
+	(with length = (mapcar #'- upper lower))
+	(for i from 0 below (first res))
+	(for u = (+ (first lower) (/ (* i (first length)) (1- (first res)))))
+	(for (min v) =
+	     (iter (for j from 0 below (second res))
+		   (for v = (+ (second lower) (/ (* j (second length))
+						 (1- (second res)))))
+		   (for distance = (vlength
+				    (v- point
+					(biquadratic-point net (list u v)))))
+		   (finding (list distance v) minimizing distance)))
+	(finding (list u v) minimizing min)))
+
+(defun bq-projection-delta (net uv r)
+  (let* ((du (biquadratic-point net uv 'u))
+	 (dv (biquadratic-point net uv 'v))
+	 (du2 (biquadratic-point net uv 'u2))
+	 (duv (biquadratic-point net uv 'uv))
+	 (dv2 (biquadratic-point net uv 'v2))
+	 (k (make-array '(2 1) :initial-contents
+			`((,(- (scalar-product r du)))
+			  (,(- (scalar-product r dv))))))
+	 (J (make-array
+	     '(2 2) :initial-contents
+	     `((,(+ (scalar-product du du) (scalar-product r du2))
+		 ,(+ (scalar-product du dv) (scalar-product r duv)))
+	       (,(+ (scalar-product du dv) (scalar-product r duv))
+		 ,(+ (scalar-product dv dv) (scalar-product r dv2))))))
+	 (delta (matrix:multiplication (matrix:inverse-2x2 J) k)))
+    (list (aref delta 0 0) (aref delta 1 0))))
+
+(defun bq-project-point (net point iterations search-resolution &optional
+			  (distance-tolerance 0.0) (cosine-tolerance 0.0))
+  "Returns the parameters of the biquadratic defined by NET closest to POINT.
+
+The function uses the Newton-Raphson method. (NURBS Book, pp. 232-234)
+\(FIRST SEARCH-RESOLUTION) * \(SECOND SEARCH-RESOLUTION) parameters
+are checked for a suitable initial value."
+  (let ((uv0 (bq-projection-starting-value net point search-resolution))
+	(lower '(0.0d0 0.0d0))
+	(upper '(1.0d0 1.0d0)))
+    (iter (repeat iterations)
+	  (for last first nil then uv)
+	  (for uv first uv0 then
+	       (mapcar (lambda (x next low upp) (min (max (+ x next) low) upp))
+		       uv (bq-projection-delta net uv deviation)
+		       lower upper))
+	  (for p = (biquadratic-point net uv))
+	  (for du = (biquadratic-point net uv 'u))
+	  (for dv = (biquadratic-point net uv 'v))
+	  (for deviation = (v- p point))
+	  (when (or (<= (vlength deviation) distance-tolerance)
+		    (and (<= (/ (abs (scalar-product du deviation))
+				(* (vlength du) (vlength deviation)))
+			     cosine-tolerance)
+			 (<= (/ (abs (scalar-product dv deviation))
+				(* (vlength dv) (vlength deviation)))
+			     cosine-tolerance))
+		    (and last
+			 (<= (+ (vlength (v* du (- (first uv) (first last))))
+				(vlength (v* dv (- (second uv) (second last)))))
+			     distance-tolerance)))
+	    (leave (values uv (vlength deviation))))
+	  (finally (return (values uv (vlength deviation)))))))
+
+(defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
+  (let ((sd (bq-project-point (biquadratic-net points segments) p 10 '(20 20))))
+    (if (eq dir 's)
+	(first sd)
+	(second sd))))
