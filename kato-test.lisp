@@ -680,7 +680,7 @@ The function uses the Newton-Raphson method. (NURBS Book, pp. 232-234)
 are checked for a suitable initial value."
   (let ((uv0 (bq-projection-starting-value net point search-resolution))
 	(lower '(0.0d0 0.0d0))
-	(upper '(1.0d0 1.0d0)))
+	(upper '(1.0d0 2.0d0)))
     (iter (repeat iterations)
 	  (for last first nil then uv)
 	  (for uv first uv0 then
@@ -706,7 +706,7 @@ are checked for a suitable initial value."
 	  (finally (return (values uv (vlength deviation)))))))
 
 (defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
-  (let ((sd (bq-project-point (biquadratic-net points segments) p 10 '(20 20))))
+  (let ((sd (bq-project-point (biquadratic-net points segments) p 20 '(4 4) 1.0d-4)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
