@@ -418,6 +418,7 @@
   (distance-function-test (points-from-angles '(40 20 60 100 80)) 'chord-based '(s d)
 			  "/tmp/distance.ppm"))
 
+#+nil
 (defun trace-parameter-buggy (points i distance-type type parameter resolution)
   (let ((lines (lines-from-points points)))
     (labels ((query (p) (- (elt (compute-parameter distance-type type points p t) i) parameter))
@@ -671,14 +672,31 @@
 	 (delta (matrix:multiplication (matrix:inverse-2x2 J) k)))
     (list (aref delta 0 0) (aref delta 1 0))))
 
-(defun bq-project-point (net point iterations search-resolution &optional
-			  (distance-tolerance 0.0) (cosine-tolerance 0.0))
-  "Returns the parameters of the biquadratic defined by NET closest to POINT.
+(defun bq-halving-search (net point iterations &optional (distance-tolerance 0))
+  (labels ((rec (lower upper iter)
+	     (let* ((mid (affine-combine lower 0.5d0 upper))
+		    (p (biquadratic-point net mid))
+		    (distance (point-distance point p)))
+	       (if (or (= iter 0) (< distance distance-tolerance))
+		   (values mid distance)
+		   (let ((d (v- point p))
+			 (pu (biquadratic-point net mid 'u))
+			 (pv (biquadratic-point net mid 'v))
+			 (new-lower lower)
+			 (new-upper upper))
+		     (if (< (scalar-product d pu) 0)
+			 (setf new-upper (list (first mid) (second new-upper)))
+			 (setf new-lower (list (first mid) (second new-lower))))
+		     (if (< (scalar-product d pv) 0)
+			 (setf new-upper (list (first new-upper) (second mid)))
+			 (setf new-lower (list (first new-lower) (second mid))))
+		     (rec new-lower new-upper (1- iter)))))))
+    (rec '(0 0) '(1 1) iterations)))
 
-The function uses the Newton-Raphson method. (NURBS Book, pp. 232-234)
-\(FIRST SEARCH-RESOLUTION) * \(SECOND SEARCH-RESOLUTION) parameters
-are checked for a suitable initial value."
-  (let ((uv0 (bq-projection-starting-value net point search-resolution))
+(defun bq-project-point (net point iterations &optional
+			  (distance-tolerance 0.0) (cosine-tolerance 0.0))
+  "Returns the parameters of the biquadratic defined by NET closest to POINT."
+  (let ((uv0 (bq-halving-search net point iterations (* distance-tolerance 10)))
 	(lower '(0.0d0 0.0d0))
 	(upper '(1.0d0 2.0d0)))
     (iter (repeat iterations)
@@ -706,7 +724,7 @@ are checked for a suitable initial value."
 	  (finally (return (values uv (vlength deviation)))))))
 
 (defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
-  (let ((sd (bq-project-point (biquadratic-net points segments) p 20 '(4 4) 1.0d-4)))
+  (let ((sd (bq-project-point (biquadratic-net points segments) p 20 1.0d-4)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
