@@ -296,6 +296,9 @@
 (vectorized-distance-function-test
  *points* '(nil sd nil nil nil) "n-sided-paper/08e1-sweep-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
+(vectorized-distance-function-test
+ *points* '(nil sd nil nil nil) "n-sided-paper/08f1-biquadratic-sd.ps"
+ :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil)
 
 (vectorized-distance-function-test
  *points* '(s s s s s) "n-sided-paper/08a2-perpendicular-center.ps"
@@ -312,6 +315,9 @@
 (vectorized-distance-function-test
  *points* '(s s s s s) "n-sided-paper/08e2-sweep-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'line-sweep)
+(vectorized-distance-function-test
+ *points* '(s s s s s) "n-sided-paper/08f2-biquadratic-center.ps"
+ :resolution 0.001d0 :density 2 :distance-type 'biquadratic :color t)
 
 (vectorized-distance-function-test
  *points* '(s s nil nil nil) "n-sided-paper/08a3-perpendicular-ss.ps"
@@ -328,6 +334,9 @@
 (vectorized-distance-function-test
  *points* '(s s nil nil nil) "n-sided-paper/08e3-sweep-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil)
+(vectorized-distance-function-test
+ *points* '(s s nil nil nil) "n-sided-paper/08f3-biquadratic-ss.ps"
+ :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil)
 
 
 ;;; Figure 9
