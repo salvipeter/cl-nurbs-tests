@@ -60,11 +60,54 @@ For example, for a equilateral triangle give '(120 120 120)."
 		     (collect (v+ vertex (v* difference (/ accumulated length-sum)))))
 	       '((0 0)))))))
 
+(defun find-with-lower-limit (fn low)
+  "Finds x where f(x) = 0 (with *EPSILON* tolerance).
+Assumes that f(y) > 0 for y < x and f(y) < 0 for y > x."
+  (let ((hi (iter (for hi first (* 2 low) then (* 2 hi))
+		  (while (> (* (funcall fn low) (funcall fn hi)) 0))
+		  (finally (return hi)))))
+    (iter (for mid = (/ (+ low hi) 2.0d0))
+	  (for fx = (funcall fn mid))
+	  (while (> (abs fx) *epsilon*))
+	  (if (> fx 0)
+	      (setf low mid)
+	      (setf hi mid))
+	  (finally (return mid)))))
+
+(defun circle-radius (lengths)
+  (let ((sorted (sort (copy-list lengths) #'>)))
+    (when (> (reduce #'+ (rest sorted)) (first sorted))
+      (flet ((radius-error (r)
+	       (- (iter (for li in lengths)
+			(sum (asin (/ li (* 2 r)))))
+		  pi)))
+	(let ((low (/ (first sorted) 2.0d0)))
+	  (if (>= (radius-error low) 0)
+	      (find-with-lower-limit #'radius-error low)
+	      (find-with-lower-limit
+	       (lambda (r)
+		 (- (asin (/ (first sorted) (* 2 r)))
+		    (iter (for li in (rest sorted))
+			  (sum (asin (/ li (* 2 r)))))))
+	       low)))))))
+
+(defun angles-from-lengths (lengths)
+  (let ((r (circle-radius lengths)))
+    (assert r (lengths) "these are not the side lengths of a cyclic polygon")
+    (let ((alpha (mapcar (lambda (li)
+			   (/ (* (* 2 (asin (/ li (* 2 r)))) 180.0d0) pi))
+			 lengths)))
+      (cons 0.0d0
+	    (subseq (append (rest (member (reduce #'max alpha) alpha)) alpha)
+		    0 (1- (length lengths)))))))
+
 (defun domain-from-curves (curves &optional (type 'angular))
   (ecase type
     (regular (let ((n (length curves)))
 	       (points-from-angles (cons 13 (iter (repeat (1- n)) (collect (/ 360 n)))))))
     (circular (points-from-angles (angles-from-curves curves)))
+    (circular-mod (points-from-angles
+		   (angles-from-lengths (mapcar #'bezier-arc-length curves))))
     (angular (domain-from-curves-angular curves))))
 
 (defun point-line-distance (p line &optional signedp)
