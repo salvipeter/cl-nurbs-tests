@@ -94,12 +94,12 @@ Assumes that f(y) > 0 for y < x and f(y) < 0 for y > x."
 (defun angles-from-lengths (lengths)
   (let ((r (circle-radius lengths)))
     (assert r (lengths) "these are not the side lengths of a cyclic polygon")
-    (let ((alpha (mapcar (lambda (li)
-			   (/ (* (* 2 (asin (/ li (* 2 r)))) 180.0d0) pi))
-			 lengths)))
-      (cons 0.0d0
-	    (subseq (append (rest (member (reduce #'max alpha) alpha)) alpha)
-		    0 (1- (length lengths)))))))
+    (let* ((alpha (mapcar (lambda (li)
+			    (/ (* (* 2 (asin (/ li (* 2 r)))) 180.0d0) pi))
+			  lengths))
+	   (max-alpha (reduce #'max alpha)))
+      (substitute (- 360.0d0 (reduce #'+ (remove max-alpha alpha)))
+		  max-alpha alpha :count 1))))
 
 (defun domain-from-curves (curves &optional (type 'angular))
   (ecase type

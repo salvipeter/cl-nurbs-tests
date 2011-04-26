@@ -13,6 +13,6 @@
 
 ;;; Modules
 (load (compile-file "blends"))
-(load (compile-file "ribbons"))
 (load (compile-file "kato-test"))
+(load (compile-file "ribbons"))
 (load (compile-file "patches"))
