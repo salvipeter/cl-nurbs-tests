@@ -45,11 +45,11 @@
 
 (let ((*centralized-line-sweep* 1.0d0)
       (distance-type 'line-sweep)
-      (domain-type 'angular))
+      (domain-type 'circular-mod))
   (vectorized-distance-function-test
    (domain-from-curves (first *coords*) domain-type)
-   '(nil sd nil nil nil) "/tmp/proba.ps"
-   :resolution 0.001d0 :density 6 :distance-type distance-type :color nil))
+   '(s s s s s s) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 4 :distance-type distance-type :color t))
 
 ;;; Utils
 

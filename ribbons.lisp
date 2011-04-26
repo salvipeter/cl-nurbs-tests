@@ -98,7 +98,7 @@ Assumes that f(y) > 0 for y < x and f(y) < 0 for y > x."
 			    (/ (* (* 2 (asin (/ li (* 2 r)))) 180.0d0) pi))
 			  lengths))
 	   (max-alpha (reduce #'max alpha)))
-      (substitute (- 360.0d0 (reduce #'+ (remove max-alpha alpha)))
+      (substitute (- 360.0d0 (reduce #'+ (remove max-alpha alpha :count 1)))
 		  max-alpha alpha :count 1))))
 
 (defun domain-from-curves (curves &optional (type 'angular))
