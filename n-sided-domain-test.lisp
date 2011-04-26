@@ -1,5 +1,6 @@
 (in-package :cl-nurbs-tests)
 
+;;; standard tesztpatch
 (defparameter *coords*
   '((((0.0d0 0.0d0 0.0d0)
       (0.8d0 0.0d0 0.0d0)
@@ -32,6 +33,21 @@
      ((0.9354120267260579d0 4.062360801781738d0 0.0d0)
       (0.8471177944862156d0 1.4135338345864663d0 0.0d0)))))
 
+;;; uj torzitas teszt
+(defparameter *coords*
+  '((((0 2 0) (1.5 1.5 0) (4.5 0.5 0) (6 0 0))
+     ((6 0 0) (6.75 0.75 0) (8.25 2.25 0) (9 3 0))
+     ((9 3 0) (8.75 5.5 0) (8.25 10.5 0) (8 13 0))
+     ((8 13 0) (6.25 11.0 0) (2.75 7.0 0) (1 5 0))
+     ((1 5 0) (0.75 4.5 0) (0.25 3.5 0) (0 3 0))
+     ((0 3 0) (0 2.75 0) (0 2.25 0) (0 2 0)))
+    (((1.1975807 1.983871 0) (5.036215 1.1308411 0))
+     ((5.036215 1.1308411 0) (7.7705297 4.347682 0))
+     ((7.7705297 4.347682 0) (6.655797 9.224638 0))
+     ((6.655797 9.224638 0) (1.5426829 5.134146 0))
+     ((1.5426829 5.134146 0) (0.36560693 3.315029 0))
+     ((0.36560693 3.315029 0) (1.1975807 1.983871 0)))))
+
 (write-constraint-grid nil "/tmp/proba.vtk" :coords *coords*)
 (write-constraint-ribbons nil "/tmp/proba.vtk" :coords *coords* :resolution 20)
 (let ((*resolution* 30)
@@ -39,7 +55,7 @@
       (*ribbon-multiplier* 1.0d0)
       (patch-type 'ribbon)
       (distance-type 'line-sweep)
-      (domain-type 'circular-mod)) ; type: regular/circular/circular-mod/angular
+      (domain-type 'angular)) ; type: regular/circular/circular-mod/angular
   (write-patch (domain-from-curves (first *coords*) domain-type) patch-type "/tmp/proba.vtk"
 	       :coords *coords* :distance-type distance-type :spider t))
 
@@ -63,6 +79,27 @@
 	    (/ (- (* (- (* x1 y2) (* y1 x2)) (- y3 y4))
 		  (* (- (* x3 y4) (* y3 x4)) (- y1 y2)))
 	       (- (* (- x1 x2) (- y3 y4)) (* (- y1 y2) (- x3 x4))))))))
+
+(defun patch2d->3d (patch)
+  (list (mapcar (lambda (curve) (mapcar (lambda (p) (append p (list 0))) curve)) (first patch))
+	(mapcar (lambda (curve) (mapcar (lambda (p) (append p (list 0))) curve)) (second patch))))
+
+(defun generate-planar-patch-by-points (points)
+  (let ((curves (iter (for x in points)
+		      (for y in (append (rest points) (list (first points))))
+		      (collect (list x (affine-combine x 0.25 y) (affine-combine x 0.75 y) y)))))
+    (let ((lines (iter (for c1 in (append (last curves) (butlast curves)))
+		       (for c2 in (append (rest curves) (list (first curves))))
+		       (collect (list (third c1) (second c2))))))
+      (patch2d->3d
+       (list curves
+	     (iter (for l1 in (append (last lines) (butlast lines)))
+		   (for l2 in lines)
+		   (for l3 in (append (rest lines) (list (first lines))))
+		   (collect (list (line-line-intersection l1 l2)
+				  (line-line-intersection l2 l3)))))))))
+
+;;; (generate-planar-patch-by-points '((0 2) (6 0) (9 3) (8 13) (1 5) (0 3)))
 
 (defparameter *pontok*
   '((0.0d0 0.0d0 0.0d0)
