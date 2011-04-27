@@ -1,0 +1,192 @@
+(in-package :cl-nurbs-tests)
+
+(defun ts-domain (coords)
+  (let ((l1 (bezier-arc-length (first (first coords))))
+	(l2 (bezier-arc-length (second (first coords)))))
+    (if (> l1 l2)
+	`(((-1 0) (0 -1) (1 0))
+	  ((1 0) (0 ,(/ l2 l1)) (-1 0)))
+	`(((-1 0) (0 ,(/ l1 l2)) (1 0))
+	  ((1 0) (0 1) (-1 0))))))
+
+(defun ts-vertices (points)
+  (iter (with imax = (1- (* 2 *resolution*)))
+	(for i from 0 below imax)
+	(for u = (/ i (1- imax)))
+	(appending
+	 (iter (with jmax = (if (>= i *resolution*) (- imax i) (1+ i)))
+	       (for j from 0 below jmax)
+	       (for v = (if (= jmax 1) 1/2 (/ j (1- jmax))))
+	       (collect
+		(affine-combine (bezier (first points) u)
+				v
+				(bezier (second points) (- 1 u))))))))
+
+(defun ts-triangles ()
+  (append
+   (iter (for n from 1 below *resolution*)
+	 (appending
+	  (iter (for i from 0 below n)
+		(collect (list (+ (/ (- (* n n) n) 2) i)
+			       (+ (/ (+ (* n n) n) 2) i 1)
+			       (+ (/ (+ (* n n) n) 2) i)))
+		(when (< i (1- n))
+		  (collect (list (+ (/ (- (* n n) n) 2) i)
+				 (+ (/ (- (* n n) n) 2) i 1)
+				 (+ (/ (+ (* n n) n) 2) i 1)))))))
+   (iter (for n from (1- *resolution*) downto 1)
+	 (appending
+	  (iter (with end = (1- (* *resolution* *resolution*)))
+		(for i from 0 below n)
+		(collect (list (+ (- end (/ (+ (* n n) n) 2) n) i)
+			       (+ (- end (/ (+ (* n n) n) 2) n) i 1)
+			       (+ (- end (/ (- (* n n) n) 2) n -1) i)))
+		(when (< i (1- n))
+		  (collect (list (+ (- end (/ (+ (* n n) n) 2) n) i 1) 
+				 (+ (- end (/ (- (* n n) n) 2) n -1) i 1)
+				 (+ (- end (/ (- (* n n) n) 2) n -1) i)))))))))
+
+(defun ts-intersection (curve line)
+  (let ((p (first line))
+	(s (v- (second line) (first line))))
+    (if (< (abs (first s)) *epsilon*)
+	(values (bezier curve 0.5) 0.5)
+	(labels ((m- (a b) (if (= (first (first curve)) -1) (- a b) (+ a b)))
+		 (m+ (a b) (m- a (- b))))
+	  (let ((a (* (second (second curve)) -2))
+		(b (* 2 (m- (second (second curve))
+			    (/ (second s) (first s)))))
+		(c (- (* (/ (second s) (first s))
+			 (m+ (first p) 1))
+		      (second p))))
+	    (let ((u (second-degree-solver a b c :min 0.0d0 :max 1.0d0)))
+	      (values (bezier curve u) u)))))))
+
+(defun ts-compute-distance (points i p dir)
+  (let* ((this (elt points i))
+	 (other (elt points (- 1 i)))
+	 (line (list p (second other))))
+    (multiple-value-bind (s-point s)
+	(ts-intersection this line)
+      (if (eq dir 's)
+	  s
+	  (if (< (min (abs s) (abs (- s 1))) *epsilon*)
+	      0.0d0
+	      (/ (point-distance s-point p)
+		 (point-distance s-point (ts-intersection other line))))))))
+
+(defun ts-compute-parameter (dir points p &optional no-tiny-p)
+  (macrolet ((tiny-lambda ((args) &body body)
+	       `(lambda (,args)
+		  (if no-tiny-p
+		      (let ((result (progn ,@body)))
+			(if (< result *tiny*) 0.0d0 result))
+		      (progn ,@body)))))
+    (mapcar (tiny-lambda (i) (ts-compute-distance points i p dir)) '(0 1))))
+
+(defun ts-patch-evaluate (patch points type distance-type domain-point)
+  (declare (ignore type distance-type))
+  (let* ((p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (ts-compute-parameter 'd points p t))
+	 (s (ts-compute-parameter 's points p t)))
+    (iter (for i from 0 below 2)
+	  (with result = '(0 0 0))
+	  (setf result
+		(v+ result (v* (ribbon-evaluate patch i s d) (ribbon-blend d i))))
+	  (finally (return result)))))
+
+(defun ts-write-patch (points type filename &key inner-points heights coords
+		       (distance-type 'perpendicular) spider)
+  (declare (ignore type distance-type))	; only ribbon w/radial
+  (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights))))
+    (if spider
+	#+nil(write-vtk-polylines
+	      (iter (for line in (spider-lines points))
+		    (collect (iter (for domain-point in line)
+				   (collect (patch-evaluate patch points type distance-type
+							    domain-point)))))
+	      filename)
+	(error "Not implemented yet.")
+	(write-vtk-indexed-mesh
+	 (iter (for domain-point in (ts-vertices points))
+	       (collect (ts-patch-evaluate patch points type distance-type domain-point)))
+	 (ts-triangles) filename))))
+
+(defun ts-vectorized-distance-function-test (points line-types filename &key (resolution 50)
+					     (density 4) (distance-type 'perpendicular)
+					     (color t))
+  "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
+  (declare (ignore distance-type))
+  (labels ((map-point (p)
+	     (list (+ (* (+ (first p) 1.0d0) 200) 30)
+		   (+ (* (+ (second p) 1.0d0) 200) 30)))
+	   (draw-polyline (lst &optional (s t))
+	     (iter (for p in lst) 
+		   (for cmd first 'moveto then 'lineto)
+		   (format s "~{~f ~}~(~a~)~%" (map-point p) cmd)
+		   (finally (format s "stroke~%"))))
+	   (draw-bezier (curve &optional (s t))
+	     (iter (for i from 0 below resolution)
+		   (for u = (/ i (1- resolution)))
+		   (for cmd first 'moveto then 'lineto)
+		   (format s "~{~f ~}~(~a~)~%" (map-point (bezier curve u)) cmd)
+		   (finally (format s "stroke~%"))))
+	   (draw-comb (c1 c2 s)
+	     (iter (for i from 1 below density)
+		   (for u = (/ i density))
+		   (for p = (bezier c1 u))
+		   (for q = (ts-intersection c2 (list p (second c2))))
+		   (draw-polyline (list p q) s)))
+	   (draw-distance-line (c1 c2 d s)
+	     (draw-polyline
+	      (iter (for i from 0 below resolution)
+		    (for u = (/ i (1- resolution)))
+		    (for p = (bezier c1 u))
+		    (for q = (ts-intersection c2 (list p (second c2))))
+		    (collect (affine-combine p d q)))
+	      s))
+	   (draw-distance (c1 c2 s)
+	     (iter (for i from 1 below density)
+		   (for d = (/ i density))
+		   (draw-distance-line c1 c2 d s))))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "%!PS~%")
+      (when color
+	(format s "0.7 0.3 0 setrgbcolor~%"))
+      (draw-polyline (first points) s)
+      (when color
+	(format s "1 0 0 setrgbcolor~%"))
+      (draw-bezier (first points) s)
+      (when (member (first line-types) '(s sd))
+	(when color
+	  (format s "0.8 0 0.2 setrgbcolor~%"))
+	(draw-comb (first points) (second points) s))
+      (when (member (first line-types) '(d sd))
+	(when color
+	  (format s "0.6 0.2 0.2 setrgbcolor~%"))
+	(draw-distance (first points) (second points) s))
+      (when color
+	(format s "0 0.3 0.7 setrgbcolor~%"))
+      (draw-polyline (second points) s)
+      (when color
+	(format s "0 0 1 setrgbcolor~%"))
+      (draw-bezier (second points) s)
+      (when (member (second line-types) '(s sd))
+	(when color
+	  (format s "0.2 0 0.8 setrgbcolor~%"))
+	(draw-comb (second points) (first points) s))
+      (when (member (second line-types) '(d sd))
+	(when color
+	  (format s "0.2 0.2 0.6 setrgbcolor~%"))
+	(draw-distance (second points) (first points) s))
+      (format s "showpage~%"))))
+
+(let ((coords '((((0 3 0) (1 1 1) (4 0 1) (6 3 0))
+		 ((6 3 0) (4 4 2) (2 4 2) (0 3 0)))
+		(((2 2 1.5) (4 2 1.5))
+		 ((4 2 1.5) (2 2 1.5)))))
+      (*ribbon-multiplier* 0.2))
+  #+nil(ts-vectorized-distance-function-test (ts-domain coords) '(sd nil) "/tmp/proba.ps"
+					     :resolution 100 :density 8 :color t)
+  (ts-write-patch (ts-domain coords) nil "/tmp/proba.vtk" :coords coords))
