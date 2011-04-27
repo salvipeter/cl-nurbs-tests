@@ -73,7 +73,7 @@
 	  (if (< (min (abs s) (abs (- s 1))) *epsilon*)
 	      0.0d0
 	      (/ (point-distance s-point p)
-		 (point-distance s-point (ts-intersection other line))))))))
+		 (point-distance s-point (second other))))))))
 
 (defun ts-compute-parameter (dir points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
@@ -140,11 +140,14 @@
 		   (draw-polyline (list p q) s)))
 	   (draw-distance-line (c1 c2 d s)
 	     (draw-polyline
-	      (iter (for i from 0 below resolution)
+	      (iter (with end = (second c2))
+		    (for i from 0 below resolution)
 		    (for u = (/ i (1- resolution)))
 		    (for p = (bezier c1 u))
 		    (for q = (ts-intersection c2 (list p (second c2))))
-		    (collect (affine-combine p d q)))
+		    (for next = (affine-combine p d end)) 
+		    (when (< (point-distance next p) (point-distance q p))
+		      (collect next)))
 	      s))
 	   (draw-distance (c1 c2 s)
 	     (iter (for i from 1 below density)
@@ -186,7 +189,7 @@
 		 ((6 3 0) (4 4 2) (2 4 2) (0 3 0)))
 		(((2 2 1.5) (4 2 1.5))
 		 ((4 2 1.5) (2 2 1.5)))))
-      (*ribbon-multiplier* 0.2))
-  #+nil(ts-vectorized-distance-function-test (ts-domain coords) '(sd nil) "/tmp/proba.ps"
-					     :resolution 100 :density 8 :color t)
+      (*ribbon-multiplier* 1.0))
+  (ts-vectorized-distance-function-test (ts-domain coords) '(sd nil) "/tmp/proba.ps"
+					:resolution 200 :density 8 :color t)
   (ts-write-patch (ts-domain coords) nil "/tmp/proba.vtk" :coords coords))
