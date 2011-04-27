@@ -244,8 +244,6 @@ thus containing point I-1 (NOT point I)."
 				 (list (elt next 1))))))))
 
 (defun patch-evaluate (patch points type distance-type domain-point)
-  (when (eq type 'sketches)
-    (setf distance-type 'line-sweep))
   (let* ((n (length points))
 	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
 	 (d (compute-parameter distance-type 'd points p t))
