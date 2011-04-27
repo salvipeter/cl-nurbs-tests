@@ -6,7 +6,7 @@
     (if (> l1 l2)
 	`(((-1 0) (0 -1) (1 0))
 	  ((1 0) (0 ,(/ l2 l1)) (-1 0)))
-	`(((-1 0) (0 ,(/ l1 l2)) (1 0))
+	`(((-1 0) (0 ,(- (/ l1 l2))) (1 0))
 	  ((1 0) (0 1) (-1 0))))))
 
 (defun ts-vertices (points)
@@ -185,11 +185,13 @@
 	(draw-distance (second points) (first points) s))
       (format s "showpage~%"))))
 
-(let ((coords '((((0 3 0) (1 1 1) (4 0 1) (6 3 0))
-		 ((6 3 0) (4 4 2) (2 4 2) (0 3 0)))
-		(((2 2 1.5) (4 2 1.5))
-		 ((4 2 1.5) (2 2 1.5)))))
+(let ((coords '((((0 3 0) (1 1 1) (3 0 2) (5 1 1) (6 3 0))
+		 ((6 3 0) (5 4 2) (3 5 3) (1 4 2) (0 3 0)))
+		(((2 2 1.5) (3 3 2) (4 2 1.5))
+		 ((4 2 1.5) (3 2 2) (2 2 1.5)))))
       (*ribbon-multiplier* 1.0))
+  (write-constraint-grid nil "/tmp/grid.vtk" :coords coords)
+  (write-constraint-ribbons nil "/tmp/ribbon.vtk" :coords coords :resolution 20)
   (ts-vectorized-distance-function-test (ts-domain coords) '(sd nil) "/tmp/proba.ps"
 					:resolution 200 :density 8 :color t)
   (ts-write-patch (ts-domain coords) nil "/tmp/proba.vtk" :coords coords))

@@ -35,21 +35,10 @@
 
 ;;; uj torzitas teszt
 (defparameter *coords*
-  '((((0 2 0) (1.5 1.5 0) (4.5 0.5 0) (6 0 0))
-     ((6 0 0) (6.75 0.75 0) (8.25 2.25 0) (9 3 0))
-     ((9 3 0) (8.75 5.5 0) (8.25 10.5 0) (8 13 0))
-     ((8 13 0) (6.25 11.0 0) (2.75 7.0 0) (1 5 0))
-     ((1 5 0) (0.75 4.5 0) (0.25 3.5 0) (0 3 0))
-     ((0 3 0) (0 2.75 0) (0 2.25 0) (0 2 0)))
-    (((1.1975807 1.983871 0) (5.036215 1.1308411 0))
-     ((5.036215 1.1308411 0) (7.7705297 4.347682 0))
-     ((7.7705297 4.347682 0) (6.655797 9.224638 0))
-     ((6.655797 9.224638 0) (1.5426829 5.134146 0))
-     ((1.5426829 5.134146 0) (0.36560693 3.315029 0))
-     ((0.36560693 3.315029 0) (1.1975807 1.983871 0)))))
+  (generate-planar-patch-by-points
+   '((572 783) (734 629) (626 5) (87 495) (84 593) (153 668))))
 
-(write-constraint-grid nil "/tmp/proba.vtk" :coords *coords*)
-(write-constraint-ribbons nil "/tmp/proba.vtk" :coords *coords* :resolution 20)
+(write-constraint-ribbons nil "/tmp/ribbon.vtk" :coords *coords* :resolution 20)
 (let ((*resolution* 30)
       (*centralized-line-sweep* 1.0d0)
       (*ribbon-multiplier* 1.0d0)
@@ -99,21 +88,3 @@
 		   (collect (list (line-line-intersection l1 l2)
 				  (line-line-intersection l2 l3)))))))))
 
-;;; (generate-planar-patch-by-points '((0 2) (6 0) (9 3) (8 13) (1 5) (0 3)))
-
-(defparameter *pontok*
-  '((0.0d0 0.0d0 0.0d0)
-    (0.8d0 0.0d0 0.0d0)
-    (1.6d0 0.0d0 0.0d0)
-    (2.4d0 0.0d0 0.0d0)
-    (2.6d0 0.2d0 0.0d0)
-    (2.8d0 0.4d0 0.0d0)
-    (3.0d0 0.6d0 0.0d0)
-    (3.0d0 2.4d0 0.0d0)
-    (3.0d0 4.2d0 0.0d0)
-    (3.0d0 6.0d0 0.0d0)
-    (2.0d0 6.0d0 0.0d0)
-    (1.0d0 6.0d0 0.0d0)
-    (0.0d0 6.0d0 0.0d0)
-    (0.0d0 4.0d0 0.0d0)
-    (0.0d0 2.0d0 0.0d0)))
