@@ -1,3 +1,5 @@
+(in-package :cl-nurbs-tests)
+
 ;;; Parameters for Figures 1-3
 (defparameter *p0* '(0.3 0.5))
 (defparameter *t0* '(0.2 0.5))
@@ -425,25 +427,28 @@
       (1.0d0 2.0d0 1.2d0)))))
 
 #+nil
-(let ((*resolution* 20)
-      (*ribbon-multiplier* 1.0d0)
-      (*centralized-line-sweep* t))
+(write-constraint-ribbons *points* "n-sided-paper/11d-ribbons.vtk"
+			  :coords *coords* :resolution 20)
+
+#+nil
+(let ((*resolution* 80)
+      (*ribbon-multiplier* 0.5d0))
   (write-patch *points* 'hybrid "n-sided-paper/11a-side.vtk" :coords *coords*
-	       :distance-type 'line-sweep))
+	       :distance-type 'biquadratic))
 
 #+nil
 (let ((*resolution* 80)
-      (*ribbon-multiplier* 1.0d0)
-      (*centralized-line-sweep* t))
+      (*ribbon-multiplier* 0.5d0)
+      (*centralized-line-sweep* 1.0d0))
   (write-patch *points* 'corner "n-sided-paper/11b-corner.vtk" :coords *coords*
-	       :distance-type 'line-sweep))
+	       :distance-type 'biquadratic))
 
 #+nil
 (let ((*resolution* 80)
-      (*ribbon-multiplier* 1.0d0)
-      (*centralized-line-sweep* t))
-  (write-patch *points* 'ribbon "n-sided-paper/11c-special-side.vtk" :coords *coords*
-	       :distance-type 'line-sweep))
+      (*ribbon-multiplier* 0.5d0)
+      (*centralized-line-sweep* 1.0d0))
+  (write-patch *points* 'ribbon "n-sided-paper/11c-special-side.vtk"
+	       :coords *coords* :distance-type 'biquadratic))
 
 
 ;;; Torzitas teszt
@@ -473,3 +478,18 @@
    ((12 0 0) (12 1 0) (12 2 0))
    ((12 2 0) (6 2 8) (0 2 0))
    ((0 2 0) (0 1 0) (0 0 0))))
+
+
+;;; Biquadratic domain szemlelteto kepek
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-domain.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
+(let ((points (points-from-angles '(0 45 75 30 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil nil sd) "n-sided-paper/biquad-domain2.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-corner-domain.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))

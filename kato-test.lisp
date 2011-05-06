@@ -568,13 +568,15 @@
 		    (while next)
 		    (collect next)))))))
 
-(defun trace-biquadratic (points i type parameter resolution)
+(defun trace-biquadratic (distance-type points i type parameter resolution)
   (let* ((n (length points))
 	 (segments (list (elt points (mod (- i 2) n))
 			 (elt points (mod (1- i) n))
 			 (elt points (mod i n))
 			 (elt points (mod (1+ i) n))))
-	 (net (biquadratic-net points segments)))
+	 (net (if (eq distance-type 'biquadratic)
+		  (biquadratic-net points segments)
+		  (biquadratic-corner-net points segments))))
     (iter (for x from 0 to 1 by resolution)
 	  (collect (biquadratic-point net
 				      (if (eq type 's)
@@ -613,11 +615,11 @@
 	      (iter (for type in (case line-type (s '(s)) (d '(d)) (sd '(s d))))
 		    (format s "% Type: ~a~%" type)
 		    (iter (with d = (/ density))
-			  (for parameter from d below 1 by d)
+			  (for parameter from 0 to 1 by d)
 			  (format s "% Parameter: ~a~%" parameter)
 			  (for trace =
-			       (if (eq distance-type 'biquadratic)
-				   (trace-biquadratic points i type parameter resolution)
+			       (if (member distance-type '(biquadratic biquadratic-corner))
+				   (trace-biquadratic distance-type points i type parameter resolution)
 				   (trace-parameter points i distance-type type
 						    parameter resolution)))
 			  (format s "newpath~%")
@@ -653,6 +655,29 @@
 					       1/2
 					       (elt points (mod (+ i k) n))))
 	      (aref net 2 2) (fourth segments)))
+    net))
+
+(defun biquadratic-corner-net (points segments)
+  (let ((net (make-array '(3 3)))
+	(n (length points)))
+    (setf (aref net 2 0) (second segments)
+	  (aref net 1 0) (affine-combine (second segments) 1/2 (third segments))
+	  (aref net 0 0) (third segments)
+	  (aref net 0 1) (affine-combine (third segments) 1/2 (fourth segments))
+	  (aref net 0 2) (fourth segments)
+	  (aref net 2 1) (affine-combine (first segments) 1/2 (second segments))
+	  (aref net 1 1) (central-point points (lines-from-points points) t))
+    (if (= n 3)
+	(error "3-sided corner biquadratic: not implemented yet")
+	(setf (aref net 1 2) (let ((k (position (fourth segments) points :test #'equal)))
+			       (affine-combine (fourth segments)
+					       1/2
+					       (elt points (mod (1+ k) n))))
+	      (aref net 2 2) (let ((i (position (third segments) points :test #'equal))
+				   (k (ceiling n 2)))
+			       (affine-combine (elt points (mod (- i k) n))
+					       1/2
+					       (elt points (mod (+ i k) n))))))
     net))
 
 (defun biquadratic-point (net uv &optional derivative)
@@ -782,6 +807,12 @@
 
 (defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
   (let ((sd (bq-project-point (biquadratic-net points segments) p 20 1.0d-4)))
+    (if (eq dir 's)
+	(first sd)
+	(second sd))))
+
+(defmethod compute-distance ((type (eql 'biquadratic-corner)) points segments p dir)
+  (let ((sd (bq-project-point (biquadratic-corner-net points segments) p 20 1.0d-4)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
