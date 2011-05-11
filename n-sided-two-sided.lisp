@@ -95,19 +95,45 @@
 		(v+ result (v* (ribbon-evaluate patch i s d) (ribbon-blend d i))))
 	  (finally (return result)))))
 
+(defun ts-spider-lines (points &optional (chords ))
+  (let ((center (affine-combine (second (first points)) 1/2 (second (second points)))))
+    (append (iter (for i from 0 below *spider-lines*)
+		  (for u = (/ i *spider-lines*))
+		  (for p = (bezier (first points) u))
+		  (for q = (bezier (second points) u))
+		  (collect
+		   (iter (for j from 0 below *resolution*)
+			 (for v = (/ j (1- *resolution*)))
+			 (collect (affine-combine center v p))))
+		  (collect
+		   (iter (for j from 0 below *resolution*)
+			 (for v = (/ j (1- *resolution*)))
+			 (collect (affine-combine center v q)))))
+	    (iter (for j from 0 below *resolution*)
+		  (when (zerop (mod j *spider-density*))
+		    (for v = (/ j *resolution*))
+		    (collect
+		     (append (iter (for i from 0 below *resolution*)
+				   (for u = (/ i *resolution*))
+				   (for p = (bezier (first points) u))
+				   (collect (affine-combine p v center)))
+			     (iter (for i from 0 below *resolution*)
+				   (for u = (/ i (1- *resolution*)))
+				   (for p = (bezier (second points) u))
+				   (collect (affine-combine p v center))))))))))
+
 (defun ts-write-patch (points type filename &key inner-points heights coords
 		       (distance-type 'perpendicular) spider)
   (declare (ignore type distance-type))	; only ribbon w/radial
   (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
 		    (generate-patch-from-heights points inner-points heights))))
     (if spider
-	#+nil(write-vtk-polylines
-	      (iter (for line in (spider-lines points))
-		    (collect (iter (for domain-point in line)
-				   (collect (patch-evaluate patch points type distance-type
-							    domain-point)))))
-	      filename)
-	(error "Not implemented yet.")
+	(write-vtk-polylines
+	 (iter (for line in (ts-spider-lines points))
+	       (collect (iter (for domain-point in line)
+			      (collect (ts-patch-evaluate patch points type distance-type
+							  domain-point)))))
+	 filename)
 	(write-vtk-indexed-mesh
 	 (iter (for domain-point in (ts-vertices points))
 	       (collect (ts-patch-evaluate patch points type distance-type domain-point)))
@@ -194,4 +220,5 @@
   (write-constraint-ribbons nil "/tmp/ribbon.vtk" :coords coords :resolution 20)
   (ts-vectorized-distance-function-test (ts-domain coords) '(sd nil) "/tmp/proba.ps"
 					:resolution 200 :density 8 :color t)
-  (ts-write-patch (ts-domain coords) nil "/tmp/proba.vtk" :coords coords))
+  (ts-write-patch (ts-domain coords) nil "/tmp/mesh.vtk" :coords coords)
+  (ts-write-patch (ts-domain coords) nil "/tmp/spider.vtk" :coords coords :spider t))
