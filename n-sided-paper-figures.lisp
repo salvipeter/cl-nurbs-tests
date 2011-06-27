@@ -493,3 +493,96 @@
   (vectorized-distance-function-test
    points '(nil nil nil nil sd) "n-sided-paper/biquad-corner-domain.ps"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))
+
+
+;;; Osszehasonlitas: klasszikus gregory vs. sketches
+
+(defparameter *coords*
+  '((((0 0 0) (1 0 0) (13 0 0) (14 0 0))
+     ((14 0 0) (15 1 0) (17 3 0) (18 4 0))
+     ((18 4 0) (18 5 0) (18 9 0) (18 10 0))
+     ((18 10 0) (17 10 0) (1 10 0) (0 10 0))
+     ((0 10 0) (0 9 0) (0 1 0) (0 0 0)))
+    (((1 1 1) (14 1 1))
+     ((14 1 1) (17 4 1))
+     ((17 4 1) (17 9 1))
+     ((17 9 1) (1 9 1))
+     ((1 9 1) (1 1 1)))))
+
+(defparameter *coords*
+  '((((0.0d0 0.0d0 0.0d0)
+      (1.0d0 0.0d0 1.0d0)
+      (2.0d0 0.0d0 1.0d0)
+      (2.4d0 0.0d0 0.3d0))
+     ((2.4d0 0.0d0 0.3d0)
+      (2.6d0 0.2d0 0.4d0)
+      (2.8d0 0.4d0 0.4d0)
+      (3.0d0 0.6d0 0.3d0))
+     ((3.0d0 0.6d0 0.3d0)
+      (3.0d0 2.0d0 1.0d0)
+      (3.0d0 4.0d0 1.0d0)
+      (3.0d0 6.0d0 0.0d0))
+     ((3.0d0 6.0d0 0.0d0)
+      (2.0d0 6.0d0 1.0d0)
+      (1.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 2.0d0 1.2d0)
+      (2.1d0 1.1d0 1.2d0))
+     ((2.1d0 1.1d0 1.2d0)
+      (2.8d0 1.8d0 1.1d0))
+     ((2.8d0 1.8d0 1.1d0)
+      (2.0d0 4.0d0 1.2d0))
+     ((2.0d0 4.0d0 1.2d0)
+      (1.0d0 4.0d0 1.2d0))
+     ((1.0d0 4.0d0 1.2d0)
+      (1.0d0 2.0d0 1.2d0)))))
+
+(defparameter *coords*
+  '((((0.0d0 0.0d0 0.0d0)
+      (1.0d0 0.0d0 1.0d0)
+      (2.0d0 0.0d0 1.0d0)
+      (3.0d0 0.0d0 0.0d0))
+     ((3.0d0 0.0d0 0.0d0)
+      (3.0d0 2.0d0 1.0d0)
+      (3.0d0 4.0d0 1.0d0)
+      (3.0d0 6.0d0 0.0d0))
+     ((3.0d0 6.0d0 0.0d0)
+      (2.0d0 6.0d0 1.0d0)
+      (1.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 2.0d0 1.2d0)
+      (2.0d0 2.0d0 1.2d0))
+     ((2.0d0 2.0d0 1.2d0)
+      (2.0d0 4.0d0 1.2d0))
+     ((2.0d0 4.0d0 1.2d0)
+      (1.0d0 4.0d0 1.2d0))
+     ((1.0d0 4.0d0 1.2d0)
+      (1.0d0 2.0d0 1.2d0)))))
+
+(let ((*resolution* 30)
+      (*centralized-line-sweep* 1.0)
+      (*ribbon-multiplier* 0.5))
+  (write-constraint-grid nil "n-sided-paper/comparison-grid.vtk"
+			 :coords *coords*)
+  (write-constraint-ribbons nil "n-sided-paper/comparison-ribbons.vtk"
+			    :coords *coords* :resolution 20)
+  (write-patch (domain-from-curves (first *coords*) 'regular) 'corner
+	       "n-sided-paper/comparison-corner-spider.vtk"
+	       :coords *coords* :distance-type 'radial :spider t)
+  (write-patch (domain-from-curves (first *coords*) 'regular) 'corner
+	       "n-sided-paper/comparison-corner.vtk"
+	       :coords *coords* :distance-type 'radial)
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'sketches
+	       "n-sided-paper/comparison-sketches-spider.vtk"
+	       :coords *coords* :distance-type 'line-sweep :spider t)
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'sketches
+	       "n-sided-paper/comparison-sketches.vtk"
+	       :coords *coords* :distance-type 'line-sweep))

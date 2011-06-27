@@ -199,10 +199,8 @@ thus containing point I-1 (NOT point I)."
 	 (si (elt s i))
 	 (ci-1 (bezier (elt (first patch) i-1) si-1))
 	 (ci (bezier (elt (first patch) i) si))
-	 (di-1 (v* (v- (bezier (elt (second patch) i-1) si-1) ci-1) 3.0d0
-		   *ribbon-multiplier*))
-	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0
-		 *ribbon-multiplier*)))
+	 (di-1 (v* (v- (bezier (elt (second patch) i-1) si-1) ci-1) 3.0d0))
+	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0)))
     (v+ ci ci-1 (v* di (- 1.0d0 si-1)) (v* di-1 si))))
 
 (defun corner-correction (patch i s)
@@ -216,10 +214,10 @@ thus containing point I-1 (NOT point I)."
 	 (next (second (elt (first patch) i)))
 	 (twist (second (elt (second patch) i))))
     (v+ corner
-	(v* (v- previous corner) 3.0d0 (- 1.0d0 si-1) *ribbon-multiplier*)
-	(v* (v- next corner) 3.0d0 si *ribbon-multiplier*)
+	(v* (v- previous corner) 3.0d0 (- 1.0d0 si-1))
+	(v* (v- next corner) 3.0d0 si)
 	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0
-	    (- 1.0d0 si-1) si *ribbon-multiplier* *ribbon-multiplier*))))
+	    (- 1.0d0 si-1) si))))
 
 (defun compute-parameter (type dir points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
