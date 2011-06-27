@@ -508,6 +508,93 @@ The ON-OFF parameter declares which blends should be turned on."
 		     :distance-type 'line-sweep
 		     :threshold 0.03d0)
 
+(defun floater-mean-value (points p)
+  (flet ((angle (a b c)
+	   (acos (scalar-product (vnormalize (v- a b))
+				 (vnormalize (v- c b))))))
+    (let* ((wi (iter (for vi in points)
+		     (for vi-1 in (append (last points) points))
+		     (for vi+1 in (append (rest points) points))
+		     (for ri = (point-distance p vi))
+		     (when (< (abs ri) *epsilon*)
+		       (collect 1)
+		       (next-iteration))
+		     (for alphai = (angle vi p vi+1))
+		     (for alphai-1 = (angle vi-1 p vi))
+		     (collect (/ (+ (tan (/ alphai 2))
+				    (tan (/ alphai-1 2)))
+				 ri))))
+	   (sum (reduce #'+ wi)))
+      (mapcar (lambda (x) (/ x sum)) wi))))
+
+(defun write-floater-blend-test (points filename r &key
+				 (trim '(0.89d0 0.91d0)) (cornerp t))
+  "TODO: How should side blends work in this case?"
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length points))
+	   (lines (lines-from-points points))
+	   (colors (generate-colors n)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let ((blends (if cornerp
+				    (floater-mean-value points p)
+				    (let ((b (floater-mean-value points p)))
+				      (mapcar (lambda (x y) (/ (+ x y) 2))
+					      b (append (last b) b))))))
+                    (if (and trim (some (lambda (x)
+					  (< (first trim) x (second trim)))
+					blends))
+			(format s "0 0 0~%")
+			(format s "~{~d~^ ~}~%"
+				(mapcar #'round
+					(reduce (lambda (x y) (mapcar #'+ x y))
+						(mapcar #'v* colors blends))))))
+                  (format s "255 255 255~%")))))))))
+
+#+nil
+(write-floater-blend-test (points-from-angles '(40 20 60 100 80))
+			  "n-sided-paper/09-floater-corner.ppm" 400 :trim nil)
+#+nil
+(write-floater-blend-test (points-from-angles '(40 20 60 100 80))
+			  "n-sided-paper/09-floater-corner-trim.ppm" 400)
+#+nil
+(write-floater-blend-test (points-from-angles '(40 20 60 100 80))
+			  "n-sided-paper/09-floater-side.ppm" 400
+			  :cornerp nil :trim nil)
+
+(defun write-floater-blend-voronoi (points filename r &key
+				    (threshold 0.01d0) (cornerp t))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length points))
+	   (lines (lines-from-points points)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let ((blends (if cornerp
+				    (floater-mean-value points p)
+				    (let ((b (floater-mean-value points p)))
+				      (mapcar (lambda (x y) (/ (+ x y) 2))
+					      b (append (last b) b))))))
+                    (if (destructuring-bind (a b)
+			    (subseq (sort blends #'>) 0 2)
+			  (< (- a b) threshold))
+			(format s "0 0 0~%")
+			(format s "127 127 127~%")))
+                  (format s "255 255 255~%")))))))))
+
+#+nil
+(write-floater-blend-voronoi (points-from-angles '(40 20 60 100 80))
+			     "n-sided-paper/09-floater-corner-voronoi.ppm" 400)
+
 (defparameter *spider-density* 4)
 (defparameter *spider-lines* 3)
 (defun spider-lines (points)
