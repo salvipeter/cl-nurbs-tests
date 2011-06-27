@@ -258,7 +258,7 @@
 		   (let ((1-x (- 1.0d0 x)))
 		     (+ (* a (/ (sqr 1-x) (+ (sqr 1-x) (sqr x))))
 			(* b (/ (sqr x) (+ (sqr 1-x) (sqr x)))))))
-		 (blend2 (a x b)	; could be used instead of BLEND
+		 #+nil(blend2 (a x b)	; could be used instead of BLEND
 		   (cond ((< x *epsilon*) a)
 			 ((> x (- 1.0d0 *epsilon*)) b)
 			 (t (+ (* a (hermite-blend-function 'point 'start x))
