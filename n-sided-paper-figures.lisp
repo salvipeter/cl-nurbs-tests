@@ -498,16 +498,36 @@
 ;;; Osszehasonlitas: klasszikus gregory vs. sketches
 
 (defparameter *coords*
-  '((((0 0 0) (1 0 0) (13 0 0) (14 0 0))
-     ((14 0 0) (15 1 0) (17 3 0) (18 4 0))
-     ((18 4 0) (18 5 0) (18 9 0) (18 10 0))
-     ((18 10 0) (17 10 0) (1 10 0) (0 10 0))
-     ((0 10 0) (0 9 0) (0 1 0) (0 0 0)))
-    (((1 1 1) (14 1 1))
-     ((14 1 1) (17 4 1))
-     ((17 4 1) (17 9 1))
-     ((17 9 1) (1 9 1))
-     ((1 9 1) (1 1 1)))))
+  '((((0.0d0 0.0d0 0.0d0)
+      (1.0d0 0.0d0 1.0d0)
+      (2.0d0 0.0d0 1.0d0)
+      (2.4d0 0.0d0 0.3d0))
+     ((2.4d0 0.0d0 0.3d0)
+      (2.6d0 0.2d0 0.4d0)
+      (2.8d0 0.4d0 0.4d0)
+      (3.0d0 0.6d0 0.3d0))
+     ((3.0d0 0.6d0 0.3d0)
+      (3.0d0 2.0d0 5.0d0)
+      (3.0d0 4.0d0 5.0d0)
+      (3.0d0 6.0d0 0.0d0))
+     ((3.0d0 6.0d0 0.0d0)
+      (2.0d0 6.0d0 1.0d0)
+      (1.0d0 6.0d0 1.0d0)
+      (0.0d0 6.0d0 0.0d0))
+     ((0.0d0 6.0d0 0.0d0)
+      (0.0d0 4.0d0 1.0d0)
+      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 2.0d0 1.2d0)
+      (2.1d0 1.7d0 1.2d0))
+     ((2.1d0 1.7d0 1.2d0)
+      (2.5d0 1.8d0 5.0d0))
+     ((2.5d0 1.8d0 5.0d0)
+      (2.0d0 4.0d0 5.0d0))
+     ((2.0d0 4.0d0 5.0d0)
+      (1.0d0 4.0d0 1.2d0))
+     ((1.0d0 4.0d0 1.2d0)
+      (1.0d0 2.0d0 1.2d0)))))
 
 (defparameter *coords*
   '((((0.0d0 0.0d0 0.0d0)
@@ -519,8 +539,10 @@
       (2.8d0 0.4d0 0.4d0)
       (3.0d0 0.6d0 0.3d0))
      ((3.0d0 0.6d0 0.3d0)
-      (3.0d0 2.0d0 1.0d0)
-      (3.0d0 4.0d0 1.0d0)
+      (3.5d0 1.0d0 2.0d0)
+      (4.0d0 2.0d0 5.0d0)
+      (4.0d0 4.0d0 5.0d0)
+      (3.5d0 5.0d0 2.0d0)
       (3.0d0 6.0d0 0.0d0))
      ((3.0d0 6.0d0 0.0d0)
       (2.0d0 6.0d0 1.0d0)
@@ -531,58 +553,133 @@
       (0.0d0 2.0d0 1.0d0)
       (0.0d0 0.0d0 0.0d0)))
     (((1.0d0 2.0d0 1.2d0)
-      (2.1d0 1.1d0 1.2d0))
-     ((2.1d0 1.1d0 1.2d0)
-      (2.8d0 1.8d0 1.1d0))
-     ((2.8d0 1.8d0 1.1d0)
-      (2.0d0 4.0d0 1.2d0))
-     ((2.0d0 4.0d0 1.2d0)
+      (2.1d0 2.1d0 2.0d0))
+     ((2.1d0 2.1d0 2.0d0)
+      (2.5d0 1.8d0 3.0d0))
+     ((2.5d0 1.8d0 3.0d0)
+      (2.0d0 4.0d0 3.0d0))
+     ((2.0d0 4.0d0 3.0d0)
       (1.0d0 4.0d0 1.2d0))
      ((1.0d0 4.0d0 1.2d0)
       (1.0d0 2.0d0 1.2d0)))))
 
 (defparameter *coords*
   '((((0.0d0 0.0d0 0.0d0)
-      (1.0d0 0.0d0 1.0d0)
-      (2.0d0 0.0d0 1.0d0)
-      (3.0d0 0.0d0 0.0d0))
-     ((3.0d0 0.0d0 0.0d0)
-      (3.0d0 2.0d0 1.0d0)
-      (3.0d0 4.0d0 1.0d0)
+      (1.0d0 0.0d0 0.0d0)
+      (2.0d0 0.0d0 0.0d0)
+      (2.4d0 0.0d0 0.0d0))
+     ((2.4d0 0.0d0 0.0d0)
+      (2.6d0 0.2d0 0.0d0)
+      (2.8d0 0.4d0 0.0d0)
+      (3.0d0 0.6d0 0.0d0))
+     ((3.0d0 0.6d0 0.0d0)
+      (3.5d0 2.5d0 0.0d0)
+      (4.0d0 2.5d0 5.0d0)
+      (4.0d0 3.2d0 5.0d0)
+      (3.5d0 3.2d0 0.0d0)
       (3.0d0 6.0d0 0.0d0))
      ((3.0d0 6.0d0 0.0d0)
-      (2.0d0 6.0d0 1.0d0)
-      (1.0d0 6.0d0 1.0d0)
+      (2.0d0 6.0d0 0.0d0)
+      (1.0d0 6.0d0 0.0d0)
       (0.0d0 6.0d0 0.0d0))
      ((0.0d0 6.0d0 0.0d0)
-      (0.0d0 4.0d0 1.0d0)
-      (0.0d0 2.0d0 1.0d0)
+      (0.0d0 4.0d0 0.0d0)
+      (0.0d0 2.0d0 0.0d0)
       (0.0d0 0.0d0 0.0d0)))
-    (((1.0d0 2.0d0 1.2d0)
-      (2.0d0 2.0d0 1.2d0))
-     ((2.0d0 2.0d0 1.2d0)
-      (2.0d0 4.0d0 1.2d0))
-     ((2.0d0 4.0d0 1.2d0)
-      (1.0d0 4.0d0 1.2d0))
-     ((1.0d0 4.0d0 1.2d0)
-      (1.0d0 2.0d0 1.2d0)))))
+    (((1.0d0 2.0d0 0.0d0)
+      (2.1d0 2.1d0 0.0d0))
+     ((2.1d0 2.1d0 0.0d0)
+      (2.5d0 1.8d0 0.0d0))
+     ((2.5d0 1.8d0 0.0d0)
+      (2.3d0 2.5d0 6.0d0)
+      (2.2d0 3.2d0 6.0d0)
+      (2.0d0 4.0d0 0.0d0))
+     ((2.0d0 4.0d0 0.0d0)
+      (1.0d0 4.0d0 0.0d0))
+     ((1.0d0 4.0d0 0.0d0)
+      (1.0d0 2.0d0 0.0d0)))))
+
+(defun six-sided-patch (x y z)
+  "X, Y and Z are (a b c) triples.
+a: side length
+b: ribbon length
+c: side width"
+  (labels ((xaxis (type) (case type (x '(1 0 0)) (y '(0 1 0)) (z '(0 0 1))))
+	   (yaxis (type) (case type (x '(0 1 0)) (y '(0 0 1)) (z '(1 0 0))))
+	   (zaxis (type) (case type (x '(0 0 1)) (y '(1 0 0)) (z '(0 1 0))))
+	   (p1 (a b c x y z) (v+ (v* x a) (v* z c)))
+	   (p2 (a b c x y z) (v+ (v* x a) (v* z (/ c 3))))
+	   (p3 (a b c x y z) (v+ (v* x a) (v* y (/ c 3))))
+	   (p4 (a b c x y z) (v+ (v* x a) (v* y c)))
+	   (q1 (a b c x y z) (v- (p1 a b c x y z) (v* x b)))
+	   (q2 (a b c x y z) (v- (p2 a b c x y z) (v* x b)))
+	   (q3 (a b c x y z) (v- (p3 a b c x y z) (v* x b)))
+	   (q4 (a b c x y z) (v- (p4 a b c x y z) (v* x b))))
+    (macrolet ((c (a b) `(apply #',a (append ,b (list (xaxis ',b) (yaxis ',b) (zaxis ',b))))))
+      `(((,(c p1 x) ,(c p2 x) ,(c p3 x) ,(c p4 x))
+	 (,(c p4 x) ,(c q4 x) ,(c q1 y) ,(c p1 y))
+	 (,(c p1 y) ,(c p2 y) ,(c p3 y) ,(c p4 y))
+	 (,(c p4 y) ,(c q4 y) ,(c q1 z) ,(c p1 z))
+	 (,(c p1 z) ,(c p2 z) ,(c p3 z) ,(c p4 z))
+	 (,(c p4 z) ,(c q4 z) ,(c q1 x) ,(c p1 x)))
+	((,(c q2 x) ,(c q3 x))
+	 (,(c q3 x) ,(c q2 y))
+	 (,(c q2 y) ,(c q3 y))
+	 (,(c q3 y) ,(c q2 z))
+	 (,(c q2 z) ,(c q3 z))
+	 (,(c q3 z) ,(c q2 x)))))))
+
+(defparameter *coords*
+  (six-sided-patch '(80 40 60) '(150 40 20) '(150 40 20)))
 
 (let ((*resolution* 30)
-      (*centralized-line-sweep* 1.0)
-      (*ribbon-multiplier* 0.5))
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 1.0))
   (write-constraint-grid nil "n-sided-paper/comparison-grid.vtk"
 			 :coords *coords*)
   (write-constraint-ribbons nil "n-sided-paper/comparison-ribbons.vtk"
 			    :coords *coords* :resolution 20)
-  (write-patch (domain-from-curves (first *coords*) 'regular) 'corner
-	       "n-sided-paper/comparison-corner-spider.vtk"
+  (write-patch (domain-from-curves (first *coords*) 'regular) 'ribbon
+	       "n-sided-paper/comparison-radial-spider.vtk"
 	       :coords *coords* :distance-type 'radial :spider t)
-  (write-patch (domain-from-curves (first *coords*) 'regular) 'corner
-	       "n-sided-paper/comparison-corner.vtk"
+  (write-patch (domain-from-curves (first *coords*) 'regular) 'ribbon
+	       "n-sided-paper/comparison-radial.vtk"
 	       :coords *coords* :distance-type 'radial)
-  (write-patch (domain-from-curves (first *coords*) 'circular) 'sketches
-	       "n-sided-paper/comparison-sketches-spider.vtk"
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'ribbon
+	       "n-sided-paper/comparison-sweep-spider.vtk"
 	       :coords *coords* :distance-type 'line-sweep :spider t)
-  (write-patch (domain-from-curves (first *coords*) 'circular) 'sketches
-	       "n-sided-paper/comparison-sketches.vtk"
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'ribbon
+	       "n-sided-paper/comparison-sweep.vtk"
 	       :coords *coords* :distance-type 'line-sweep))
+
+(let ((*resolution* 30)
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 2.0))
+  (write-patch (domain-from-curves (first *coords*) 'regular) 'ribbon
+	       "/tmp/patch.vtk"
+	       :coords *coords* :distance-type 'radial :spider nil))
+
+(let ((*resolution* 30)
+      (*centralized-line-sweep* nil)
+      (*ribbon-multiplier* 2.0))
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'ribbon
+	       "/tmp/patch.vtk"
+	       :coords *coords* :distance-type 'line-sweep :spider nil))
+
+(let ((*resolution* 30)
+      (*centralized-line-sweep* 1.0)
+      (*ribbon-multiplier* 1.0))
+  (write-constraint-grid nil "n-sided-paper/comparison-grid.vtk"
+			 :coords *coords*)
+  (write-constraint-ribbons nil "n-sided-paper/comparison-ribbons.vtk"
+			    :coords *coords* :resolution 20)
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'corner
+	       "n-sided-paper/comparison-biquad-corner.vtk"
+	       :coords *coords* :distance-type 'biquadratic-corner :spider nil)
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'ribbon
+	       "n-sided-paper/comparison-biquad-ribbon.vtk"
+	       :coords *coords* :distance-type 'biquadratic :spider nil)
+  (write-patch (domain-from-curves (first *coords*) 'circular) 'hybrid
+	       "n-sided-paper/comparison-biquad-hybrid.vtk"
+	       :coords *coords* :distance-type 'biquadratic :spider nil))
+
