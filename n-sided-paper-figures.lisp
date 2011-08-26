@@ -683,3 +683,54 @@ c: side width"
 	       "n-sided-paper/comparison-biquad-hybrid.vtk"
 	       :coords *coords* :distance-type 'biquadratic :spider nil))
 
+
+;;; Tests for the new biquadratic (regular polygons)
+;;; 3 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil sd nil) "n-sided-paper/bq3s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil nil sd) "n-sided-paper/bq3s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil sd nil) "n-sided-paper/bq3c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+;;; 5 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil sd nil) "n-sided-paper/bq5s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil nil sd) "n-sided-paper/bq5s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil sd nil) "n-sided-paper/bq5c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+;;; 6 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil sd nil) "n-sided-paper/bq6s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil nil sd) "n-sided-paper/bq6s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil sd nil) "n-sided-paper/bq6c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+
+;;; Biquadratic domain szemlelteto kepek [uj verzio]
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-domain-new.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-corner-domain-new.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))

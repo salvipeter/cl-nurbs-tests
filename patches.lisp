@@ -244,8 +244,16 @@ thus containing point I-1 (NOT point I)."
 (defun patch-evaluate (patch points type distance-type domain-point)
   (let* ((n (length points))
 	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
-	 (d (compute-parameter distance-type 'd points p t))
-	 (s (compute-parameter distance-type 's points p t))
+	 (d (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 'd points p t)))
+	 (dc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 'd points p t)
+		 d))
+	 (s (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 's points p t)))
+	 (sc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 's points p t)
+		 s))
 	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t))))
     (iter (for i from 0 below n)
 	  (with result = '(0 0 0))
@@ -254,14 +262,14 @@ thus containing point I-1 (NOT point I)."
 		    (case type
 		      (ribbon (v* (ribbon-evaluate patch i s d)
 				  (ribbon-blend d i)))
-		      (corner (v* (v- (corner-evaluate patch i s)
-				      (corner-correction patch i s))
-				  (corner-blend d (mod (1- i) n))))
+		      (corner (v* (v- (corner-evaluate patch i sc)
+				      (corner-correction patch i sc))
+				  (corner-blend dc (mod (1- i) n))))
 		      (hybrid (v- (v* (ribbon-evaluate patch i s d)
 				      (+ (corner-blend d (mod (1- i) n))
 					 (corner-blend d i)))
-				  (v* (corner-correction patch i s)
-				      (corner-blend d (mod (1- i) n)))))
+				  (v* (corner-correction patch i sc)
+				      (corner-blend dc (mod (1- i) n)))))
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i))))))
 	  (finally (return result)))))
@@ -485,7 +493,8 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for domain-point = (line-point line u))
 		 (for p = (patch-evaluate patch points type distance-type domain-point))
 		 (for v = (bezier-project-point curve p 10 *resolution*))
-		 (maximize (point-distance p (bezier curve v))))))))
+		 (for diff = (point-distance p (bezier curve v)))
+		 (maximize diff))))))
 
 (defun check-patch-tangents (points type &key inner-points heights coords
 			     (distance-type 'perpendicular) (step 0.1d-3))
@@ -512,12 +521,14 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for q = (patch-evaluate patch points type distance-type inner-domain-point))
 		 (for v = (bezier-project-point curve p 10 *resolution*))
 		 (for derivative = (vnormalize (bezier curve v 1)))
-		 (maximize (vlength
-			    (cross-product
-			     (vnormalize (cross-product derivative (v- q p)))
-			     (vnormalize (cross-product derivative
-							(v- (bezier inner-curve v)
-							    (bezier curve v))))))))))))
+		 (for diff =
+		      (vlength
+		       (cross-product
+			(vnormalize (cross-product derivative (v- q p)))
+			(vnormalize (cross-product derivative
+						   (v- (bezier inner-curve v)
+						       (bezier curve v)))))))
+		 (maximize diff))))))
 
 #+nil
 (let ((*resolution* 100)
@@ -587,3 +598,18 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 
 (defun derivative-error-to-angle (err)
   (/ (* (asin err) 180) pi))
+
+;;; Biquadratic tests:
+#+nil
+(let ((*resolution* 100)
+      (*ribbon-multiplier* 1.0d0)
+      (*centralized-line-sweep* t)) 
+  (iter (for type in '(ribbon hybrid))
+	(iter (for distance in '(biquadratic))
+	      (format t "Maximal  point  deviation using ~a with ~a: ~f~%"
+		      type distance
+		      (check-patch *points* type :coords *coords* :distance-type distance))
+	      (format t "Maximal tangent deviation using ~a with ~a: ~f~%"
+		      type distance
+		      (check-patch-tangents *points* type :coords *coords* :distance-type distance
+					    :step 1.0d-4)))))
