@@ -773,7 +773,7 @@ c: side width"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
 (let ((points (points-from-angles '(0 90 60 75 90))))
   (vectorized-distance-function-test
-   points '(nil nil nil nil sd) "n-sided-paper/biquad-corner-domain-new.ps"
+   points '(sd nil nil nil nil) "n-sided-paper/biquad-corner-domain-new.ps"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))
 
 ;;; Biquadratic domain szemlelteto kepek [uj verzio, Bezier]
@@ -783,5 +783,5 @@ c: side width"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
 (let ((points (points-from-angles '(0 90 60 75 90))))
   (vectorized-distance-function-test
-   points '(nil nil nil nil sd) "n-sided-paper/biquad-bezier-corner-domain-new.ps"
+   points '(sd nil nil nil nil) "n-sided-paper/biquad-bezier-corner-domain-new.ps"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))

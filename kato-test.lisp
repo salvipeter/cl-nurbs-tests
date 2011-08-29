@@ -642,7 +642,6 @@
  (points-from-angles '(40 20 60 100 80)) '(sd nil nil nil sd) "/tmp/params.ps"
  :resolution 0.1d0 :density 4 :distance-type 'chord-based)
 
-#+nil
 (defun biquadratic-net (points segments)
   "Uses Bezier curves to determine dangling corners."
   (let ((net (make-array '(3 3)))
@@ -664,6 +663,7 @@
 		(aref net 2 2) (fourth segments))))
     net))
 
+#+nil
 (defun biquadratic-net (points segments)
   "Uses opposing corners as dangling corners."
   (let ((net (make-array '(3 3)))
@@ -687,7 +687,6 @@
 		(aref net 2 2) (fourth segments))))
     net))
 
-#+nil
 (defun biquadratic-corner-net (points segments)
   "Uses Bezier curves to determine dangling corners."
   (let ((net (make-array '(3 3)))
@@ -720,6 +719,7 @@
 					       (elt points (mod (+ i -1 k) n))))))
     net))
 
+#+nil
 (defun biquadratic-corner-net (points segments)
   "Uses opposing corners as dangling corners."
   (let ((net (make-array '(3 3)))
@@ -749,6 +749,21 @@
 					       1/2
 					       (elt points (mod (+ i k) n))))))
     net))
+
+(defun write-biquadratic-net (net filename)
+  (labels ((map-point (p)
+	     (list (* (+ (first p) 1.0d0) 200)
+		   (* (+ (second p) 1.0d0) 200)))
+	   (pp (i j) (map-point (aref net i j))))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "%!PS~%")
+      (dotimes (i 3)
+	(dotimes (j 2)
+	  (format s "newpath~%~{~f ~}moveto~%~{~f ~}lineto~%stroke~%"
+		  (pp i j) (pp i (1+ j)))
+	  (format s "newpath~%~{~f ~}moveto~%~{~f ~}lineto~%stroke~%"
+		  (pp j i) (pp (1+ j) i))))
+      (format s "showpage~%"))))
 
 (defun biquadratic-point (net uv &optional derivative)
   (let ((u (first uv))
