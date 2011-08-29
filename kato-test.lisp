@@ -890,32 +890,47 @@
 	    (leave (values uv (vlength deviation))))
 	  (finally (return (values uv (vlength deviation)))))))
 
-(defun gsll-minimize-2d (fn start initial-step iterations deviation)
-  (let ((obj (gsll:make-multi-dimensional-minimizer-f
-	      gsll:+simplex-nelder-mead+ 2
-	      (lambda (u v) (funcall fn (list u v)))
+(defun gsll-minimize-2d (fn start iterations deviation)
+  (let ((obj (gsll:make-multi-dimensional-root-solver-fdf
+	      gsll:+gnewton-mfdfsolver+
+	      (list (lambda (u v)
+		      (let ((f (funcall fn (list u v))))
+			(values (first f) (second f))))
+		    (lambda (u v)
+		      (let ((fu (funcall fn (list u v) 'u))
+			    (fv (funcall fn (list u v) 'v)))
+			(values (first fu) (first fv)
+				(second fu) (second fv))))
+		    (lambda (u v)
+		      (let ((f (funcall fn (list u v)))
+			    (fu (funcall fn (list u v) 'u))
+			    (fv (funcall fn (list u v) 'v)))
+			(values (first f) (second f)
+				(first fu) (first fv)
+				(second fu) (second fv)))))
 	      (grid:make-foreign-array 'double-float :dimensions 2
-				       :initial-contents start)
-	      (grid:make-foreign-array 'double-float :dimensions 2
-				       :initial-element initial-step))))
+				       :initial-contents start))))
     (iter (repeat iterations)
 	  (gsll:iterate obj)
-	  (until (< (gsll:size obj) deviation))
+	  (until (gsll:multiroot-test-residual obj deviation))
 	  (finally (let ((result (gsll:solution obj)))
 		     (return (list (grid:gref result 0) (grid:gref result 1))))))))
 
 (defun bq-project-point-gsll (net point iterations deviation)
-  (flet ((fn (uv) (point-distance (biquadratic-point net uv) point)))
-    (gsll-minimize-2d #'fn '(0.5d0 0.5d0) 0.2d0 iterations deviation)))
+  (flet ((fn (uv &optional deriv)
+	   (if deriv
+	       (biquadratic-point net uv deriv)
+	       (v- (biquadratic-point net uv) point))))
+    (gsll-minimize-2d #'fn '(0.5d0 0.5d0) iterations deviation)))
 
 (defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
-  (let ((sd (bq-project-point (biquadratic-net points segments) p 200 1.0d-8)))
+  (let ((sd (bq-project-point-gsll (biquadratic-net points segments) p 200 1.0d-8)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
 
 (defmethod compute-distance ((type (eql 'biquadratic-corner)) points segments p dir)
-  (let ((sd (bq-project-point (biquadratic-corner-net points segments) p 200 1.0d-8)))
+  (let ((sd (bq-project-point-gsll (biquadratic-corner-net points segments) p 200 1.0d-8)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))

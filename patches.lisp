@@ -613,3 +613,7 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		      type distance
 		      (check-patch-tangents *points* type :coords *coords* :distance-type distance
 					    :step 1.0d-4)))))
+
+;;; Maximal  point  deviation using RIBBON with BIQUADRATIC: 0.000000003326540158483576 < 10^-8
+;;; Maximal tangent deviation using RIBBON with BIQUADRATIC: 0.0020216320104845657 ~ 0.1 degree
+;;; Average tangent deviation using RIBBON with BIQUADRATIC: 0.0002265976245136393 ~ 0.01 degree
