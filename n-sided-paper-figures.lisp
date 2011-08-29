@@ -684,7 +684,7 @@ c: side width"
 	       :coords *coords* :distance-type 'biquadratic :spider nil))
 
 
-;;; Tests for the new biquadratic (regular polygons)
+;;; Tests for the new biquadratic (regular polygons, simple version)
 ;;; 3 sides:
 (vectorized-distance-function-test (points-from-angles (uniform-angles 3))
 				   '(nil sd nil) "n-sided-paper/bq3s1.ps"
@@ -695,7 +695,7 @@ c: side width"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
 (vectorized-distance-function-test (points-from-angles (uniform-angles 3))
-				   '(nil sd nil) "n-sided-paper/bq3c.ps"
+				   '(nil nil sd) "n-sided-paper/bq3c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
 ;;; 5 sides:
@@ -708,7 +708,7 @@ c: side width"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
 (vectorized-distance-function-test (points-from-angles (uniform-angles 5))
-				   '(nil nil nil sd nil) "n-sided-paper/bq5c.ps"
+				   '(nil nil nil nil sd) "n-sided-paper/bq5c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
 ;;; 6 sides:
@@ -721,11 +721,52 @@ c: side width"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
 (vectorized-distance-function-test (points-from-angles (uniform-angles 6))
-				   '(nil nil nil nil sd nil) "n-sided-paper/bq6c.ps"
+				   '(nil nil nil nil nil sd) "n-sided-paper/bq6c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
 
-;;; Biquadratic domain szemlelteto kepek [uj verzio]
+;;; Tests for the new biquadratic (regular polygons, Bezier-version)
+;;; 3 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil sd nil) "n-sided-paper/bqb3s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil nil sd) "n-sided-paper/bqb3s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil nil sd) "n-sided-paper/bqb3c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+;;; 5 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil sd nil) "n-sided-paper/bqb5s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil nil sd) "n-sided-paper/bqb5s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 5))
+				   '(nil nil nil nil sd) "n-sided-paper/bqb5c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+;;; 6 sides:
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil sd nil) "n-sided-paper/bqb6s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil nil sd) "n-sided-paper/bqb6s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 6))
+				   '(nil nil nil nil nil sd) "n-sided-paper/bqb6c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+
+;;; Biquadratic domain szemlelteto kepek [uj verzio, sima]
 (let ((points (points-from-angles '(0 90 60 75 90))))
   (vectorized-distance-function-test
    points '(nil nil nil nil sd) "n-sided-paper/biquad-domain-new.ps"
@@ -733,4 +774,14 @@ c: side width"
 (let ((points (points-from-angles '(0 90 60 75 90))))
   (vectorized-distance-function-test
    points '(nil nil nil nil sd) "n-sided-paper/biquad-corner-domain-new.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))
+
+;;; Biquadratic domain szemlelteto kepek [uj verzio, Bezier]
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-bezier-domain-new.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil))
+(let ((points (points-from-angles '(0 90 60 75 90))))
+  (vectorized-distance-function-test
+   points '(nil nil nil nil sd) "n-sided-paper/biquad-bezier-corner-domain-new.ps"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))

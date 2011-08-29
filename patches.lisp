@@ -604,7 +604,7 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 (let ((*resolution* 100)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* t)) 
-  (iter (for type in '(ribbon hybrid))
+  (iter (for type in '(ribbon corner hybrid))
 	(iter (for distance in '(biquadratic))
 	      (format t "Maximal  point  deviation using ~a with ~a: ~f~%"
 		      type distance
