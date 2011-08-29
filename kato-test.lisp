@@ -656,7 +656,7 @@
     (if (= n 3)
 	(setf (aref net 2 0) (affine-combine (first segments) 1/4 (second segments))
 	      (aref net 2 2) (affine-combine (third segments) 3/4 (fourth segments))
-	      (aref net 2 1) (affine-combine (aref net 2 0) 1/2 (aref net 2 2)))
+	      (aref net 2 1) (bezier (list (aref net 2 0) (first segments) (aref net 2 2)) 1/2))
 	(let* ((i (position (fourth segments) points :test #'equal))
 	       (curve (subseq (append points points) i (+ i n -2))))
 	  (setf (aref net 2 0) (first segments)
@@ -677,7 +677,7 @@
     (if (= n 3)
 	(setf (aref net 2 0) (affine-combine (first segments) 1/4 (second segments))
 	      (aref net 2 2) (affine-combine (third segments) 3/4 (fourth segments))
-	      (aref net 2 1) (affine-combine (aref net 2 0) 1/2 (aref net 2 2)))
+	      (aref net 2 1) (first segments))
 	(let ((i (position (second segments) points :test #'equal))
 	      (k (ceiling n 2)))
 	  (setf (aref net 2 0) (first segments)
@@ -700,12 +700,12 @@
     (if (= n 3)
 	(setf (aref net 0 2) (affine-combine (second segments) 3/4 (third segments))
 	      (aref net 2 0) (affine-combine (first segments) 1/4 (second segments))
-	      (aref net 1 2) (affine-combine (aref net 0 2) 1/2
-					     (affine-combine
-					      (third segments) 1/4 (fourth segments)))
-	      (aref net 2 1) (affine-combine (aref net 2 0) 1/2
-					     (affine-combine
-					      (third segments) 3/4 (fourth segments)))
+	      (aref net 1 2) (bezier (list (aref net 0 2) (third segments)
+					   (affine-combine (third segments) 1/4 (fourth segments)))
+				     1/2)
+	      (aref net 2 1) (bezier (list (aref net 2 0) (first segments)
+					   (affine-combine (third segments) 3/4 (fourth segments)))
+				     1/2)
 	      (aref net 2 2) (affine-combine (third segments) 1/2 (fourth segments)))
 	(let* ((i (position (third segments) points :test #'equal))
 	       (k (ceiling n 2))
@@ -731,12 +731,8 @@
     (if (= n 3)
 	(setf (aref net 0 2) (affine-combine (second segments) 3/4 (third segments))
 	      (aref net 2 0) (affine-combine (first segments) 1/4 (second segments))
-	      (aref net 1 2) (affine-combine (aref net 0 2) 1/2
-					     (affine-combine
-					      (third segments) 1/4 (fourth segments)))
-	      (aref net 2 1) (affine-combine (aref net 2 0) 1/2
-					     (affine-combine
-					      (third segments) 3/4 (fourth segments)))
+	      (aref net 1 2) (third segments)
+	      (aref net 2 1) (first segments)
 	      (aref net 2 2) (affine-combine (third segments) 1/2 (fourth segments)))
 	(let* ((i (position (second segments) points :test #'equal))
 	       (k (ceiling n 2)))
