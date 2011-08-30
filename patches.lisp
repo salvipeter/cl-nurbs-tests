@@ -191,11 +191,11 @@ For a 4-sided patch, D is (U V 1-U 1-V)"
 	 (derivative (v* (v- inner-point base-point) 3.0d0)))
     (v+ base-point (v* derivative (elt d i) *ribbon-multiplier*))))
 
-(defun corner-evaluate (patch i s)
+(defun corner-evaluate (patch i s &optional d)
   "The corner defined by segments I-1 and I,
 thus containing point I-1 (NOT point I)."
   (let* ((i-1 (mod (1- i) (length s)))
-	 (si-1 (elt s i-1))
+	 (si-1 (if d (- 1.0d0 (elt d i)) (elt s i-1)))
 	 (si (elt s i))
 	 (ci-1 (bezier (elt (first patch) i-1) si-1))
 	 (ci (bezier (elt (first patch) i) si))
@@ -203,10 +203,10 @@ thus containing point I-1 (NOT point I)."
 	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0)))
     (v+ ci ci-1 (v* di (- 1.0d0 si-1)) (v* di-1 si))))
 
-(defun corner-correction (patch i s)
+(defun corner-correction (patch i s &optional d)
   "Correction for the same corner as explained in CORNER-EVALUATE."
   (let* ((i-1 (mod (1- i) (length s)))
-	 (si-1 (elt s i-1))
+	 (si-1 (if d (elt d i) (- 1.0d0 (elt s i-1))))
 	 (si (elt s i))
 	 (previous (let ((lst (elt (first patch) i-1)))
 		     (elt lst (- (length lst) 2))))
@@ -214,10 +214,9 @@ thus containing point I-1 (NOT point I)."
 	 (next (second (elt (first patch) i)))
 	 (twist (second (elt (second patch) i))))
     (v+ corner
-	(v* (v- previous corner) 3.0d0 (- 1.0d0 si-1))
+	(v* (v- previous corner) 3.0d0 si-1)
 	(v* (v- next corner) 3.0d0 si)
-	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0
-	    (- 1.0d0 si-1) si))))
+	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 si-1 si))))
 
 (defun compute-parameter (type dir points p &optional no-tiny-p)
   (macrolet ((tiny-lambda ((args) &body body)
@@ -262,14 +261,21 @@ thus containing point I-1 (NOT point I)."
 		    (case type
 		      (ribbon (v* (ribbon-evaluate patch i s d)
 				  (ribbon-blend d i)))
-		      (corner (v* (v- (corner-evaluate patch i sc)
-				      (corner-correction patch i sc))
-				  (corner-blend dc (mod (1- i) n))))
+		      (corner (if (eq distance-type 'biquadratic)
+				  (v* (v- (corner-evaluate patch i sc dc)
+					  (corner-correction patch i sc dc))
+				      (corner-blend dc (mod (1- i) n)))
+				  (v* (v- (corner-evaluate patch i s)
+					  (corner-correction patch i s))
+				      (corner-blend d (mod (1- i) n)))))
 		      (hybrid (v- (v* (ribbon-evaluate patch i s d)
 				      (+ (corner-blend d (mod (1- i) n))
 					 (corner-blend d i)))
-				  (v* (corner-correction patch i sc)
-				      (corner-blend dc (mod (1- i) n)))))
+				  (if (eq distance-type 'biquadratic)
+				      (v* (corner-correction patch i sc dc)
+					  (corner-blend d (mod (1- i) n)))
+				      (v* (corner-correction patch i s)
+					  (corner-blend d (mod (1- i) n))))))
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i))))))
 	  (finally (return result)))))
@@ -615,5 +621,8 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 					    :step 1.0d-4)))))
 
 ;;; Maximal  point  deviation using RIBBON with BIQUADRATIC: 0.000000003326540158483576 < 10^-8
-;;; Maximal tangent deviation using RIBBON with BIQUADRATIC: 0.0020216320104845657 ~ 0.1 degree
-;;; Average tangent deviation using RIBBON with BIQUADRATIC: 0.0002265976245136393 ~ 0.01 degree
+;;; Maximal tangent deviation using RIBBON with BIQUADRATIC: 0.0020216320104845657 ~ 0.1 degrees
+;;; Maximal  point  deviation using CORNER with BIQUADRATIC: 0.000000000000002817430187 < 10^-14
+;;; Maximal tangent deviation using CORNER with BIQUADRATIC: 0.0005757214242044044 ~ 0.03 degrees
+;;; Maximal  point  deviation using HYBRID with BIQUADRATIC: 0.000000027472604973633572 < 10^-7
+;;; Maximal tangent deviation using HYBRID with BIQUADRATIC: 0.0005757216288853803 ~ 0.03 degrees

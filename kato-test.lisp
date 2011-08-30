@@ -924,13 +924,13 @@
     (gsll-minimize-2d #'fn '(0.5d0 0.5d0) iterations deviation)))
 
 (defmethod compute-distance ((type (eql 'biquadratic)) points segments p dir)
-  (let ((sd (bq-project-point-gsll (biquadratic-net points segments) p 200 1.0d-8)))
+  (let ((sd (bq-project-point-gsll (biquadratic-net points segments) p 20 1.0d-8)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
 
 (defmethod compute-distance ((type (eql 'biquadratic-corner)) points segments p dir)
-  (let ((sd (bq-project-point-gsll (biquadratic-corner-net points segments) p 200 1.0d-8)))
+  (let ((sd (bq-project-point-gsll (biquadratic-corner-net points segments) p 20 1.0d-8)))
     (if (eq dir 's)
 	(first sd)
 	(second sd))))
