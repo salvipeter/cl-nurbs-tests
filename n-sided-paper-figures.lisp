@@ -731,40 +731,67 @@ c: side width"
 				   '(nil sd nil) "n-sided-paper/bqb3s1.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 2 6))
+			 "n-sided-paper/bqb3s1-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 3))
 				   '(nil nil sd) "n-sided-paper/bqb3s2.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 0 4))
+			 "n-sided-paper/bqb3s2-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 3))
 				   '(nil nil sd) "n-sided-paper/bqb3c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-corner-net points (subseq (append points points) 0 4))
+			 "n-sided-paper/bqb3c-net.ps"))
 ;;; 5 sides:
 (vectorized-distance-function-test (points-from-angles (uniform-angles 5))
 				   '(nil nil nil sd nil) "n-sided-paper/bqb5s1.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 5))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 1 5))
+			 "n-sided-paper/bqb5s1-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 5))
 				   '(nil nil nil nil sd) "n-sided-paper/bqb5s2.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 5))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 2 6))
+			 "n-sided-paper/bqb5s2-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 5))
 				   '(nil nil nil nil sd) "n-sided-paper/bqb5c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 5))))
+  (write-biquadratic-net (biquadratic-corner-net points (subseq (append points points) 2 6))
+			 "n-sided-paper/bqb5c-net.ps"))
 ;;; 6 sides:
 (vectorized-distance-function-test (points-from-angles (uniform-angles 6))
 				   '(nil nil nil nil sd nil) "n-sided-paper/bqb6s1.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 6))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 2 6))
+			 "n-sided-paper/bqb6s1-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 6))
 				   '(nil nil nil nil nil sd) "n-sided-paper/bqb6s2.ps"
 				   :distance-type 'biquadratic :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 6))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 3 7))
+			 "n-sided-paper/bqb6s2-net.ps"))
 (vectorized-distance-function-test (points-from-angles (uniform-angles 6))
 				   '(nil nil nil nil nil sd) "n-sided-paper/bqb6c.ps"
 				   :distance-type 'biquadratic-corner :resolution 0.001d0
 				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 6))))
+  (write-biquadratic-net (biquadratic-corner-net points (subseq (append points points) 3 7))
+			 "n-sided-paper/bqb6c-net.ps"))
 
 ;;; Biquadratic domain szemlelteto kepek [uj verzio, sima]
 (let ((points (points-from-angles '(0 90 60 75 90))))
@@ -785,3 +812,36 @@ c: side width"
   (vectorized-distance-function-test
    points '(sd nil nil nil nil) "n-sided-paper/biquad-bezier-corner-domain-new.ps"
    :resolution 0.001d0 :density 6 :distance-type 'biquadratic-corner :color nil))
+
+;;; Haromoldalu
+(defparameter *coords*
+  '((((0.0d0 0.0d0 0.0d0) (1.0d0 0.0d0 0.2d0) (7.0d0 0.0d0 0.2d0) (8.0d0 0.0d0 0.0d0))
+     ((8.0d0 0.0d0 0.0d0) (7.0d0 1.0d0 0.3d0) (1.0d0 7.0d0 0.3d0) (0.0d0 8.0d0 0.0d0))
+     ((0.0d0 8.0d0 0.0d0) (0.0d0 7.0d0 0.1d0) (0.0d0 1.0d0 0.1d0) (0.0d0 0.0d0 0.0d0)))
+    (((1.0d0 1.0d0 0.2d0) (6.0d0 1.0d0 0.3d0))
+     ((6.0d0 1.0d0 0.3d0) (1.0d0 6.0d0 0.2d0))
+     ((1.0d0 6.0d0 0.2d0) (1.0d0 1.0d0 0.2d0)))))
+(defparameter *points* (points-from-angles '(0 180 90)))
+
+;;; Tests for the new singular biquadratic triangle (regular polygons)
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil sd nil) "n-sided-paper/bqs3s1.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 2 6))
+			 "n-sided-paper/bqs3s1-net.ps"))
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil nil sd) "n-sided-paper/bqs3s2.ps"
+				   :distance-type 'biquadratic :resolution 0.001d0
+				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-net points (subseq (append points points) 0 4))
+			 "n-sided-paper/bqs3s2-net.ps"))
+(vectorized-distance-function-test (points-from-angles (uniform-angles 3))
+				   '(nil nil sd) "n-sided-paper/bqs3c.ps"
+				   :distance-type 'biquadratic-corner :resolution 0.001d0
+				   :density 12 :color nil)
+(let ((points (points-from-angles (uniform-angles 3))))
+  (write-biquadratic-net (biquadratic-corner-net points (subseq (append points points) 0 4))
+			 "n-sided-paper/bqs3c-net.ps"))
