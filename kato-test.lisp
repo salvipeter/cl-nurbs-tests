@@ -238,7 +238,9 @@
 	      (layby-div (/ (* length (second a) (second b)) axby-aybx)))
 	  (destructuring-bind (x y)
 	      (in-system base-x base-y (v- p p1))
-	    (let ((x0 (+ x (* (/ y (- y layby-div)) (- laxby-div x)))))
+	    (let ((x0 (if (< (abs (- y layby-div)) *epsilon*)
+			  0.5 ; kutykurutty the point is the focus itself
+			  (+ x (* (/ y (- y layby-div)) (- laxby-div x))))))
 	      (values (/ x0 length) (v+ p1 (v* base-x x0)))))))))
 
 (defmethod compute-distance ((type (eql 'radial)) points segments p dir)
