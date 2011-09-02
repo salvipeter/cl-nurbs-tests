@@ -262,8 +262,8 @@
     (append (rest segments)
 	    (list (elt points (mod (+ i 4) (length points)))))))
 
-(defconstant +hermite-blend+ (lambda (x) (hermite-blend-function 'point 'start x)))
-(defconstant +distance-blend+ (lambda (x) (blend (list x (- 1.0d0 x)) 0)))
+(defparameter +hermite-blend+ (lambda (x) (hermite-blend-function 'point 'start x)))
+(defparameter +distance-blend+ (lambda (x) (blend (list x (- 1.0d0 x)) 0)))
 
 (defmacro defmodified-distance (distance blend-fn)
   "Warning: parameters are evaluated multiple times."
