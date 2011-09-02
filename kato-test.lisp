@@ -252,28 +252,40 @@
 				 (maximize (point-distance q1 q2))))))
 	s)))
 
-(defmethod compute-distance ((type (eql 'radial-mod)) points segments p dir)
-  (let ((s (radial-intersection segments p)))
-    (if (eq dir 'd)
-	(labels ((sqr (x) (* x x))
-		 (blend (a x b)
-		   (let ((1-x (- 1.0d0 x)))
-		     (+ (* a (/ (sqr 1-x) (+ (sqr 1-x) (sqr x))))
-			(* b (/ (sqr x) (+ (sqr 1-x) (sqr x)))))))
-		 #+nil(blend2 (a x b)	; could be used instead of BLEND
-		   (cond ((< x *epsilon*) a)
-			 ((> x (- 1.0d0 *epsilon*)) b)
-			 (t (+ (* a (hermite-blend-function 'point 'start x))
-			       (* b (hermite-blend-function 'point 'end x)))))))
-	  (let* ((i (position (first segments) points :test #'equal))
-		 (prev (append (list (elt points (mod (1- i) (length points))))
-			       (butlast segments)))
-		 (next (append (rest segments)
-			       (list (elt points (mod (+ i 4) (length points))))))
-		 (s-prev (- 1.0d0 (radial-intersection prev p)))
-		 (s-next (radial-intersection next p)))
-	    (blend s-prev s s-next)))
-	s)))
+(defun segments-prev (points segments)
+  (let ((i (position (first segments) points :test #'equal)))
+    (cons (elt points (mod (1- i) (length points)))
+	  (butlast segments))))
+
+(defun segments-next (points segments)
+  (let ((i (position (first segments) points :test #'equal)))
+    (append (rest segments)
+	    (list (elt points (mod (+ i 4) (length points)))))))
+
+(defconstant +hermite-blend+ (lambda (x) (hermite-blend-function 'point 'start x)))
+(defconstant +distance-blend+ (lambda (x) (blend (list x (- 1.0d0 x)) 0)))
+
+(defmacro defmodified-distance (distance blend-fn)
+  "Warning: parameters are evaluated multiple times."
+  `(defmethod compute-distance ((type (eql ',(intern (format nil "~:@(~a~)-MOD" distance))))
+				points segments p dir)
+     (let ((si (compute-distance ',distance points segments p 's)))
+       (if (eq dir 's)
+	   si
+	   (let ((si-1 (compute-distance ',distance points
+					 (segments-prev points segments)
+					 p 's)) 
+		 (si+1 (compute-distance ',distance points
+					 (segments-next points segments)
+					 p 's)))
+	     (+ (* (- 1.0d0 si-1) (funcall ,blend-fn si))
+		(* si+1 (funcall ,blend-fn (- 1.0d0 si)))))))))
+
+(defmodified-distance radial +distance-blend+)
+(defmodified-distance perpendicular +distance-blend+)
+(defmodified-distance barycentric +distance-blend+)
+(defmodified-distance chord-based +distance-blend+)
+(defmodified-distance line-sweep +distance-blend+)
 
 (defun blend3 (x a b c)
   "Blends between three values, giving A for 0, B for 0.5, C for 1."

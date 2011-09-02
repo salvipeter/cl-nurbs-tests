@@ -845,3 +845,18 @@ c: side width"
 (let ((points (points-from-angles (uniform-angles 3))))
   (write-biquadratic-net (biquadratic-corner-net points (subseq (append points points) 0 4))
 			 "n-sided-paper/bqs3c-net.ps"))
+
+;;; Test the modified distances
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (labels ((filename (distance n)
+	     (format nil "n-sided-paper/~(~a~)-~d.ps" distance n))
+	   (write-test (distance n lst)
+	     (vectorized-distance-function-test
+	      points lst (filename distance n)
+	      :resolution 0.001d0 :density 6
+	      :distance-type distance :color nil)))
+    (iter (for distance in '(radial-mod line-sweep-mod perpendicular-mod
+			     barycentric-mod chord-based-mod))
+	  (write-test distance 1 '(sd nil nil nil nil))
+	  (write-test distance 2 '(nil sd nil nil nil))
+	  (write-test distance 3 '(nil nil sd nil nil)))))

@@ -1,5 +1,13 @@
 (in-package :cl-nurbs-tests)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (unless (find-package "GSLL")
+    (defpackage gsll (:export make-multi-dimensional-root-solver-fdf
+			      +gnewton-mfdfsolver+ iterate
+			      multiroot-test-residual solution)))
+  (unless (find-package "GRID")
+    (defpackage grid (:export make-foreign-array gref))))
+
 ;;; Utils
 (defmacro acond (&rest clauses)
   (if (null clauses)
