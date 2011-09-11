@@ -164,11 +164,13 @@ This eliminates the singularity problem in the corners."
 			(when (and (/= k j) (/= (mod (1+ k) n) j))
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
-(defun compute-alpha (lines center)
+(defun compute-alpha (points)
   "Computes alpha such that at the center point of the domain the weight of
 the interior surface will be 1/(N+1), where N is the number of lines."
-  (let ((c (mapcar (lambda (line) (point-line-distance center line)) lines))
-	(n (length lines)))
+  (let* ((lines (lines-from-points points))
+	 (center (central-point points lines t))
+	 (c (mapcar (lambda (line) (point-line-distance center line)) lines))
+	 (n (length lines)))
     (/ (iter (for k from 0 below n)
 	     (sum (iter (for j from 0 below n)
 			(when (/= j k)
@@ -193,20 +195,13 @@ the interior surface will be 1/(N+1), where N is the number of lines."
 	  (* *alpha* (iter (for j from 0 below n)
 			   (multiply (expt (elt d j) *exponent*))))))))
 
-(defun interior-ribbon-blend (lines p i)
-  "When using this blend, an extra on-off parameter should be added at the end."
-  (let ((d (mapcar (lambda (line) (point-line-distance p line)) lines)))
-    (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (interior-blend d i))
-	  ((= i (length d))
-	   (if (some (lambda (x) (< (abs x) *tiny*)) d)
-	       0.0d0
-	       (interior-blend d i)))
-	  ((< (min (point-distance (first (elt lines i)) p)
-		   (point-distance (second (elt lines i)) p))
-	      *tiny*)
-	   0.5d0)
-	  ((< (point-line-distance p (elt lines i)) *tiny*) 1.0d0)
-	  (t 0.0d0))))
+(defun interior-ribbon-blend (d i)
+  (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (interior-blend d i))
+	((= i (length d)) 0.0d0)
+	((>= (elt d i) *tiny*) 0.0d0)
+	((= (length (remove-if-not (lambda (di) (< di *tiny*)) d)) 2)
+	 0.5d0)
+	(t 1.0d0)))
 
 ;;; triangular mesh
 (defun triangles (n)
