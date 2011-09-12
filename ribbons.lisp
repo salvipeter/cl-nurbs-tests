@@ -164,20 +164,18 @@ This eliminates the singularity problem in the corners."
 			(when (and (/= k j) (/= (mod (1+ k) n) j))
 			  (multiply (expt (elt d j) *exponent*)))))))))
 
-(defun compute-alpha (points)
-  "Computes alpha such that at the center point of the domain the weight of
-the interior surface will be 1/(N+1), where N is the number of lines."
-  (let* ((lines (lines-from-points points))
-	 (center (central-point points lines t))
-	 (c (mapcar (lambda (line) (point-line-distance center line)) lines))
-	 (n (length lines)))
-    (/ (iter (for k from 0 below n)
-	     (sum (iter (for j from 0 below n)
-			(when (/= j k)
-			  (multiply (expt (elt c j) *exponent*))))))
-       (iter (for j from 0 below n)
-	     (multiply (expt (elt c j) *exponent*)))
-       n)))
+(defun compute-alpha (points alpha distance-type)
+  (let* ((n (length points))
+	 (lines (lines-from-points points))
+	 (d (compute-parameter distance-type 'd points (central-point points lines t) t)))
+    (/ (* (- 1.0d0 alpha)
+	  (iter (for k from 0 below n)
+		(sum (iter (for j from 0 below n)
+			   (when (/= j k)
+			     (multiply (expt (elt d j) *exponent*)))))))
+       (* alpha
+	  (iter (for j from 0 below n)
+		(multiply (expt (elt d j) *exponent*)))))))
 
 (defun interior-blend (d i)
   "Used by INTERIOR-RIBBON-BLEND."

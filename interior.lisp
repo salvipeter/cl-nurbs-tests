@@ -18,9 +18,10 @@
 			       (v* (funcall interior-patch-fn domain-point)
 				   (interior-ribbon-blend b n))))))))
 
-(defun write-interior-patch (points interior-patch-fn filename
+(defun write-interior-patch (points interior-patch-fn alpha filename
 			     &key inner-points heights coords spider)
   (let* ((n (length points))
+	 (*alpha* (compute-alpha points alpha 'perpendicular))
 	 (patch (or (and coords (generate-patch (first coords) (second coords)))
 		    (generate-patch-from-heights points inner-points heights))))
     (if spider
@@ -56,9 +57,11 @@
 (defparameter *points*
   (domain-from-curves (first *coords*) 'circular-mod))
 
-(flet ((interior (uv)
-	 (append uv (list (- (cos (+ (first uv) (second uv))) 0.5d0)))))
-  (let ((*alpha* 100.0d0))
-    (write-interior-patch *points* #'interior 
-			  "/tmp/proba.vtk" :coords *coords*)
+(let ((*resolution* 40))
+  (flet ((interior (uv)
+	   (append uv (list (if (< (vlength uv) 0.3)
+				1.0d0
+				(- 1.9d0 (* 3 (vlength uv))))))))
+    (write-interior-patch *points* #'interior 0.5d0 "/tmp/proba.vtk"
+			  :coords *coords*)
     (write-interior-surface #'interior "/tmp/proba2.vtk")))
