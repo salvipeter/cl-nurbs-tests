@@ -154,3 +154,20 @@ the first is a list of points, the second is a list of index tuples."
 	      (+ n (reduce #'+ (mapcar #'length polygons)))))
     (dolist (poly polygons)
       (format s "~d~{ ~d~}~%" (length poly) poly))))
+
+(defun write-ply-indexed-mesh (points polygons filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "ply~%~
+                 format ascii 1.0~%~
+                 comment Exported Mesh~%~
+                 element vertex ~d~%~
+                 property float x~%~
+                 property float y~%~
+                 property float z~%~
+                 element face ~d~%~
+                 property list uchar int vertex_index~%~
+                 end_header~%"
+	    (length points) (length polygons))
+    (dotimes (i (length points))
+      (format s "~{~f~^ ~}~%" (elt points i)))
+    (dolist (p polygons) (format s "~d~{ ~d~}~%" (length p) p))))
