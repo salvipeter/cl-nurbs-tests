@@ -36,15 +36,24 @@
 	       (collect (interior-patch-evaluate patch interior-patch-fn points domain-point)))
 	 (triangles n) filename))))
 
-(defun write-interior-surface (interior-patch-fn filename &optional (resolution 100))
-  (let ((points (make-array (list resolution resolution))))
-    (iter (for i from 0 below resolution)
-	  (for u = (1- (* (/ i (1- resolution)) 2)))
-	  (iter (for j from 0 below resolution)
-		(for v = (1- (* (/ j (1- resolution)) 2)))
-		(setf (aref points i j)
-		      (funcall interior-patch-fn (list u v)))))
-    (write-points2-vtk points filename)))
+(defun write-interior-surface (points interior-patch-fn filename)
+  (write-vtk-indexed-mesh
+   (iter (for domain-point in (vertices points))
+	 (collect (funcall interior-patch-fn domain-point)))
+   (triangles (length points)) filename))
+
+(defun rotational (curve)
+  "CURVE is a Bezier-curve in the XZ plane, rotated around the Z axis."
+  (flet ((rotate (p a)
+	   (destructuring-bind (x y z) p
+	     (list (- (* (cos a) x) (* (sin a) y))
+		   (+ (* (sin a) x) (* (cos a) y))
+		   z))))
+    (lambda (xy)
+      (let ((u (vlength xy))
+	    (phi (* (acos (first (vnormalize xy)))
+		    (if (< (second xy) 0) -1 1))))
+	(rotate (bezier curve u) phi)))))
 
 ;;; Example: [uses n-sided-domain-test.lisp]
 (defparameter *coords*
@@ -57,11 +66,43 @@
 (defparameter *points*
   (domain-from-curves (first *coords*) 'circular-mod))
 
-(let ((*resolution* 40))
-  (flet ((interior (uv)
-	   (append uv (list (if (< (vlength uv) 0.3)
-				1.0d0
-				(- 1.9d0 (* 3 (vlength uv))))))))
+#+nil
+(flet ((interior (uv)
+	 (append uv (list (if (< (vlength uv) 0.3)
+			      1.0d0
+			      (- 1.9d0 (* 3 (vlength uv))))))))
+  (let ((*resolution* 40)
+	(interior (rotational '((0 0 0.5) (0.1 0 0.5) (0.3 0 0) (1 0 0)))))
     (write-interior-patch *points* #'interior 0.5d0 "/tmp/proba.vtk"
 			  :coords *coords*)
-    (write-interior-surface #'interior "/tmp/proba2.vtk")))
+    (write-interior-surface *points* #'interior "/tmp/proba2.vtk")))
+
+(defun write-color-interior-blend-test (points alpha filename r &key (trim '(0.89d0 0.91d0)))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length points))
+	   (lines (lines-from-points points))
+	   (*alpha* (compute-alpha points alpha 'perpendicular))
+	   (colors (cons '(255 255 255) (generate-colors n))))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let* ((d (compute-parameter 'perpendicular 'd points p t)) 
+			 (blends (cons (interior-ribbon-blend d n)
+				       (iter (for i from 0 below n)
+					     (collect (interior-ribbon-blend d i))))))
+                    (if (and trim (some (lambda (x) (< (first trim) x (second trim))) blends))
+			(format s "0 0 0~%")
+			(format s "~{~d~^ ~}~%"
+				(mapcar #'round
+					(reduce (lambda (x y) (mapcar #'+ x y))
+						(mapcar #'v* colors blends))))))
+                  (format s "255 255 255~%")))))))))
+
+; (defparameter *points* (points-from-angles '(40 20 60 100 80)))
+#+nil
+(write-color-interior-blend-test *points* 0.2d0 "/tmp/interior-blend-test.ppm" 400
+				 :trim '(0.89d0 0.91d0))
