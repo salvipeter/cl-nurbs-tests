@@ -106,3 +106,38 @@
 #+nil
 (write-color-interior-blend-test *points* 0.2d0 "/tmp/interior-blend-test.ppm" 400
 				 :trim '(0.89d0 0.91d0))
+
+(defun write-color-aux-blend-test (points point multiplier filename r &key
+				   (trim '(0.89d0 0.91d0)))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length points))
+	   (lines (lines-from-points points))
+	   (colors (cons '(255 255 255) (generate-colors n))))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let* ((d (cons (* (point-distance p point) multiplier)
+				  (compute-parameter 'perpendicular 'd points p t))) 
+			 (blends (iter (for i from 0 to n)
+				       (collect (ribbon-blend d i)))))
+                    (if (and trim (some (lambda (x) (< (first trim) x (second trim))) blends))
+			(format s "0 0 0~%")
+			(format s "~{~d~^ ~}~%"
+				(mapcar #'round
+					(reduce (lambda (x y) (mapcar #'+ x y))
+						(mapcar #'v* colors blends))))))
+                  (format s "255 255 255~%")))))))))
+
+; (defparameter *points* (points-from-angles '(40 20 60 100 80)))
+#+nil
+(let ((multiplier 2.0d0))
+  (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
+			      "/tmp/aux-blend-test-black.ppm" 400 :trim '(0.89d0 0.91d0))
+  (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
+			      "/tmp/aux-blend-test-white.ppm" 400 :trim '(0.89d0 0.91d0))
+  (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
+			      "/tmp/aux-blend-test-clean.ppm" 400 :trim '(0.89d0 0.91d0)))

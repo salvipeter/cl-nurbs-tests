@@ -249,7 +249,7 @@ This eliminates the singularity problem in the corners."
 The ON-OFF parameter declares which blends should be turned on."
   (let* ((n (length points))
 	 (lines (lines-from-points points))
-	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
+	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n)) distance-type))
 	 (vertices (mapcar (lambda (p)
 			     (let ((d (compute-parameter distance-type 'd points p t)))
 			       (cons (iter (for i from 0 below (length on-off))
@@ -384,7 +384,7 @@ The ON-OFF parameter declares which blends should be turned on."
   "See the documentation of WRITE-BLENDS."
   (let* ((n (length points)) 
 	 (lines (lines-from-points points))
-	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n))))
+	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n)) distance-type))
 	 (vertices (mapcar (lambda (p)
 			     (let ((d (compute-parameter distance-type 'd points p t)))
 			       (cons (iter (for i from 0 below (length on-off))
