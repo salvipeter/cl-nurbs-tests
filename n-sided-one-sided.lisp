@@ -66,8 +66,8 @@
 	 (for alpha = (* (/ j (1- *resolution*)) 2.0d0 pi))
 	 (when (zerop (mod j *spider-density*))
 	   (collect
-	    (iter (for i from 0 to *spider-lines*)
-		  (for d = (/ i *spider-lines*))
+	    (iter (for i from 0 below *resolution*)
+		  (for d = (/ i (1- *resolution*)))
 		  (collect (v* (list (cos alpha) (sin alpha)) d))))))))
 
 (defun os-patch-evaluate (patch domain-point)
