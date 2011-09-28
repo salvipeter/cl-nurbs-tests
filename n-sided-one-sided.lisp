@@ -118,6 +118,7 @@
 			   (finally (return (cons circle edges))))))
     (write-vtk-curves (append aux-curves curves) filename)))
 
+;;; Bab
 (let ((patch '((((0 0 0) (3 0 0) (5 -2 0) (7 1 0) (7 4 0) (5 6 0) (3 4 0)
 		 (0 4 0) (-3 4 0) (-6 6 0) (-9 4 0) (-9 0 0) (-6 -2 0) (-3 0 0)
 		 (0 0 0))
@@ -133,6 +134,21 @@
   (os-write-patch patch "/tmp/proba.vtk")
   (os-write-patch patch "/tmp/proba2.vtk" :spider t))
 
+;;; Hajlott bab
+(let ((patch '((((0 0 0) (7 0 0) (7 10 0) (7 15 0) (2 15 0) (2 6 0) (1 6 0) (0 6 0)
+		 (-1 6 0) (-2 6 0) (-2 15 0) (-7 15 0) (-7 10 0) (-7 0 0) (0 0 0))
+		((0 4.5 2.5) (0 0 1) 3))
+	       (((0 1 2) (6 1 2) (6 10 1) (6 14 1.5) (3 14 1.5) (3 6 2) (1 6 2) (0 6 2)
+		 (-1 6 2) (-3 6 2) (-3 14 1.5) (-6 14 1.5) (-6 10 1) (-6 1 2) (0 1 2)))))
+      (*resolution* 60)
+      (*ribbon-multiplier* 0.5)
+      (*spider-lines* 6))
+  (os-write-constraint-grid patch "/tmp/grid.vtk")
+  (os-write-constraint-ribbons patch "/tmp/ribbon.vtk")
+  (os-write-patch patch "/tmp/proba.vtk")
+  (os-write-patch patch "/tmp/proba2.vtk" :spider t))
+
+;;; Sapka
 (let ((patch '((((10.0d0 0.0d0 0.0d0) (17.0d0 0.0d0 0.0d0) (20.0d0 0.0d0 0.0d0)
 		 (20.0d0 3.0d0 0.0d0) (20.0d0 10.0d0 0.0d0) (20.0d0 17.0d0 0.0d0)
 		 (20.0d0 20.0d0 0.0d0) (17.0d0 20.0d0 0.0d0) (10.0d0 20.0d0 0.0d0)
