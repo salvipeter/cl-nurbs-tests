@@ -54,18 +54,41 @@
 	     (dir (v- diff (v+ (v* n (scalar-product diff n))))))
 	(v+ p (v* (vnormalize dir) scale (second d)))))))
 
-(defun os-write-patch (patch filename)
+(defun os-spider-lines ()
+  (append
+   (iter (for i from 1 to *spider-lines*)
+	 (for d = (/ i *spider-lines*))
+	 (collect
+	  (iter (for j from 0 below *resolution*)
+		(for alpha = (* (/ j (1- *resolution*)) 2.0d0 pi))
+		(collect (v* (list (cos alpha) (sin alpha)) d)))))
+   (iter (for j from 0 below *resolution*)
+	 (for alpha = (* (/ j (1- *resolution*)) 2.0d0 pi))
+	 (when (zerop (mod j *spider-density*))
+	   (collect
+	    (iter (for i from 0 to *spider-lines*)
+		  (for d = (/ i *spider-lines*))
+		  (collect (v* (list (cos alpha) (sin alpha)) d))))))))
+
+(defun os-patch-evaluate (patch domain-point)
+  (let ((p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
+		    domain-point)))
+    (destructuring-bind (s d) (os-compute-parameters p)
+      (v+ (v* (ribbon-evaluate patch 0 s d) (ribbon-blend d 0))
+	  (v* (os-aux-evaluate patch s d) (ribbon-blend d 1))))))
+
+(defun os-write-patch (patch filename &key spider)
   "Patch:((RibbonCurve (AuxiliaryPoint APNormal APRadius)) (RibbonInnerCurve))."
-  (write-vtk-indexed-mesh
-   (iter (for domain-point in (os-vertices))
-	 (for p = (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0))
-			  domain-point))
-	 (for (s d) = (os-compute-parameters p))
-	 (for point =
-	      (v+ (v* (ribbon-evaluate patch 0 s d) (ribbon-blend d 0))
-		  (v* (os-aux-evaluate patch s d) (ribbon-blend d 1))))
-	 (collect point))
-   (os-triangles) filename))
+  (if spider
+      (write-vtk-polylines
+       (iter (for line in (os-spider-lines))
+	     (collect (iter (for domain-point in line)
+			    (collect (os-patch-evaluate patch domain-point)))))
+       filename)
+      (write-vtk-indexed-mesh
+       (iter (for domain-point in (os-vertices))
+	     (collect (os-patch-evaluate patch domain-point)))
+       (os-triangles) filename)))
 
 (defun os-write-constraint-grid (patch filename)
   (write-vtk-curves (cons (first (first patch)) (second patch)) filename))
@@ -73,7 +96,7 @@
 (defun os-write-constraint-ribbons (patch filename)
   "TODO: auxiliary ribbon is always displayed with a Z normal."
   (let* ((aux-point (first (second (first patch))))
-	 (aux-normal (vnormalize (second (second (first patch)))))
+	 ;; (aux-normal (vnormalize (second (second (first patch)))))
 	 (aux-radius (third (second (first patch))))
 	 (curves (iter (for curve1 in (first patch))
 		       (for curve2 in (second patch))
@@ -103,7 +126,9 @@
 		 (0 3 1) (-2 3 1) (-6 5 1) (-8 3 1) (-8 1 1) (-6 -1 1) (-2 1 1)
 		 (0 1 1)))))
       (*resolution* 60)
-      (*ribbon-multiplier* 0.5))
+      (*ribbon-multiplier* 0.5)
+      (*spider-lines* 6))
   (os-write-constraint-grid patch "/tmp/grid.vtk")
   (os-write-constraint-ribbons patch "/tmp/ribbon.vtk")
-  (os-write-patch patch "/tmp/proba.vtk"))
+  (os-write-patch patch "/tmp/proba.vtk")
+  (os-write-patch patch "/tmp/proba2.vtk" :spider t))
