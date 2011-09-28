@@ -75,7 +75,8 @@
 	(interior (rotational '((0 0 0.5) (0.1 0 0.5) (0.3 0 0) (1 0 0)))))
     (write-interior-patch *points* #'interior 0.5d0 "/tmp/proba.vtk"
 			  :coords *coords*)
-    (write-interior-surface *points* #'interior "/tmp/proba2.vtk")))
+    (write-interior-surface *points* #'interior "/tmp/proba2.vtk")
+    (write-patch *points* 'ribbon "/tmp/proba3.vtk" :coords *coords*)))
 
 (defun write-color-interior-blend-test (points alpha filename r &key (trim '(0.89d0 0.91d0)))
   (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
