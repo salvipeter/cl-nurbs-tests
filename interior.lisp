@@ -132,12 +132,35 @@
 						(mapcar #'v* colors blends))))))
                   (format s "255 255 255~%")))))))))
 
+(defun write-aux-blend-voronoi (points point multiplier filename r &key
+				(threshold 0.01d0))
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((wh (1+ (* 2 r)))
+	   (n (length points))
+	   (lines (lines-from-points points)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "P3~%~d ~d~%255~%" wh wh)
+        (dotimes (x wh)
+          (dotimes (y wh)
+            (let ((p (map-coordinates x y)))
+              (if (insidep lines p)
+                  (let* ((d (cons (* (point-distance p point) multiplier)
+				  (compute-parameter 'perpendicular 'd points p t))) 
+			 (blends (iter (for i from 0 to n)
+				       (collect (ribbon-blend d i)))))
+                    (if (destructuring-bind (a b)
+			    (subseq (sort blends #'>) 0 2)
+			  (< (- a b) threshold))
+			(format s "0 0 0~%")
+			(format s "127 127 127~%")))
+                  (format s "255 255 255~%")))))))))
+
 ; (defparameter *points* (points-from-angles '(40 20 60 100 80)))
 #+nil
-(let ((multiplier 2.0d0))
+(let ((multiplier 0.5d0))
   (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
 			      "/tmp/aux-blend-test-black.ppm" 400 :trim '(0.89d0 0.91d0))
+  (write-aux-blend-voronoi *points* '(0.0d0 0.0d0) multiplier
+			   "/tmp/aux-blend-test-white.ppm" 400)
   (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
-			      "/tmp/aux-blend-test-white.ppm" 400 :trim '(0.89d0 0.91d0))
-  (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
-			      "/tmp/aux-blend-test-clean.ppm" 400 :trim '(0.89d0 0.91d0)))
+			      "/tmp/aux-blend-test-clean.ppm" 400 :trim nil))
