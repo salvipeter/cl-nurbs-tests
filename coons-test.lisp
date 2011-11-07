@@ -1,0 +1,117 @@
+(defparameter *coords*
+  '((((0 0 0) (1 0 0.4) (3 0 0.4) (5 0 0.4) (6 0 0))
+     ((6 0 0) (6 1 0.4) (6 3 -0.2) (6 5 0) (6 6 0))
+     ((6 6 0) (5 6 0.4) (3 6 0.4) (1 6 0.4) (0 6 0))
+     ((0 6 0) (0 5 0) (0 3 -0.2) (0 1 0.4) (0 0 0)))
+    (((1 1 0.4) (3 1 0.6) (5 1 0.4))
+     ((5 1 0.4) (5 3 0.2) (5 5 0.6))
+     ((5 5 0.6) (3 5 0.6) (1 5 0.6))
+     ((1 5 0.6) (1 3 0.2) (1 1 0.4)))))
+(defparameter *points* (domain-from-curves (first *coords*)))
+
+;;; Does not work, since we have to do this with u,v,z ...
+#+nil
+(defun write-constraint-curves (points filename &key (resolution 100) inner-points heights coords)
+  (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights)))
+	 (curves (iter (for curve1 in (first patch))
+		       (for points1 =
+			    (iter (for u from 0 to 1 by (/ resolution))
+				  (collect (bezier curve1 u))))
+		       (collect points1))))
+    (write-vtk-curves curves filename)))
+
+;; (setf *hermite* t)
+;; (write-constraint-grid *points* "/tmp/grid.vtk" :coords *coords*)
+;; (write-constraint-ribbons *points* "/tmp/ribbons.vtk" :coords *coords* :resolution 20)
+;; (write-coons-patch *coords* "/tmp/coons.vtk")
+;; (write-coons-patch *coords* "/tmp/coons-u.vtk")
+;; (write-coons-patch *coords* "/tmp/coons-v.vtk")
+;; (write-coons-patch *coords* "/tmp/coons-corr.vtk")
+(write-constraint-curves *points* "/tmp/curves.vtk" :coords *coords* :resolution 20)
+(write-patch (domain-from-curves (first *coords*) 'circular-mod)
+	     'hybrid "/tmp/hybrid.vtk" :coords *coords*
+	     :distance-type 'line-sweep-mod)
+(write-patch (domain-from-curves (first *coords*) 'circular-mod)
+	     'hybrid "/tmp/hybrid-u.vtk" :coords *coords*
+	     :distance-type 'line-sweep-mod)
+(write-patch (domain-from-curves (first *coords*) 'circular-mod)
+	     'hybrid "/tmp/hybrid-v.vtk" :coords *coords*
+	     :distance-type 'line-sweep-mod)
+(write-patch (domain-from-curves (first *coords*) 'circular-mod)
+	     'hybrid "/tmp/hybrid-corr.vtk" :coords *coords*
+	     :distance-type 'line-sweep-mod)
+
+;;; patch-evaluate / hybrid - with only 1 interpolating surface
+(defun patch-evaluate (patch points type distance-type domain-point)
+  (let* ((n (length points))
+	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 'd points p t)))
+	 (dc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 'd points p t)
+		 d))
+	 (s (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 's points p t)))
+	 (sc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 's points p t)
+		 s))
+	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t))))
+    (let ((i 1)
+	  (cornerp t))
+      (append domain-point
+	      (last (if cornerp
+			(v* (corner-correction patch i s)
+			    (corner-blend d (mod (1- i) n)))
+			(v* (ribbon-evaluate patch i s d)
+			    (+ (corner-blend d (mod (1- i) n))
+			       (corner-blend d i)))
+			#+nil
+			(iter (for i from 0 below n)
+			      (with result = '(0 0 0))
+			      (setf result
+				    (v+ result
+					(v* (corner-correction patch i s)
+					    (corner-blend d (mod (1- i) n)))))
+			      (finally (return result)))))))))
+
+;;; Original version with u,v,z coordinates
+(defun patch-evaluate (patch points type distance-type domain-point)
+  (let* ((n (length points))
+	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 'd points p t)))
+	 (dc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 'd points p t)
+		 d))
+	 (s (unless (and (eq type 'corner) (eq distance-type 'biquadratic))
+	      (compute-parameter distance-type 's points p t)))
+	 (sc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
+		 (compute-parameter 'biquadratic-corner 's points p t)
+		 s))
+	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t))))
+    (iter (for i from 0 below n)
+	  (with result = '(0 0 0))
+	  (setf result
+		(v+ result
+		    (case type
+		      (ribbon (v* (ribbon-evaluate patch i s d)
+				  (ribbon-blend d i)))
+		      (corner (if (eq distance-type 'biquadratic)
+				  (v* (v- (corner-evaluate patch i sc dc)
+					  (corner-correction patch i sc dc))
+				      (corner-blend dc (mod (1- i) n)))
+				  (v* (v- (corner-evaluate patch i s)
+					  (corner-correction patch i s))
+				      (corner-blend d (mod (1- i) n)))))
+		      (hybrid (v- (v* (ribbon-evaluate patch i s d)
+				      (+ (corner-blend d (mod (1- i) n))
+					 (corner-blend d i)))
+				  (if (eq distance-type 'biquadratic)
+				      (v* (corner-correction patch i sc dc)
+					  (corner-blend d (mod (1- i) n)))
+				      (v* (corner-correction patch i s)
+					  (corner-blend d (mod (1- i) n))))))
+		      (sketches (v* (ribbon-evaluate patch i s d)
+				    (ribbon-blend b i))))))
+	  (finally (return (append domain-point (last result)))))))
