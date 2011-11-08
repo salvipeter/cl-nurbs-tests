@@ -118,6 +118,15 @@ Returns a list."
       (write-stl-ascii triangles filename (or name "exported"))
       (write-stl-binary triangles filename (or header "Exported by CL-NURBS."))))
 
+(defun write-stl-indexed-mesh (points polygons filename &key ascii name header)
+  "TODO: Works only for triangles."
+  (let ((triangles (mapcar (lambda (tri)
+			     (mapcar (lambda (i) (elt points i)) tri))
+			   polygons)))
+    (if ascii
+	(write-stl-ascii triangles filename (or name "exported"))
+	(write-stl-binary triangles filename (or header "Exported by CL-NURBS.")))))
+
 (defun mesh-bounding-box (mesh)
   (iter (with min = (first (elt mesh 0)))
 	(with max = (first (elt mesh 0)))
