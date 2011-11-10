@@ -288,13 +288,7 @@
 (defmodified-distance chord-based +distance-blend+)
 (defmodified-distance line-sweep +distance-blend+)
 
-(defun tomification-points (points segments p)
-  "Idea: Find a constant (y in [0,1]) such that P is on the line (segment)
-defined by points on the adjacent sides chosen using linear intepolation (by y).
-Another constant (x in [0,1]) is the proportion of P on that line.
-Then we return return the two points at x/2 and (x+1)/2 proportion on the line.
-kutykurutty This idea seems to be flawed:
-the d parameter lines do not start in the adjacent sides' sweep line direction."
+(defun bilinear-parameterization (segments p)
   (let* ((p0 (first segments))
 	 (p1 (second segments))
 	 (p2 (third segments))
@@ -305,14 +299,35 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 	 (b (in-system base-x base-y (v- p3 p2)))
 	 (length (point-distance p1 p2)))
     (destructuring-bind (u v) (in-system base-x base-y (v- p p1))
-      (let* ((x (second-degree-solver
+      (let* ((s (second-degree-solver
 		 (* length (- (second a) (second b)))
 		 (+ (* u (second b)) (* -1 (+ u length) (second a)) (* (- (first a) (first b)) v))
 		 (- (* u (second a)) (* v (first a)))
 		 :min 0 :max 1))
-	     (y (/ v (+ (* (- 1 x) (second a)) (* x (second b)))))
-	     (left (v+ p1 (v* (v- p0 p1) y)))
-	     (right (v+ p2 (v* (v- p3 p2) y))))
+	     (d (/ v (+ (* (- 1 s) (second a)) (* s (second b))))))
+	(list s d)))))
+
+(defmethod compute-distance ((type (eql 'bilinear)) points segments p dir)
+  (declare (ignore points))
+  (let ((sd (bilinear-parameterization segments p)))
+    (if (eq dir 's)
+	(first sd)
+	(second sd))))
+
+(defun tomification-points (segments p)
+  "Idea: Find a constant (y in [0,1]) such that P is on the line (segment)
+defined by points on the adjacent sides chosen using linear intepolation (by y).
+Another constant (x in [0,1]) is the proportion of P on that line.
+Then we return return the two points at x/2 and (x+1)/2 proportion on the line.
+kutykurutty This idea seems to be flawed:
+the d parameter lines do not start in the adjacent sides' sweep line direction."
+  (let* ((p0 (first segments))
+	 (p1 (second segments))
+	 (p2 (third segments))
+	 (p3 (fourth segments)))
+    (destructuring-bind (x y) (bilinear-parameterization segments p)
+      (let ((left (v+ p1 (v* (v- p0 p1) y)))
+	    (right (v+ p2 (v* (v- p3 p2) y))))
 	(list (affine-combine left (/ x 2) right)
 	      (affine-combine left (/ (1+ x) 2) right))))))
 
@@ -323,7 +338,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
      (let ((si (compute-distance ',distance points segments p 's)))
        (if (eq dir 's)
 	   si
-	   (destructuring-bind (p1 p2) (tomification-points points segments p)
+	   (destructuring-bind (p1 p2) (tomification-points segments p)
 	     (let ((si-1 (compute-distance ',distance points
 					   (segments-prev points segments)
 					   p1 's))
