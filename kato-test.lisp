@@ -314,6 +314,66 @@
 	(first sd)
 	(second sd))))
 
+(defun solve-linear-two-variable (a1 b1 c1 a2 b2 c2)
+  "Two linear equations of the form Ai*x + Bi*y + Ci = 0.
+Returns (x y)."
+  (let ((d (- (* b2 a1) (* b1 a2))))
+    (if (< (abs d) *epsilon*)
+	(if (< (abs (- (* b2 c1) (* b1 c2))) *epsilon*)
+	    (cond ((> (abs b1) *epsilon*) (list 0 (/ (- c1) b1)))
+		  ((> (abs b2) *epsilon*) (list 0 (/ (- c2) b2)))
+		  ((> (abs a1) *epsilon*) (list (/ (- c1) a1) 0))
+		  ((> (abs a2) *epsilon*) (list (/ (- c2) a2) 0))
+		  ((and (< (abs c1) *epsilon*) (< (abs c2) *epsilon*)) '(0 0))
+		  (t (error "No solutions (0-variable case)")))
+	    (error "No solutions (1-variable case)"))
+	(list (/ (- (* c2 b1) (* c1 b2)) d)
+	      (/ (- (* c1 a2) (* c2 a1)) d)))))
+
+(defun handle-point-on-side (p q1 q2 from to)
+  (let* ((dir (vnormalize (v- q2 q1)))
+	 (n (list (- (second dir)) (first dir))))
+    (when (< (scalar-product (v- p q1) n) *epsilon*)
+      (interpolate from
+		   (/ (point-distance p q1) (point-distance q2 q1))
+		   to))))
+
+(defun handle-point-on-sides (segments p)
+  "Use linear interpolation on the three defining sides to compute d,
+or return NIL if the point is not on either side."
+  (or (handle-point-on-side p (first segments) (second segments) 1 0)
+      (handle-point-on-side p (second segments) (third segments) 0 0)
+      (handle-point-on-side p (third segments) (fourth segments) 0 1)))
+
+(defparameter *proportion* 0.5)
+(defmethod compute-distance ((type (eql 'bilinear-new)) points segments p dir)
+  "kutykurutty This idea seems to be flawed as well."
+  (let ((s (first (bilinear-parameterization segments p))))
+    (if (eq dir 's)
+	s
+	(or (handle-point-on-sides segments p)
+	    (dlet* (((p-1 p0 p1 p2) (segments-prev points segments))
+		    ((p1 p2 p3 p4) (segments-next points segments))
+		    (s1 s)
+		    (s2 (- 1 s))
+		    (hs1 (funcall +hermite-blend+ s1))
+		    (hs2 (funcall +hermite-blend+ s2))
+		    (w1 *proportion*)
+		    (w2 *proportion*)
+		    (a (v* (v+ (v- p1 p0)
+			       (v* (v+ (v- p0 p-1) (v- p2 p1)) s1 w1))
+			   hs1))
+		    (b (v* (v+ (v- p2 p3)
+			       (v* (v+ (v- p3 p4) (v- p1 p2)) s2 w2))
+			   hs2))
+		    (c (v+ (v* (v+ p0 (v* (v- p-1 p0) s1 w1)) hs1)
+			   (v* (v+ p3 (v* (v- p4 p3) s2 w2)) hs2)))
+		    ((d1 d2) (solve-linear-two-variable
+			      (first a) (first b) (- (first c) (first p))
+			      (second a) (second b) (- (second c) (second p)))))
+	      (+ (* (- 1 d1) (funcall +hermite-blend+ s))
+		 (* (- 1 d2) (funcall +hermite-blend+ (- 1 s)))))))))
+
 (defun tomification-points (segments p)
   "Idea: Find a constant (y in [0,1]) such that P is on the line (segment)
 defined by points on the adjacent sides chosen using linear intepolation (by y).

@@ -19,6 +19,15 @@
                (let ((it ,sym)) ,@(cdr cl1))
                (acond ,@(cdr clauses)))))))
 
+(defmacro dlet* (bindings &body body)
+  (cond ((null bindings) `(progn ,@body))
+	((atom (car (first bindings)))
+	 `(let (,(first bindings))
+	    (dlet* ,(rest bindings) ,@body)))
+	(t `(destructuring-bind ,(car (first bindings))
+		,(cadr (first bindings))
+	      (dlet* ,(rest bindings) ,@body)))))
+
 ;;; Modules
 (load (compile-file "blends"))
 (load (compile-file "kato-test"))
