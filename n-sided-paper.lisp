@@ -4,7 +4,8 @@
   (unless (find-package "GSLL")
     (defpackage gsll (:export make-multi-dimensional-root-solver-fdf
 			      +gnewton-mfdfsolver+ iterate
-			      multiroot-test-residual solution)))
+			      multiroot-test-residual solution
+			      polynomial-solve)))
   (unless (find-package "GRID")
     (defpackage grid (:export make-foreign-array gref))))
 

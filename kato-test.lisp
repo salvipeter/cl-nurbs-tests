@@ -345,7 +345,7 @@ or return NIL if the point is not on either side."
       (handle-point-on-side p (second segments) (third segments) 0 0)
       (handle-point-on-side p (third segments) (fourth segments) 0 1)))
 
-(defparameter *proportion* 0.5)
+(defparameter *proportion* 1.0d0)
 (defmethod compute-distance ((type (eql 'bilinear-new)) points segments p dir)
   "kutykurutty This idea seems to be flawed as well."
   (let ((s (first (bilinear-parameterization segments p))))
@@ -373,6 +373,77 @@ or return NIL if the point is not on either side."
 			      (second a) (second b) (- (second c) (second p)))))
 	      (+ (* (- 1 d1) (funcall +hermite-blend+ s))
 		 (* (- 1 d2) (funcall +hermite-blend+ (- 1 s)))))))))
+
+(defun third-degree-solver (a b c d &key min max)
+  "TODO: MIN and MAX are mandatory for the time being.
+Strict checking is turned off."
+  (if (< (abs a) *epsilon*)
+      (second-degree-solver a b c :min min :max max)
+      (let* ((coeff (mapcar (lambda (x) (coerce x 'double-float))
+			    (list d c b a)))
+	     (result (gsll:polynomial-solve
+		      (grid:make-foreign-array 'double-float :dimensions 4
+					       :initial-contents coeff)))
+	     (values (iter (for i from 0 below 3)
+			   (for x = (grid:gref result i))
+			   (when (< (abs (imagpart x)) *epsilon*)
+			     (collect (realpart x)))))
+	     (good (iter (for x in values)
+			 (when (<= min x max)
+			   (collect x)))))
+	(if good
+	    (progn
+	      (when (> (length good) 1)
+		(warn "More than one eligible solutions for 3rd degree equation:~%~a" good))
+	      (iter (for x in good)
+		    (with mean = (/ (+ min max) 2))
+		    (finding x minimizing (min (abs (- x mean))))))
+	    (iter (for x in values)
+		  (when (or (< (abs (- x min)) *epsilon*)
+			    (< (abs (- x max)) *epsilon*))
+		    (return x))
+		  (finally
+		   #+nil(warn "No eligible solutions for 3rd degree equation:~%~a" result)
+		   (return
+		     (iter (for x in values)
+			   (finding x minimizing (min (abs (- x min)) (abs (- x max))))))))))))
+
+(defun one-sided-parabola-sweep (points segments p leftp)
+  (dlet* (((p-1 p0 p1 p2) (segments-prev points segments))
+	  ((p1 p2 p3 p4) (segments-next points segments))
+	  (base-x (vnormalize (v- p2 p1)))
+	  (base-y (list (- (second base-x)) (first base-x)))
+	  (a (in-system base-x base-y (v- p0 p1)))
+	  (b (in-system base-x base-y
+			(v- (if leftp
+				(affine-combine p0 *proportion* p-1)
+				(affine-combine p3 *proportion* p4))
+			    p1)))
+	  (c (in-system base-x base-y (v- p3 p1)))
+	  (d (in-system base-x base-y (v- p2 p1)))
+	  (local-p (in-system base-x base-y (v- p p1)))
+	  (((ax ay) (bx by) (cx cy) (dx dy) (x y)) (list a b c d local-p))
+	  (s (third-degree-solver
+	      (* (+ ay (* -2 by) cy) dx)
+	      (+ (* (+ ax (* -2 bx) cx) y)
+		 (* (+ ay (* -2 by) cy) (- x))
+		 (* (+ (* -2 ay) (* 2 by)) dx))
+	      (+ (* (+ (* -2 ax) (* 2 bx) (- dx)) y)
+		 (* (+ (* -2 ay) (* 2 by)) (- x))
+		 (* ay dx))
+	      (- (* ax y) (* ay x))
+	      :min 0 :max 1))
+	  (1-s (- 1 s)))
+    (list s (/ y (+ (* ay 1-s 1-s) (* by 2 s 1-s) (* cy s s))))))
+
+(defmethod compute-distance ((type (eql 'two-parabola)) points segments p dir)
+  (let ((s (first (bilinear-parameterization segments p))))
+    (if (eq dir 's)
+	s
+	(dlet* (((s1 d1) (one-sided-parabola-sweep points segments p t))
+		((s2 d2) (one-sided-parabola-sweep points segments p nil)))
+	  (+ (* (funcall +hermite-blend+ s) d1)
+	     (* (funcall +hermite-blend+ (- 1 s)) d2))))))
 
 (defun tomification-points (segments p)
   "Idea: Find a constant (y in [0,1]) such that P is on the line (segment)
