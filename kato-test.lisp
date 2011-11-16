@@ -345,7 +345,7 @@ or return NIL if the point is not on either side."
       (handle-point-on-side p (second segments) (third segments) 0 0)
       (handle-point-on-side p (third segments) (fourth segments) 0 1)))
 
-(defparameter *proportion* 1.0d0)
+(defparameter *proportion* 0.5d0)
 (defmethod compute-distance ((type (eql 'bilinear-new)) points segments p dir)
   "kutykurutty This idea seems to be flawed as well."
   (let ((s (first (bilinear-parameterization segments p))))
@@ -416,8 +416,8 @@ Strict checking is turned off."
 	  (a (in-system base-x base-y (v- p0 p1)))
 	  (b (in-system base-x base-y
 			(v- (if leftp
-				(affine-combine p0 *proportion* p-1)
-				(affine-combine p3 *proportion* p4))
+				(affine-combine p0 1/2 p-1)
+				(affine-combine p3 1/2 p4))
 			    p1)))
 	  (c (in-system base-x base-y (v- p3 p1)))
 	  (d (in-system base-x base-y (v- p2 p1)))
