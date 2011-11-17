@@ -287,6 +287,7 @@
 (defmodified-distance barycentric +distance-blend+)
 (defmodified-distance chord-based +distance-blend+)
 (defmodified-distance line-sweep +distance-blend+)
+(defmodified-distance bilinear +distance-blend+)
 
 (defun bilinear-parameterization (segments p)
   (let* ((p0 (first segments))
@@ -378,7 +379,7 @@ or return NIL if the point is not on either side."
   "TODO: MIN and MAX are mandatory for the time being.
 Strict checking is turned off."
   (if (< (abs a) *epsilon*)
-      (second-degree-solver a b c :min min :max max)
+      (second-degree-solver b c d :min min :max max)
       (let* ((coeff (mapcar (lambda (x) (coerce x 'double-float))
 			    (list d c b a)))
 	     (result (gsll:polynomial-solve
@@ -408,29 +409,68 @@ Strict checking is turned off."
 		     (iter (for x in values)
 			   (finding x minimizing (min (abs (- x min)) (abs (- x max))))))))))))
 
+(defun fourth-degree-solver (a b c d e &key min max)
+  "TODO: MIN and MAX are mandatory for the time being.
+Strict checking is turned off."
+  (if (< (abs a) *epsilon*)
+      (third-degree-solver b c d e :min min :max max)
+      (let* ((coeff (mapcar (lambda (x) (coerce x 'double-float))
+			    (list e d c b a)))
+	     (result (gsll:polynomial-solve
+		      (grid:make-foreign-array 'double-float :dimensions 5
+					       :initial-contents coeff)))
+	     (values (iter (for i from 0 below 4)
+			   (for x = (grid:gref result i))
+			   (when (< (abs (imagpart x)) *epsilon*)
+			     (collect (realpart x)))))
+	     (good (iter (for x in values)
+			 (when (<= min x max)
+			   (collect x)))))
+	(if good
+	    (progn
+	      (when (> (length good) 1)
+		(warn "More than one eligible solutions for 4th degree equation:~%~a" good))
+	      (iter (for x in good)
+		    (with mean = (/ (+ min max) 2))
+		    (finding x minimizing (min (abs (- x mean))))))
+	    (iter (for x in values)
+		  (when (or (< (abs (- x min)) *epsilon*)
+			    (< (abs (- x max)) *epsilon*))
+		    (return x))
+		  (finally
+		   #+nil(warn "No eligible solutions for 4th degree equation:~%~a" result)
+		   (return
+		     (iter (for x in values)
+			   (finding x minimizing (min (abs (- x min)) (abs (- x max))))))))))))
+
 (defun one-sided-parabola-sweep (points segments p leftp)
   (dlet* (((p-1 p0 p1 p2) (segments-prev points segments))
 	  ((p1 p2 p3 p4) (segments-next points segments))
 	  (base-x (vnormalize (v- p2 p1)))
 	  (base-y (list (- (second base-x)) (first base-x)))
+	  (l (if leftp *proportion* (- 1 *proportion*)))
 	  (a (in-system base-x base-y (v- p0 p1)))
 	  (b (in-system base-x base-y
 			(v- (if leftp
-				(affine-combine p0 1/2 p-1)
-				(affine-combine p3 1/2 p4))
+				(affine-combine p0 l p-1)
+				(affine-combine p4 l p3))
 			    p1)))
 	  (c (in-system base-x base-y (v- p3 p1)))
 	  (d (in-system base-x base-y (v- p2 p1)))
 	  (local-p (in-system base-x base-y (v- p p1)))
 	  (((ax ay) (bx by) (cx cy) (dx dy) (x y)) (list a b c d local-p))
-	  (s (third-degree-solver
-	      (* (+ ay (* -2 by) cy) dx)
+	  (2ldx (* 2 l dx))
+	  (s (fourth-degree-solver
+	      (* (- dx 2ldx) (+ ay (* -2 by) cy))
+	      (+ (* (+ ay (* -2 by) cy) 2ldx)
+		 (* (- dx 2ldx) 2 (- by ay)))
 	      (+ (* (+ ax (* -2 bx) cx) y)
 		 (* (+ ay (* -2 by) cy) (- x))
-		 (* (+ (* -2 ay) (* 2 by)) dx))
-	      (+ (* (+ (* -2 ax) (* 2 bx) (- dx)) y)
+		 (* (+ (* -2 ay) (* 2 by)) 2ldx)
+		 (* (- dx 2ldx) (- ay y)))
+	      (+ (* (+ (* -2 ax) (* 2 bx) (- 2ldx)) y)
 		 (* (+ (* -2 ay) (* 2 by)) (- x))
-		 (* ay dx))
+		 (* ay 2ldx))
 	      (- (* ax y) (* ay x))
 	      :min 0 :max 1))
 	  (1-s (- 1 s)))
@@ -440,10 +480,11 @@ Strict checking is turned off."
   (let ((s (first (bilinear-parameterization segments p))))
     (if (eq dir 's)
 	s
-	(dlet* (((s1 d1) (one-sided-parabola-sweep points segments p t))
-		((s2 d2) (one-sided-parabola-sweep points segments p nil)))
-	  (+ (* (funcall +hermite-blend+ s) d1)
-	     (* (funcall +hermite-blend+ (- 1 s)) d2))))))
+	(or (handle-point-on-sides segments p)
+	    (dlet* (((s1 d1) (one-sided-parabola-sweep points segments p t))
+		    ((s2 d2) (one-sided-parabola-sweep points segments p nil)))
+	      (+ (* (funcall +hermite-blend+ s) d1)
+		 (* (funcall +hermite-blend+ (- 1 s)) d2)))))))
 
 (defun tomification-points (segments p)
   "Idea: Find a constant (y in [0,1]) such that P is on the line (segment)
