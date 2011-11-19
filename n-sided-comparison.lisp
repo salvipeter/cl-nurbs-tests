@@ -65,6 +65,8 @@
 
 (write-constraint-ribbons *points* "/tmp/comp/ribbons.vtk"
 			  :coords *coords* :resolution 20)
+(write-constraint-coons-ribbons *points* "/tmp/comp/coons-ribbons"
+				:coords *coords* :resolution 20)
 (let ((*resolution* 40)
       (*ribbon-multiplier* 1.0d0))
   (write-patch *points* 'hybrid "/tmp/comp/bq-patch.vtk" :coords *coords*
@@ -89,6 +91,14 @@
 		 :distance-type 'two-parabola)
     (write-patch *points* 'hybrid "/tmp/comp/tp-f-spider.vtk" :coords *coords*
 		 :distance-type 'two-parabola :spider t)))
+
+(let ((*resolution* 40)
+      (*ribbon-multiplier* 1.0d0)
+      (*proportion* 1/2))
+  (write-patch *points* 'hybrid-coons "/tmp/comp/coons-tp-patch.vtk" :coords *coords*
+		 :distance-type 'two-parabola)
+  (write-patch *points* 'hybrid-coons "/tmp/comp/coons-tp-spider.vtk" :coords *coords*
+	       :distance-type 'two-parabola :spider t))
 
 (let ((points (points-from-angles '(40 20 60 100 80))))
   (labels ((filename (distance n)
