@@ -301,6 +301,17 @@
 (vectorized-distance-function-test
  *points* '(nil sd nil nil nil) "n-sided-paper/08f1-biquadratic-sd.ps"
  :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil)
+(vectorized-distance-function-test
+ *points* '(nil sd nil nil nil) "n-sided-paper/08g1-bilinear-sd.ps"
+ :resolution 0.001d0 :density 6 :distance-type 'bilinear :color nil)
+(let ((*centralized-line-sweep* 'tomi-centralized))
+  (vectorized-distance-function-test
+   *points* '(nil sd nil nil nil) "n-sided-paper/08h1-sweep-tomi-sd.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil))
+(let ((*centralized-line-sweep* 'tomi))
+  (vectorized-distance-function-test
+   *points* '(nil sd nil nil nil) "n-sided-paper/08h1-sweep-tomi-non-centralized-sd.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil))
 
 (vectorized-distance-function-test
  *points* '(s s s s s) "n-sided-paper/08a2-perpendicular-center.ps"
@@ -320,6 +331,17 @@
 (vectorized-distance-function-test
  *points* '(s s s s s) "n-sided-paper/08f2-biquadratic-center.ps"
  :resolution 0.001d0 :density 2 :distance-type 'biquadratic :color t)
+(vectorized-distance-function-test
+ *points* '(s s s s s) "n-sided-paper/08g2-bilinear-center.ps"
+ :resolution 0.001d0 :density 2 :distance-type 'bilinear :color t)
+(let ((central-line-sweep 'tomi-centralized))
+  (vectorized-distance-function-test
+   *points* '(s s s s s) "n-sided-paper/08h2-sweep-tomi-center.ps"
+   :resolution 0.001d0 :density 2 :distance-type 'line-sweep))
+(let ((central-line-sweep 'tomi))
+  (vectorized-distance-function-test
+   *points* '(s s s s s) "n-sided-paper/08h2-sweep-tomi-centralized-center.ps"
+   :resolution 0.001d0 :density 2 :distance-type 'line-sweep))
 
 (vectorized-distance-function-test
  *points* '(s s nil nil nil) "n-sided-paper/08a3-perpendicular-ss.ps"
@@ -339,6 +361,17 @@
 (vectorized-distance-function-test
  *points* '(s s nil nil nil) "n-sided-paper/08f3-biquadratic-ss.ps"
  :resolution 0.001d0 :density 6 :distance-type 'biquadratic :color nil)
+(vectorized-distance-function-test
+ *points* '(s s nil nil nil) "n-sided-paper/08g3-bilinear-ss.ps"
+ :resolution 0.001d0 :density 6 :distance-type 'bilinear :color nil)
+(let ((central-line-sweep 'tomi-centralized))
+  (vectorized-distance-function-test
+   *points* '(s s nil nil nil) "n-sided-paper/08h3-sweep-tomi-ss.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil))
+(let ((central-line-sweep 'tomi))
+  (vectorized-distance-function-test
+   *points* '(s s nil nil nil) "n-sided-paper/08h3-sweep-tomi-centralized-ss.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'line-sweep :color nil))
 
 
 ;;; Figure 9
