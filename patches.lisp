@@ -542,7 +542,7 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for diff = (point-distance p (bezier curve v)))
 		 (maximize diff))))))
 
-(defun check-patch-tangents (points type &key inner-points heights coords
+(defun check-patch-normals (points type &key inner-points heights coords
 			     (distance-type 'perpendicular) (step 0.1d-3))
   "Only side interpolation checking for now."
   (let* ((n (length points))
@@ -574,6 +574,38 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 			(vnormalize (cross-product derivative
 						   (v- (bezier inner-curve v)
 						       (bezier curve v)))))))
+		 (maximize diff))))))
+
+(defun check-patch-tangents (points type &key inner-points heights coords
+			     (distance-type 'perpendicular) (step 0.1d-3))
+  "Only side interpolation checking for now."
+  (let* ((n (length points))
+	 (lines (lines-from-points points))
+	 (patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights))))
+    (iter (for side from 0 below n)
+	  (for curve in (first patch))
+	  (for inner-curve in (second patch))
+	  (for line in lines)
+	  (for direction = (v- (second line) (first line)))
+	  (for normal = (vnormalize (list (- (second direction)) (first direction))))
+	  (with center = (central-point points lines t))
+	  (when (< (scalar-product (v- center (first line)) normal) 0)
+	    (setf normal (v* normal -1)))
+	  (maximize
+	   (iter (for i from 0 below *resolution*)
+		 (for u = (/ i (1- *resolution*)))
+		 (for domain-point = (line-point line u))
+		 (for inner-domain-point = (v+ domain-point (v* normal step)))
+		 (for p = (patch-evaluate patch points type distance-type domain-point))
+		 (for q = (patch-evaluate patch points type distance-type inner-domain-point))
+		 (for v = (bezier-project-point curve p 10 *resolution*))
+		 (for diff =
+		      (vlength
+		       (cross-product
+			(vnormalize (v- q p))
+			(vnormalize (v- (bezier inner-curve v)
+					(bezier curve v))))))
 		 (maximize diff))))))
 
 #+nil

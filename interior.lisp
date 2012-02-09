@@ -213,3 +213,28 @@
 			   "/tmp/aux-blend-test-white.ppm" 400)
   (write-color-aux-blend-test *points* '(0.0d0 0.0d0) multiplier
 			      "/tmp/aux-blend-test-clean.ppm" 400 :trim nil))
+
+(defun write-slice-aux-blend-test (points point on-off multiplier filename)
+  (flet ((map-coordinates (x y) (list (/ (- x r) r) (/ (- y r) r))))
+    (let* ((n (length points))
+	   (lines (lines-from-points points))
+           (vertices
+            (mapcar (lambda (p)
+                      (let* ((d (cons (* (point-distance p point) multiplier)
+                                      (compute-parameter 'perpendicular 'd points p t)))
+                             (blends (iter (for i from 0 to n)
+                                           (collect (ribbon-blend d i)))))
+                        (cons (iter (for i from 0 below (length on-off))
+                                    (when (elt on-off i)
+                                      (sum (elt blends i))))
+                              p)))
+                    (vertices points))))
+      (write-vtk-indexed-mesh vertices (triangles n) filename))))
+
+(let ((multiplier 0.5d0)
+      (points (points-from-angles '(50 60 70 60 70 50)))
+      (*resolution* 80))
+  (iter (for i from 0 to 5)
+        (for filename = (format nil "/tmp/aux-blend-slice-~d.vtk" i))
+        (for on-off = (iter (for j from 0 to 5) (collect (= i j))))
+        (write-slice-aux-blend-test points '(0.0d0 0.0d0) on-off multiplier filename)))
