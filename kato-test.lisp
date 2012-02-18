@@ -1253,7 +1253,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                               1
                               0))
                         points)))
-    (funcall +hermite-blend+ (mean-value points values p))))
+    (funcall +hermite-blend+ (- 1 (mean-value points values p)))))
 
 (defun mean-distance (points segments p)
   (let ((values (mapcar (lambda (x)
@@ -1274,6 +1274,25 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 	   (mean-distance points segments p)))))
 
 (defmean-distance line-sweep)
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (vectorized-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'mean-line-sweep :color nil))
+
+(defmethod compute-distance ((type (eql 'mean-value)) points segments p dir)
+  (if (eq dir 'd)
+      (mean-distance points segments p)
+      (let ((d-1 (mean-distance points (segments-prev points segments) p))
+            (d+1 (mean-distance points (segments-next points segments) p)))
+        (/ d-1 (+ d-1 d+1)))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (vectorized-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'mean-value :color nil))
 
 (defun mean-test (points i filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -1301,8 +1320,8 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 (let ((*width* 500)
       (*height* 500)
       (*line-width* 0.005d0)
-      (points (points-from-angles '(40 20 60 100 80))))
-  (mean-test points 0 "/tmp/proba.pgm"))
+      (points (points-from-angles '(45 90 45 15 150 15))))
+  (mean-test points 5 "/tmp/proba3.pgm"))
 
 (defun mean-test-one (points i filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
@@ -1346,7 +1365,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                                       (for segments =
                                            (iter (for j from 0 below 4)
                                                  (collect (elt points (mod (+ i j) n)))))
-                                      (collect (mean-blend points segments p)))))
+                                      (collect (/ (mean-blend points segments p) 2)))))
                     (if (and trim (some (lambda (x) (< (first trim) x (second trim))) blends))
 			(format s "0 0 0~%")
 			(format s "~{~d~^ ~}~%"
@@ -1374,7 +1393,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                                       (for segments =
                                            (iter (for j from 0 below 4)
                                                  (collect (elt points (mod (+ i j) n)))))
-                                      (collect (mean-blend points segments p)))))
+                                      (collect (/ (mean-blend points segments p) 2)))))
                     (if (destructuring-bind (a b)
 			    (subseq (sort blends #'>) 0 2)
 			  (< (- a b) threshold))
@@ -1385,3 +1404,22 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 #+nil
 (let ((points (points-from-angles '(40 20 60 100 80))))
   (write-mean-voronoi points "/tmp/proba.ppm" 400))
+
+(defun write-mean-blends (points on-off filename)
+  (let* ((n (length points))
+	 (vertices (mapcar (lambda (p)
+			     (let ((blends (iter (for i from 0 below n)
+                                                 (for segments =
+                                                      (iter (for j from 0 below 4)
+                                                            (collect (elt points (mod (+ i j) n)))))
+                                                 (collect (mean-blend points segments p)))))
+			       (cons (iter (for i from 0 below (length on-off))
+					   (when (elt on-off i)
+					     (sum (elt blends i))))
+				     p)))
+			   (vertices points))))
+    (write-vtk-indexed-mesh vertices (triangles n) filename)))
+
+#+nil
+(let ((points (points-from-angles '(50 60 70 60 70 50))))
+  (write-mean-blends points '(nil nil nil nil nil t) "/tmp/proba.vtk"))

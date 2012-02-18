@@ -231,6 +231,7 @@
                     (vertices points))))
       (write-vtk-indexed-mesh vertices (triangles n) filename))))
 
+#+nil
 (let ((multiplier 0.5d0)
       (points (points-from-angles '(50 60 70 60 70 50)))
       (*resolution* 80))
