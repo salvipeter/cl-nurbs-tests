@@ -1188,6 +1188,8 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 	(first sd)
 	(second sd))))
 
+(defparameter *wachspressp* t)
+
 (defun mean-value (points values p)
   (let ((lengths (mapcar (lambda (x) (point-distance p x)) points))
         (n (length points)))
@@ -1246,6 +1248,58 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
             (iter (for i in linear)
                   (sum (* (elt values i) (elt w i)))))))))
 
+(defun wachspress (points values p)
+  (let ((lengths (mapcar (lambda (x) (point-distance p x)) points))
+        (n (length points)))
+    (labels ((heron% (a b c)
+               (let ((s (/ (+ a b c) 2)))
+                 (sqrt (* s (- s a) (- s b) (- s c)))))
+             (heron (a b c)
+               (let ((a (heron% a b c)))
+                 (if (complexp a) 0 a)))
+	     (on-same-side-p (line p q)
+	       (let* ((dir (vnormalize (v- (second line) (first line))))
+		      (n (list (- (second dir)) (first dir))))
+		 (> (* (scalar-product (v- p (first line)) n)
+		       (scalar-product (v- q (first line)) n))
+		    0)))
+             (inc (i) (mod (1+ i) n))
+             (dec (i) (mod (1- i) n))
+             (area-a (i)
+               (heron (elt lengths i)
+                      (elt lengths (inc i))
+                      (point-distance (elt points i)
+                                      (elt points (inc i)))))
+             (area-c (i)
+               (heron (point-distance (elt points (dec i))
+				      (elt points i))
+		      (point-distance (elt points (dec i))
+				      (elt points (inc i)))
+		      (point-distance (elt points i)
+				      (elt points (inc i))))))
+      (let* ((linear '())
+             (w (iter (for i from 0 below n)
+                      (for Ai = (area-a i))
+                      (for Ai-1 = (area-a (dec i)))
+                      (for Ci = (area-c i))
+                      (cond ((< Ai-1 *epsilon*)
+                             (push i linear)
+                             (collect (/ (elt lengths (dec i))
+                                         (point-distance (elt points (dec i))
+                                                         (elt points i)))))
+                            ((< Ai *epsilon*)
+                             (push i linear)
+                             (collect (/ (elt lengths (inc i))
+                                         (point-distance (elt points (inc i))
+                                                         (elt points i)))))
+                            (t (collect (/ Ci (* Ai-1 Ai)))))))
+             (wsum (reduce #'+ w)))
+        (if (null linear)
+            (iter (for i from 0 below n)
+                  (sum (/ (* (elt values i) (elt w i)) wsum)))
+            (iter (for i in linear)
+                  (sum (* (elt values i) (elt w i)))))))))
+
 (defun mean-blend (points segments p)
   (let ((values (mapcar (lambda (x)
                           (if (or (equal x (second segments))
@@ -1253,7 +1307,9 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                               1
                               0))
                         points)))
-    (funcall +hermite-blend+ (- 1 (mean-value points values p)))))
+    (funcall +hermite-blend+ (- 1 (if *wachspressp*
+                                      (wachspress points values p)
+                                      (mean-value points values p))))))
 
 (defun mean-distance (points segments p)
   (let ((values (mapcar (lambda (x)
@@ -1262,7 +1318,9 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                               0
                               1))
                         points)))
-    (mean-value points values p)))
+    (if *wachspressp*
+	(wachspress points values p)
+	(mean-value points values p))))
 
 (defmacro defmean-distance (distance)
   "Warning: parameters are evaluated multiple times."
@@ -1276,7 +1334,8 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 (defmean-distance line-sweep)
 
 #+nil
-(let ((points (points-from-angles '(40 20 60 100 80))))
+(let ((points (points-from-angles '(40 20 60 100 80)))
+      (*wachspressp* nil))
   (vectorized-distance-function-test
    points '(nil sd nil nil nil) "/tmp/proba.ps"
    :resolution 0.001d0 :density 6 :distance-type 'mean-line-sweep :color nil))
@@ -1289,7 +1348,8 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
         (/ d-1 (+ d-1 d+1)))))
 
 #+nil
-(let ((points (points-from-angles '(40 20 60 100 80))))
+(let ((points (points-from-angles '(40 20 60 100 80)))
+      (*wachspressp* nil))
   (vectorized-distance-function-test
    points '(nil sd nil nil nil) "/tmp/proba.ps"
    :resolution 0.001d0 :density 6 :distance-type 'mean-value :color nil))
@@ -1336,7 +1396,9 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                 (for p = (list u v))
                 (unless (zerop x)
                   (princ #\Space s))
-                (for current = (mean-value points values p))
+                (for current = (if *wachspressp*
+				   (wachspress points values p)
+				   (mean-value points values p)))
                 (if (not (insidep lines p))
                     (princ 255 s)
                     (princ (floor (* (- 1 current) 200)) s)))
