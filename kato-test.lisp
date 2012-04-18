@@ -1357,11 +1357,11 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
   "Warning: parameters are evaluated multiple times."
   `(defmethod compute-distance ((type (eql ',(intern (format nil "MEAN-~:@(~a~)" distance))))
 				points segments p dir)
-     (let ((s (compute-distance ',distance points segments p 's)))
-       (if (eq dir 's)
-	   s
-	   (mean-distance points segments p)))))
+     (if (eq dir 's)
+         (compute-distance ',distance points segments p 's)
+         (mean-distance points segments p))))
 
+(defmean-distance bilinear)
 (defmean-distance line-sweep)
 
 #+nil
