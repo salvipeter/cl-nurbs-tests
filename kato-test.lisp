@@ -546,8 +546,8 @@ Strict checking is turned off."
 
 (defun parallelp (l1 l2)
   (let ((d (vnormalize (v- (second l1) (first l1)))))
-    (< (scalar-product (list (- (second d)) (first d))
-		       (vnormalize (v- (second l2) (first l2))))
+    (< (abs (scalar-product (list (- (second d)) (first d))
+                            (vnormalize (v- (second l2) (first l2)))))
        *epsilon*)))
 
 (defun line-line-intersection (l1 l2)
