@@ -986,6 +986,103 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 					  (list parameter x)
 					  (list x parameter)))))))
 
+(defun bilinear-inverse (segments p)
+  (dlet* (((p0 p1 p2 p3) segments)
+          ((s d) p)
+          (a (affine-combine p1 d p0))
+          (b (affine-combine p2 d p3)))
+    (affine-combine a s b)))
+
+(defun trace-bilinear (points i type parameter resolution)
+  (let* ((n (length points))
+	 (segments (list (elt points (mod (- i 2) n))
+			 (elt points (mod (1- i) n))
+			 (elt points (mod i n))
+			 (elt points (mod (1+ i) n)))))
+    (iter (for x from 0 to 1 by resolution)
+          (for p = (if (eq type 's)
+                       (list parameter x)
+                       (list x parameter)))
+	  (collect (bilinear-inverse segments p)))))
+
+(defun trace-tomi-interconnected (points i type parameter resolution)
+  "Flawed theory - blending the same points..."
+  (let* ((n (length points))
+	 (segments (list (elt points (mod (- i 2) n))
+			 (elt points (mod (1- i) n))
+			 (elt points (mod i n))
+			 (elt points (mod (1+ i) n)))))
+    (iter (with prev-segments = (segments-prev points segments))
+          (with next-segments = (segments-next points segments))
+          (for x from 0 to 1 by resolution)
+          (for p = (if (eq type 's)
+                       (list parameter x)
+                       (list x parameter)))
+          (for s = (first p))
+          (for uv = (bilinear-inverse segments p))
+          (for p-1 = (bilinear-parameterization prev-segments uv))
+          (for p+1 = (bilinear-parameterization next-segments uv))
+          (for left = (bilinear-inverse prev-segments p-1))
+          (for right = (bilinear-inverse next-segments p+1))
+	  (collect (v+ (v* left (funcall +hermite-blend+ s))
+                       (v* right (funcall +hermite-blend+ (- 1 s))))))))
+
+(defun vectorized-distance-trace (points line-types trace-fn filename
+                                  &key (resolution 0.1d0) (density 4) (color t))
+  "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
+  (flet ((map-point (p)
+	   (list (* (+ (first p) 1.0d0) 200)
+		 (* (+ (second p) 1.0d0) 200))))
+    (let* ((n (length points)) 
+	   (lines (lines-from-points points))
+	   (colors (or (and color (generate-colors n))
+		       (iter (repeat n) (collect '(0 0 0)))))
+	   (center (central-point points lines t)))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+	(format s "%!PS~%")
+	(format s "~{~f ~}3 0 360 arc fill~%" (map-point center))
+	(iter (for i from 0 below n)
+	      (for color in colors)
+	      (for line in lines)
+	      (for line-type in line-types)
+	      (format s "% Segment: ~a~%" i)
+	      (format s "~{~d ~}setrgbcolor~%" color)
+	      (format s "2 setlinewidth~%~
+                         newpath~%~
+                         ~{~f ~}moveto~%~
+                         ~{~f ~}lineto~%~
+                         stroke~%~
+                         1 setlinewidth~%"
+		      (map-point (first line))
+		      (map-point (second line)))
+	      (iter (for type in (case line-type (s '(s)) (d '(d)) (sd '(s d))))
+		    (format s "% Type: ~a~%" type)
+		    (iter (with d = (/ density))
+			  (for parameter from 0 to 1 by d)
+			  (format s "% Parameter: ~a~%" parameter)
+			  (for trace =
+                               (funcall trace-fn points i type parameter resolution))
+			  (format s "newpath~%")
+			  (format s "~{~f ~}moveto~%~
+                                     ~{~{~f ~}lineto~%~}"
+				  (map-point (first trace))
+				  (mapcar #'map-point (rest trace)))
+			  (format s "stroke~%"))))
+	(format s "showpage~%")))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (labels ((filename (n)
+             (format nil "/tmp/bilinear-~d.ps" n))
+           (write-test (distance n lst)
+             (vectorized-distance-trace
+              points lst distance (filename n)
+              :resolution 0.001d0 :density 6 :color nil)))
+    (iter (for distance in (list #'trace-bilinear))
+          (write-test distance 1 '(sd nil nil nil nil))
+          (write-test distance 2 '(nil sd nil nil nil))
+          (write-test distance 3 '(nil nil sd nil nil)))))
+
 (defun vectorized-distance-function-test (points line-types filename &key (resolution 0.1d0)
 					  (density 4) (distance-type 'perpendicular)
 					  (color t))
