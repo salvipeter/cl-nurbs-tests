@@ -203,6 +203,9 @@ thus containing point I-1 (NOT point I)."
 	(v* (v- next corner) 3.0d0 si)
 	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 si-1 si))))
 
+(defun gamma (d)
+  (/ d (1+ (* 2 d))))
+
 (defun coons-ribbon-evaluate (patch i s d)
   (let ((n (length (first patch)))
 	(si (if (atom s) s (elt s i)))
@@ -211,7 +214,7 @@ thus containing point I-1 (NOT point I)."
 	     (let* ((base-point (bezier (elt (first patch) i) si))
 		    (inner-point (bezier (elt (second patch) i) si))
 		    (derivative (v* (v- inner-point base-point) 3.0d0)))
-	       (v+ base-point (v* derivative di))))
+	       (v+ base-point (v* derivative (gamma di)))))
 	   (correction (i si si-1)
 	     (let* ((i-1 (mod (1- i) n))
 		    (prev (let ((lst (elt (first patch) i-1)))
@@ -220,9 +223,9 @@ thus containing point I-1 (NOT point I)."
 		    (next (second (elt (first patch) i)))
 		    (twist (second (elt (second patch) i))))
 	       (v+ corner
-		   (v* (v- prev corner) 3.0d0 si-1)
-		   (v* (v- next corner) 3.0d0 si)
-		   (v* (v- (v+ corner twist) (v+ prev next)) 9.0d0 si-1 si)))))
+		   (v* (v- prev corner) 3.0d0 (gamma si-1))
+		   (v* (v- next corner) 3.0d0 (gamma si))
+		   (v* (v- (v+ corner twist) (v+ prev next)) 9.0d0 (gamma si-1) (gamma si))))))
       (let ((hs (hermite-blend-function 'point 'start si))
 	    (hd (hermite-blend-function 'point 'start di)))
 	(v- (v+ (v* (linear-ribbon (mod (1- i) n) (- 1.0d0 di) si) hs)  
