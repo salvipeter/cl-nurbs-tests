@@ -4,10 +4,20 @@
 
 (defpackage :matrix
   (:use :common-lisp :iterate)
-  (:export :transpose :multiplication :from-vector :to-vector
+  (:export :m+ :transpose :multiplication :from-vector :to-vector
 	   :inverse-2x2 :inverse-3x3 :determinant-2x2 :determinant-3x3 :mtrace))
 
 (in-package :matrix)
+
+(defun m+ (m1 m2)
+  (let* ((n (array-dimensions m1))
+         (result (make-array n)))
+    (assert (equal n (array-dimensions m2)))
+    (dotimes (i (first n))
+      (dotimes (j (second n))
+        (setf (aref result i j)
+              (+ (aref m1 i j) (aref m2 i j)))))
+    result))
 
 (defun transpose (m)
   (let* ((n (array-dimensions m))
