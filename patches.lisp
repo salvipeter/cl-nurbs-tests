@@ -174,7 +174,7 @@
   (let* ((base-point (bezier (elt (first patch) i) (elt s i)))
 	 (inner-point (bezier (elt (second patch) i) (elt s i)))
 	 (derivative (v* (v- inner-point base-point) 3.0d0)))
-    (v+ base-point (v* derivative (elt d i) *ribbon-multiplier*))))
+    (v+ base-point (v* derivative (gamma (elt d i)) *ribbon-multiplier*))))
 
 (defun corner-evaluate (patch i s &optional d)
   "The corner defined by segments I-1 and I,
@@ -199,12 +199,15 @@ thus containing point I-1 (NOT point I)."
 	 (next (second (elt (first patch) i)))
 	 (twist (second (elt (second patch) i))))
     (v+ corner
-	(v* (v- previous corner) 3.0d0 si-1)
-	(v* (v- next corner) 3.0d0 si)
-	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 si-1 si))))
+	(v* (v- previous corner) 3.0d0 (gamma si-1))
+	(v* (v- next corner) 3.0d0 (gamma si))
+	(v* (v- (v+ corner twist) (v+ previous next)) 9.0d0 (gamma si-1) (gamma si)))))
 
+(defparameter *use-gamma* nil)
 (defun gamma (d)
-  (/ d (1+ (* 2 d))))
+  (if *use-gamma*
+      (/ d (1+ (* 2 d)))
+      d))
 
 (defun coons-ribbon-evaluate (patch i s d)
   (let ((n (length (first patch)))
@@ -269,7 +272,8 @@ thus containing point I-1 (NOT point I)."
 	 (sc (if (and (member type '(corner hybrid)) (eq distance-type 'biquadratic))
 		 (compute-parameter 'biquadratic-corner 's points p t)
 		 s))
-	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t))))
+	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t)))
+         (*use-gamma* (member type '(hybrid hybrid-coons))))
     (iter (for i from 0 below n)
 	  (with result = '(0 0 0))
 	  (setf result
