@@ -234,7 +234,7 @@ In the :DIAGONAL case, a square matrix is returned."
               (select-eigenvalues (rest lst) n previous (1+ i))
               (cons i (select-eigenvalues (rest lst) (1- n) next (1+ i))))))))
 
-(defun generate-gnuplot-tests ()
+(defun generate-gnuplot-tests (n)
   (let* ((grid (create-grid 100))
          (laplace (laplace-matrix grid))
          (eigen (multiple-value-bind (l v) (eigenvalues/vectors laplace)
@@ -245,7 +245,7 @@ In the :DIAGONAL case, a square matrix is returned."
       (format s "set output \"/tmp/grid.png\"~%")
       (format s "set title \"Problem setting\"~%")
       (format s "plot [~f:~f] [~f:~f] \"/tmp/grid\" title \"Grid\", \"/tmp/curve\" with lines title \"Curve\", \"/tmp/ghost\" title \"Ghost\"~%" (first (first *window*)) (first (second *window*)) (second (first *window*)) (second (second *window*)))
-      (dolist (i (select-eigenvalues (first eigen) 6))
+      (dolist (i (select-eigenvalues (first eigen) n))
         (show-eigenvector grid eigen i)
         (format s "set output \"/tmp/eigen~d.png\"~%" i)
         (format s "set title \"Eigenvalue: ~f\"~%" (realpart (elt (first eigen) i)))
