@@ -942,8 +942,9 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 		       (collect (cons (query p) p) into tests)
 		       (finally (return (first (sort tests #'< :key #'first)))))))
 	     (get-fuzzy-start (index)
-	       (iter (for i from 0 below (length lines))
-		     (for line in lines)
+	       (iter (with n = (length lines))
+                     (for i in (list (mod (1- index) n) (mod (1+ index) n))) ; from 0 below n
+		     (for line = (elt lines i))
 		     (unless (= i index)
 		       (for (value . param) = (get-start line))
 		       (finding param minimizing value))))
@@ -1563,6 +1564,57 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 
 (defmean-distance bilinear)
 (defmean-distance line-sweep)
+
+(defun auto-wachspress-weights (points)
+  (let ((*wachspress* t)
+        (n (length points)))
+    (iter (for i from 0 below n)
+          (with center = (central-point points (lines-from-points points) t))
+          (for segments = (iter (for j from -2 below 2)
+                                (collect (elt points (mod (+ i j) n)))))
+          (collect
+              (iter (repeat 10)
+                    (with low = 0.0d0)
+                    (with high = 3.0d0)
+                    (for mid = (/ (+ low high) 2))
+                    (for d = (* (mean-distance points segments center) mid))
+                    (if (> d 1/2)
+                        (setf high mid)
+                        (setf low mid))
+                    (finally (return mid)))))))
+
+(defvar *auto-wachspress-weights*)
+
+(defmacro defautowp-distance (distance)
+  "Warning: parameters are evaluated multiple times."
+  `(defmethod compute-distance ((type (eql ',(intern (format nil "AUTOWP-~:@(~a~)" distance))))
+				points segments p dir)
+     (let ((si (compute-distance ',distance points segments p 's)))
+       (if (eq dir 's)
+           si
+           (let* ((*wachspress* t)
+                  (i (position (elt segments 2) points :test #'equal))
+                  (wi (elt *auto-wachspress-weights* i)))
+             (* (mean-distance points segments p)
+                (+ (* si si (- 4 (* 4 wi)))
+                   (* si (- (* 4 wi) 4)) 1)))))))
+
+(defautowp-distance bilinear)
+
+#+nil
+(let* ((points (points-from-angles '(40 20 60 100 80)))
+       (*wachspressp* t)
+       (*auto-wachspress-weights* (auto-wachspress-weights points)))
+  (vectorized-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'autowp-bilinear :color nil))
+
+#+nil
+(let* ((points (points-from-angles '(40 20 60 100 80)))
+       (*wachspressp* t))
+  (vectorized-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'mean-bilinear :color nil))
 
 #+nil
 (let ((points (points-from-angles '(40 20 60 100 80)))
