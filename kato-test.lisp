@@ -266,21 +266,22 @@
 (defparameter +distance-blend+ (lambda (x) (blend (list x (- 1.0d0 x)) 0)))
 (defparameter +peti-blend+ (lambda (x) (interior-blend (list x (- 1.0d0 x)) 0))) ; try alpha=-3/2
 
-(defmacro defmodified-distance (distance blend-fn)
+(defmacro defmodified-distance (distance blend-fn &optional blend-fn-2)
   "Warning: parameters are evaluated multiple times."
-  `(defmethod compute-distance ((type (eql ',(intern (format nil "~:@(~a~)-MOD" distance))))
-				points segments p dir)
-     (let ((si (compute-distance ',distance points segments p 's)))
-       (if (eq dir 's)
-	   si
-	   (let ((si-1 (compute-distance ',distance points
-					 (segments-prev points segments)
-					 p 's)) 
-		 (si+1 (compute-distance ',distance points
-					 (segments-next points segments)
-					 p 's)))
-	     (+ (* (- 1.0d0 si-1) (funcall ,blend-fn si))
-		(* si+1 (funcall ,blend-fn (- 1.0d0 si)))))))))
+  (let ((blend-fn-2 (or blend-fn-2 `(lambda (x) (funcall ,blend-fn (- 1 x))))))
+    `(defmethod compute-distance ((type (eql ',(intern (format nil "~:@(~a~)-MOD" distance))))
+                                  points segments p dir)
+       (let ((si (compute-distance ',distance points segments p 's)))
+         (if (eq dir 's)
+             si
+             (let ((si-1 (compute-distance ',distance points
+                                           (segments-prev points segments)
+                                           p 's)) 
+                   (si+1 (compute-distance ',distance points
+                                           (segments-next points segments)
+                                           p 's)))
+               (+ (* (- 1.0d0 si-1) (funcall ,blend-fn si))
+                  (* si+1 (funcall ,blend-fn-2 si)))))))))
 
 (defmodified-distance radial +distance-blend+)
 (defmodified-distance perpendicular +distance-blend+)
@@ -288,6 +289,23 @@
 (defmodified-distance chord-based +distance-blend+)
 (defmodified-distance line-sweep +distance-blend+)
 (defmodified-distance bilinear +distance-blend+)
+
+; quartic
+#+nil
+(let ((pb 0.58))
+  (defmodified-distance line-sweep
+      (lambda (x)
+        (let* ((x1 (- 1 x))
+               (x2 (* x x))
+               (x1-2 (* x1 x1))
+               (c (/ (- (* 16 pb) 5) 6)))
+          (+ (* x1-2 x1-2) (* 4 x1-2 x1 x) (* c 6 x1-2 x2))))
+    (lambda (x)
+      (let* ((x1 (- 1 x))
+             (x2 (* x x))
+             (x1-2 (* x1 x1))
+             (c (/ (- (* 16 pb) 5) 6)))
+        (+ (* x2 x2) (* 4 x2 x x1) (* c 6 x2 x1-2))))))
 
 (defun bilinear-parameterization (segments p)
   (let* ((p0 (first segments))
