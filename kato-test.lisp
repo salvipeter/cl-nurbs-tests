@@ -1584,7 +1584,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 (defmean-distance line-sweep)
 
 (defun auto-wachspress-weights (points)
-  (let ((*wachspress* t)
+  (let ((*wachspressp* t)
         (n (length points)))
     (iter (for i from 0 below n)
           (with center = (central-point points (lines-from-points points) t))
@@ -1610,7 +1610,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
      (let ((si (compute-distance ',distance points segments p 's)))
        (if (eq dir 's)
            si
-           (let* ((*wachspress* t)
+           (let* ((*wachspressp* t)
                   (i (position (elt segments 2) points :test #'equal))
                   (wi (elt *auto-wachspress-weights* i)))
              (* (mean-distance points segments p)
@@ -1618,6 +1618,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                    (* si (- (* 4 wi) 4)) 1)))))))
 
 (defautowp-distance bilinear)
+(defautowp-distance line-sweep)
 
 #+nil
 (let* ((points (points-from-angles '(40 20 60 100 80)))
@@ -1625,10 +1626,10 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
        (*auto-wachspress-weights* (auto-wachspress-weights points)))
   (vectorized-distance-function-test
    points '(nil sd nil nil nil) "/tmp/proba.ps"
-   :resolution 0.001d0 :density 6 :distance-type 'autowp-bilinear :color nil))
+   :resolution 0.001d0 :density 6 :distance-type 'autowp-line-sweep :color nil))
 
 (defun quad-wachspress-distances (points)
-  (let ((*wachspress* t)
+  (let ((*wachspressp* t)
         (n (length points)))
     (iter (for i from 0 below n)
           (with center = (central-point points (lines-from-points points) t))
@@ -1645,13 +1646,15 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
      (let ((si (compute-distance ',distance points segments p 's)))
        (if (eq dir 's)
            si
-           (let* ((*wachspress* t)
+           (let* ((*wachspressp* t)
                   (i (position (elt segments 2) points :test #'equal))
                   (wi (elt *quad-wachspress-distances* i))
                   (di (mean-distance points segments p)))
-             (+ di (* 4 wi 4 si (- 1 si) di (- 1 di))))))))
+             (format t "si: ~f, di: ~f~%" si di)
+             (+ di (* wi 16 si (- 1 si) di (- 1 di))))))))
 
 (defquadwp-distance bilinear)
+(defquadwp-distance line-sweep)
 
 #+nil
 (let* ((points (points-from-angles '(40 20 60 100 80)))
@@ -1659,7 +1662,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
        (*quad-wachspress-distances* (quad-wachspress-distances points)))
   (vectorized-distance-function-test
    points '(nil sd nil nil nil) "/tmp/proba.ps"
-   :resolution 0.001d0 :density 6 :distance-type 'quadwp-bilinear :color nil))
+   :resolution 0.001d0 :density 6 :distance-type 'quadwp-line-sweep :color nil))
 
 #+nil
 (let* ((points (points-from-angles '(40 20 60 100 80)))
