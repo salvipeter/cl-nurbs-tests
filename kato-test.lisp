@@ -1439,6 +1439,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 	(second sd))))
 
 (defparameter *wachspressp* t)
+(defparameter *squared-wachspress-coordinates* nil)
 
 (defun mean-value (points values p)
   (let ((lengths (mapcar (lambda (x) (point-distance p x)) points))
@@ -1507,12 +1508,6 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
              (heron (a b c)
                (let ((a (heron% a b c)))
                  (if (complexp a) 0 a)))
-	     (on-same-side-p (line p q)
-	       (let* ((dir (vnormalize (v- (second line) (first line))))
-		      (n (list (- (second dir)) (first dir))))
-		 (> (* (scalar-product (v- p (first line)) n)
-		       (scalar-product (v- q (first line)) n))
-		    0)))
              (inc (i) (mod (1+ i) n))
              (dec (i) (mod (1- i) n))
              (area-a (i)
@@ -1527,28 +1522,16 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 				      (elt points (inc i)))
 		      (point-distance (elt points i)
 				      (elt points (inc i))))))
-      (let* ((linear '())
+      (let* ((A (iter (for i from 0 below n) (collect (area-a i))))
              (w (iter (for i from 0 below n)
-                      (for Ai = (area-a i))
-                      (for Ai-1 = (area-a (dec i)))
                       (for Ci = (area-c i))
-                      (cond ((< Ai-1 *epsilon*)
-                             (push i linear)
-                             (collect (/ (elt lengths (dec i))
-                                         (point-distance (elt points (dec i))
-                                                         (elt points i)))))
-                            ((< Ai *epsilon*)
-                             (push i linear)
-                             (collect (/ (elt lengths (inc i))
-                                         (point-distance (elt points (inc i))
-                                                         (elt points i)))))
-                            (t (collect (/ Ci (* Ai-1 Ai)))))))
+                      (collect (reduce #'* (cons Ci (iter (for j from 0 below n)
+                                                      (unless (or (= j i) (= j (dec i)))
+                                                        (collect (elt A j)))))))))
+             (w (if *squared-wachspress-coordinates* (mapcar #'* w w) w))
              (wsum (reduce #'+ w)))
-        (if (null linear)
-            (iter (for i from 0 below n)
-                  (sum (/ (* (elt values i) (elt w i)) wsum)))
-            (iter (for i in linear)
-                  (sum (* (elt values i) (elt w i)))))))))
+        (iter (for i from 0 below n)
+              (sum (/ (* (elt values i) (elt w i)) wsum)))))))
 
 (defun mean-blend (points segments p)
   (let ((values (mapcar (lambda (x)
@@ -1560,6 +1543,29 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
     (funcall +hermite-blend+ (- 1 (if *wachspressp*
                                       (wachspress points values p)
                                       (mean-value points values p))))))
+
+(defun mean-side-blend (points i j p)
+  (let ((values (mapcar (lambda (x) (declare (ignore x)) 0) points)))
+    (setf (elt values i) 1
+          (elt values j) 1)
+    (funcall +hermite-blend+
+             (- 1 (if *wachspressp*
+                      (wachspress points values p)
+                      (mean-value points values p))))))
+
+(defun mean-corner-blend (points i p)
+  (let ((values (mapcar (lambda (x) (declare (ignore x)) 0) points)))
+    (setf (elt values i) 1)
+    (funcall +hermite-blend+
+             (- 1 (if *wachspressp*
+                      (wachspress points values p)
+                      (mean-value points values p))))))
+
+(defun wachspress-corner-blend (points i p)
+  (let ((values (mapcar (lambda (x) (declare (ignore x)) 0) points))
+        (*squared-wachspress-coordinates* t))
+    (setf (elt values i) 1)
+    (wachspress points values p)))
 
 (defun mean-distance (points segments p)
   (let ((values (mapcar (lambda (x)
