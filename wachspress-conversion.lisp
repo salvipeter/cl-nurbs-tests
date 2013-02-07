@@ -1,5 +1,8 @@
 (in-package :cl-nurbs-tests)
 
+;;; These wachspress-converted domains do not contribute to anything.
+;;; Using these just means that we are using regular domains for parameterization.
+
 (defun wachspress-coordinates (points p)
   (let ((lengths (mapcar (lambda (x) (point-distance p x)) points))
         (n (length points)))
@@ -140,4 +143,4 @@
 (let ((points (domain-from-curves '(40 20 60 100 80) 'regular)))
   (vectorized-distance-function-test
    points '(sd nil nil nil nil) "/tmp/bilin-reg.ps"
-   :resolution 0.001d0 :density 6 :distance-type 'line-sweep-mod :color nil))
+   :resolution 0.001d0 :density 6 :distance-type 'bilinear :color nil))
