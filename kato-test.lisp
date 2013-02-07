@@ -1104,7 +1104,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 
 (defun vectorized-distance-function-test (points line-types filename &key (resolution 0.1d0)
 					  (density 4) (distance-type 'perpendicular)
-					  (color t))
+					  (color t) other-center)
   "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
   (flet ((map-point (p)
 	   (list (* (+ (first p) 1.0d0) 200)
@@ -1113,7 +1113,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 	   (lines (lines-from-points points))
 	   (colors (or (and color (generate-colors n))
 		       (iter (repeat n) (collect '(0 0 0)))))
-	   (center (central-point points lines t)))
+	   (center (or other-center (central-point points lines t))))
       (with-open-file (s filename :direction :output :if-exists :supersede)
 	(format s "%!PS~%")
 	(format s "~{~f ~}3 0 360 arc fill~%" (map-point center))
