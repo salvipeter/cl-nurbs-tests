@@ -1596,16 +1596,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
           (with center = (central-point points (lines-from-points points) t))
           (for segments = (iter (for j from -2 below 2)
                                 (collect (elt points (mod (+ i j) n)))))
-          (collect
-              (iter (repeat 10)
-                    (with low = 0.0d0)
-                    (with high = 3.0d0)
-                    (for mid = (/ (+ low high) 2))
-                    (for d = (* (mean-distance points segments center) mid))
-                    (if (> d 1/2)
-                        (setf high mid)
-                        (setf low mid))
-                    (finally (return mid)))))))
+          (collect (mean-distance points segments center)))))
 
 (defvar *auto-wachspress-weights*)
 
@@ -1618,13 +1609,26 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
            si
            (let* ((*wachspressp* t)
                   (i (position (elt segments 2) points :test #'equal))
-                  (wi (elt *auto-wachspress-weights* i)))
-             (* (mean-distance points segments p)
-                (+ (* si si (- 4 (* 4 wi)))
-                   (* si (- (* 4 wi) 4)) 1)))))))
+                  (wi (elt *auto-wachspress-weights* i))
+                  (di (mean-distance points segments p))
+                  (alpha (* 4 (- 1 si) si (- 1 di) di)))
+             (* di (+ 1 (* alpha (/ (- 1 (* 2 wi))
+                                    (* 2 (- 1 wi) wi wi))))))))))
 
-(defautowp-distance bilinear)
+;;; bilinear does not work, as the center is not on s=0.5
+#+nil (defautowp-distance bilinear)
 (defautowp-distance line-sweep)
+
+;;; Test
+#+nil
+(defun test-autowp (i p)
+  (let* ((points (points-from-angles '(40 20 60 100 80)))
+         (*wachspressp* t)
+         (*auto-wachspress-weights* (auto-wachspress-weights points))
+         (n (length points))
+         (segments (iter (for j from -2 below 2)
+                         (collect (elt points (mod (+ i j) n))))))
+    (compute-distance 'autowp-line-sweep points segments p 'd)))
 
 #+nil
 (let* ((points (points-from-angles '(40 20 60 100 80)))
