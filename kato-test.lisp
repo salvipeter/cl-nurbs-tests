@@ -572,18 +572,28 @@ Strict checking is turned off."
     (if (= v 0)
         (if (eq dir 's) u 0)
         (let ((s (nth-degree-solver
-                  `(,( * (/ v) 2 (- av bv))
-                     ,(+ (* 2 (- au bu))
-                         (* (/ u v) 2 (- bv av))
-                         (* (/ v) 3 (- bv av)))
-                     ,(+ (* 3 (- bu au))
-                         (* (/ u v) 3 (- av bv)))
-                     ,(* (/ v) av)
-                     ,(- au (* (/ u v) av)))
+                  `(,( * 6 (- av bv))
+                     ,(+ (* 6  (+ (* u (- bv av))
+                                  (* v (- au bu))))
+                         (* 15 (- bv av)))
+                     ,(+ (* 15 (+ (* u (- av bv))
+                                  (* v (- bu au))))
+                         (* 10 (- av bv)))
+                     ,(* 10 (+ (* u (- bv av))
+                               (* v (- au bu))))
+                     0
+                     ,(- av)
+                     ,(- (* u av) (* v au)))
                   :min 0 :max 1)))
           (if (eq dir 's)
               s
-              (/ v (+ (* s s s 2 (- av bv)) (* s s 3 (- bv av)) av)))))))
+              (/ v (+ bv (* (- av bv) (+ (* -6 s s s s s) (* 15 s s s s) (* -10 s s s) 1)))))))))
+
+#+nil
+(let* ((points (points-from-angles '(5 72 72 72 72))))
+  (vectorized-distance-function-test
+   points '(s s s nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 18 :distance-type 'g2-sweep :color t))
 
 (defun parallelp (l1 l2)
   (let ((d (vnormalize (v- (second l1) (first l1)))))
