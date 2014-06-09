@@ -572,6 +572,35 @@ Strict checking is turned off."
     (if (= v 0)
         (if (eq dir 's) u 0)
         (let ((s (nth-degree-solver
+                  `(,( * (/ v) 2 (- av bv))
+                     ,(+ (* 2 (- au bu))
+                         (* (/ u v) 2 (- bv av))
+                         (* (/ v) 3 (- bv av)))
+                     ,(+ (* 3 (- bu au))
+                         (* (/ u v) 3 (- av bv)))
+                     ,(* (/ v) av)
+                     ,(- au (* (/ u v) av)))
+                  :min 0 :max 1)))
+          (if (eq dir 's)
+              s
+              (/ v (+ (* s s s 2 (- av bv)) (* s s 3 (- bv av)) av)))))))
+
+#+nil
+(let* ((points (points-from-angles '(5 72 72 72 72))))
+  (vectorized-distance-function-test
+   points '(s s s nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 18 :distance-type 'g2-sweep :color t))
+
+(defmethod compute-distance ((type (eql 'g2-sweep-quintic)) points segments p dir)
+  (dlet* (((p0 p1 p2 p3) segments)
+          (base-x (v- p2 p1))
+          (base-y (list (- (second base-x)) (first base-x)))
+          ((au av) (in-system base-x base-y (v- p0 p1)))
+          ((bu bv) (in-system base-x base-y (v- p3 p2)))
+          ((u v) (in-system base-x base-y (v- p p1))))
+    (if (= v 0)
+        (if (eq dir 's) u 0)
+        (let ((s (nth-degree-solver
                   `(,( * 6 (- av bv))
                      ,(+ (* 6  (+ (* u (- bv av))
                                   (* v (- au bu))))
@@ -588,12 +617,6 @@ Strict checking is turned off."
           (if (eq dir 's)
               s
               (/ v (+ bv (* (- av bv) (+ (* -6 s s s s s) (* 15 s s s s) (* -10 s s s) 1)))))))))
-
-#+nil
-(let* ((points (points-from-angles '(5 72 72 72 72))))
-  (vectorized-distance-function-test
-   points '(s s s nil nil) "/tmp/proba.ps"
-   :resolution 0.001d0 :density 18 :distance-type 'g2-sweep :color t))
 
 (defun parallelp (l1 l2)
   (let ((d (vnormalize (v- (second l1) (first l1)))))
