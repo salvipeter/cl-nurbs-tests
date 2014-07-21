@@ -250,3 +250,68 @@
 
 ;;; (trace-concave *points* #'peti-test "/tmp/peti.ps")
 ;;; (trace-concave *points* #'tomi-test "/tmp/tomi.ps")
+
+
+;;; And now for something completely different.
+
+;;; Handling concave patches by another method - proof of concept test
+(defparameter *ribbons*
+  (list (list (make-bspline-curve 3 '(0.0 0.0 0.0 0.0 0.2 0.4 0.5 0.5 0.5 0.5 0.6 0.6 0.6 0.6 0.7 0.8 1.0 1.0 1.0 1.0) '((1.00 2.00 0.0) (1.80 1.60 0.0) (4.29 0.67 0.0) (5.94 6.17 0.0) (8.57 4.37 0.0) (9.00 4.00 0.0) (9.00 4.00 0.0) (9.00 4.00 0.0) (9.00 4.00 0.0) (9.00 4.00 0.0) (9.00 4.00 0.0) (8.67 3.62 0.0) (7.43 1.81 0.0) (9.53 -0.30 0.0) (11.08 0.58 0.0) (12.00 1.50 0.0)))
+              (make-bspline-curve 3 '(0.0 0.0 0.0 0.0 0.2 0.4 0.5 0.5 0.5 0.5 0.6 0.6 0.6 0.6 0.7 0.8 1.0 1.0 1.0 1.0) '((1.447214 2.894427 0.000000) (1.575217 2.646297 0.000000) (3.274421 1.125071 0.000000) (5.663517 7.298393 0.000000) (9.137107 5.300407 0.000000) (9.645942 4.763386 0.000000) (9.645942 4.763386 0.000000) (10.154778 4.226366 0.000000) (10.014585 3.818321 0.000000) (9.747409 3.335636 0.000000) (9.747409 3.335636 0.000000) (9.480234 2.852952 0.000000) (8.691918 1.738304 0.000000) (9.562593 1.076016 0.000000) (11.042059 2.001239 0.000000) (11.292893 2.207107 0.000000))))
+        (list (make-bspline-curve 3 '(0 0 0 0 1 1 1 1)
+                                  '((12 1.5 0) (11.292893 2.207107 0) (12 10 0) (13 12 0)))
+              (make-bspline-curve 3 '(0 0 0 0 1 1 1 1)
+                                  '((10.62 0.12 0) (9 1 0) (10 10 0) (11 12 0))))
+        (list (make-bspline-curve 3 '(0 0 0 0 1 1 1 1) '((13 12 0) (11 12 0) (4 12 0) (3 12 0)))
+              (make-bspline-curve 3 '(0 0 0 0 1 1 1 1) '((12 10 0) (11 10 0) (4 10 0) (3 10 0))))
+        (list (make-bspline-curve 3 '(0 0 0 0 1 1 1 1)
+                                  '((3 12 0) (3 10 0) (1.447214 2.894427 0) (1 2 0)))
+              (make-bspline-curve 3 '(0 0 0 0 1 1 1 1)
+                                  '((4 12 0) (4 10 0) (4 3 0) (2.2 1.4 0))))))
+
+#+nil
+(with-open-file (s "/tmp/ribbons" :direction :output :if-exists :supersede)
+  (iter (for (out in) in *ribbons*)
+        (format s "~{~{~f~^ ~}~%~}" (sample-curve out 100))
+        (format s "~{~{~f~^ ~}~%~}" (sample-curve in 100))))
+
+;;; We need our own RIBBON-EVALUATE:
+(defun ribbon-evaluate (patch i s d)
+  "PATCH has n elements, each consisting of a tuple: (outer-bspline inner-bspline)."
+  (let* ((base-point (bsc-evaluate (first (elt patch i)) (elt s i)))
+	 (inner-point (bsc-evaluate (second (elt patch i)) (elt s i)))
+	 (derivative (v* (v- inner-point base-point) 3.0d0)))
+    (v+ base-point (v* derivative (gamma (elt d i)) *ribbon-multiplier*))))
+
+(defun write-concave-patch (patch type filename &key (distance-type 'perpendicular) (output 'vtk))
+  "Similar to WRITE-PATCH in patches.lisp, but PATCH is a list of bspline-tuples.
+OUTPUT is one of (SPIDER RIBBONS PATCH)."
+  (let* ((n (length patch))
+         (points (points-from-angles (uniform-angles n))))
+    (ecase output
+      (spider
+       (write-vtk-polylines
+        (iter (for line in (spider-lines points))
+              (collect (iter (for domain-point in line)
+                             (collect (patch-evaluate patch points type distance-type
+                                                      domain-point)))))
+        filename))
+      (ribbons
+       (write-vtk-curves
+        (iter (for (curve1 curve2) in patch)
+              (for points1 = (sample-curve curve1 *resolution*))
+              (for points2 = (sample-curve curve2 *resolution*))
+              (appending (append (list points1 points2)
+                                 (mapcar #'list points1 points2))))
+        filename))
+      (patch
+       (write-ply-indexed-mesh
+        (iter (for domain-point in (vertices points))
+              (collect (patch-evaluate patch points type distance-type domain-point)))
+        (triangles n) filename)))))
+
+#+nil
+(let ((*resolution* 30))
+  (write-concave-patch *ribbons* 'ribbon "/tmp/proba.ply" :output 'patch)
+  (write-concave-patch *ribbons* 'ribbon "/tmp/proba.vtk" :output 'spider)
+  (write-concave-patch *ribbons* 'ribbon "/tmp/ribbons.vtk" :output 'ribbons))
