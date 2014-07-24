@@ -81,7 +81,7 @@
 ;;;    where concave edge-series are represented as one edge with inner vertices
 ;;; 3. Compute (s,d) in the regular domain
 
-(defun peti-test (p)
+(defun peti-test (points p)
   (let ((regular (points-from-angles (uniform-angles 6)))
         (quasi-regular '((0.5d0 0.8660254037844386d0)
                          (0.16666666666666666d0 0.8660254037844386d0)
@@ -91,8 +91,8 @@
                          (-0.5d0 -0.8660254037844384d0)
                          (0.5d0 -0.866025403784439d0)
                          (1.0d0 0))))
-    (let ((u (efficient-mean-value *points* (mapcar #'first quasi-regular) p))
-          (v (efficient-mean-value *points* (mapcar #'second quasi-regular) p)))
+    (let ((u (efficient-mean-value points (mapcar #'first quasi-regular) p))
+          (v (efficient-mean-value points (mapcar #'second quasi-regular) p)))
       (list (elt (compute-parameter 'mean-bilinear 's regular (list u v)) 1)
             (elt (compute-parameter 'mean-bilinear 'd regular (list u v)) 1)))))
 
@@ -100,76 +100,77 @@
 ;;; 1. Compute d-parameters the same way as Wachspress coordinates
 ;;; 2. Compute s-parameters by a similar construct
 
-(defun tomi-test (p)
+(defun tomi-test (points p)
   (let ((values-s '(0 1/3 2/3 1 1 2/3 1/3 0))
         (values-d '(0 0 0 0 1 1 1 1)))
-    (list (efficient-mean-value *points* values-s p)
-          (efficient-mean-value *points* values-d p))))
+    (list (efficient-mean-value points values-s p)
+          (efficient-mean-value points values-d p))))
 
 ;;; Simple evaluation
 
-(defun bitmap-test (points sd-fun filename &key (size 400) (density 10))
+(defun bitmap-test (points sd-fun filename &key (object-size 2.0d0) (size 400) (density 10))
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (format s "P2~%~d ~d~%255~%" size size)
-    (let ((lines (lines-from-points points)))
-      (labels ((map-point (p) (v* p (/ 10.0d0 size)))
-               (query (p)
-                 (reduce #'min (mapcar (lambda (x)
-                                         (multiple-value-bind (quot rem) (round x (/ density))
-                                           (declare (ignore quot))
-                                           (abs rem)))
-                                       (funcall sd-fun p)))))      
-        (iter (for y from (1- size) downto 0)
-              (iter (for x from 0 below size)
-                    (for p = (map-point (list x y)))
-                    (for color = (min (floor (* (query p) density 255)) 255))
-                    (format s "~d " color))
-              (terpri s))))))
+    (labels ((map-point (p)
+               (v- (v* p (/ object-size size))
+                   (list (/ object-size 2) (/ object-size 2))))
+             (query (p)
+               (reduce #'min (mapcar (lambda (x)
+                                       (multiple-value-bind (quot rem) (round x (/ density))
+                                         (declare (ignore quot))
+                                         (abs rem)))
+                                     (funcall sd-fun points p)))))
+      (iter (for y from (1- size) downto 0)
+            (iter (for x from 0 below size)
+                  (for p = (map-point (list x y)))
+                  (for color = (min (floor (* (query p) density 255)) 255))
+                  (format s "~d " color))
+            (terpri s)))))
 
-;;; (bitmap-test *points* #'peti-test "/tmp/peti.pgm")
-;;; (bitmap-test *points* #'tomi-test "/tmp/tomi.pgm")
+;;; (bitmap-test *points* #'peti-test "/tmp/peti.pgm" :object-size 20)
+;;; (bitmap-test *points* #'tomi-test "/tmp/tomi.pgm" :object-size 20)
 
 ;;; Several other tests
 
-(defun compute-sd (points values-s values-d)
-  (lambda (p)
+(defun compute-sd (values-s values-d)
+  (lambda (points p)
     (list (efficient-mean-value points values-s p)
           (efficient-mean-value points values-d p))))
 
 (let ((p '((0 10) (5 5) (10 10) (10 0) (0 0)))
       (s '(0 1/2 1 1 0))
       (d '(0 0 0 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly1.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly1.pgm"))
 
 (let ((p '((0 10) (5 7) (10 10) (10 0) (5 3) (0 0)))
       (s '(0 1/2 1 1 1/2 0))
       (d '(0 0 0 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly2.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly2.pgm"))
 
 (let ((p '((0 7) (3 6) (10 10) (10 0) (3 4) (0 3)))
       (s '(0 0.28 1 1 0.28 0))
       (d '(0 0 0 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly3.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly3.pgm"))
 
 (let ((p '((1 10) (3 6) (6 6) (7 10) (10 10) (10 0) (0 0) (0 10)))
       (s '(0 0.39 0.64 1 1 2/3 1/3 0))
       (d '(0 0 0 0 1 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly4.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly4.pgm"))
 
 (let ((p '((1 10) (2 5) (3 5) (6 10) (10 10) (10 0) (0 0) (0 10)))
       (s '(0 0.43 0.51 1 1 2/3 1/3 0))
       (d '(0 0 0 0 1 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly5.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly5.pgm"))
 
 (let ((p '((2 10) (4 6) (6 6) (8 10) (10 10) (10 0) (3 2) (0 0) (0 10)))
       (s '(0 0.41 0.59 1 1 0.68 0.44 0.32 0))
       (d '(0 0 0 0 1 1 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly6.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly6.pgm"))
 
 (let ((p '((0 10) (2 10) (4 6) (6 6) (8 10) (10 10) (10 0) (3 2) (0 0)))
       (s '(0 1 1 1 1 0.91 0.48 0.16 0))
       (d '(0 0 1 1 1 1 1 1 1)))
-  (bitmap-test p (compute-sd p s d) "/tmp/poly6b.pgm"))
+  (bitmap-test p (compute-sd s d) "/tmp/poly6b.pgm"))
 
 ;;; Tracing
 
@@ -378,3 +379,28 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
 		  (0.2 0.2)))
 	       :distance-type 'bilinear
                :spider nil))
+
+
+;;; Mean value + Kato-style s-parameters
+
+(defun mean-kato-sd (v1 v2)
+  (lambda (points p)
+    (let ((d1 (efficient-mean-value points v1 p))
+          (d2 (efficient-mean-value points v2 p)))
+      (list (/ d1 (+ d1 d2))))))
+
+#+nil
+(let ((points '((-0.8 -0.8) (0.4 -0.8) (0.4 0) (0 0) (0 -0.4) (-0.4 -0.4) (-0.4 0) (-0.8 0)))
+      (*wachspressp* nil))
+  (bitmap-test points (mean-kato-sd '(0 0 1 1 1 1 1 1) '(1 1 1 1 1 1 0 0))
+               "/tmp/mean-kato-0.pbm" :density 10)
+  (bitmap-test points (mean-kato-sd '(0 1 1 1 1 1 1 0) '(1 0 0 1 1 1 1 1))
+               "/tmp/mean-kato-1.pbm" :density 10)
+  (bitmap-test points (mean-kato-sd '(0 0 1 1 1 1 1 1) '(1 1 0 0 1 1 1 1))
+               "/tmp/mean-kato-2.pbm" :density 10)
+  (bitmap-test points (mean-kato-sd '(1 0 0 1 1 1 1 1) '(1 1 1 0 0 0 0 1))
+               "/tmp/mean-kato-3.pbm" :density 10)
+  (bitmap-test points (mean-kato-sd '(1 1 0 0 1 1 1 1) '(1 1 1 1 1 1 0 0))
+               "/tmp/mean-kato-4.pbm" :density 10)
+  (bitmap-test points (mean-kato-sd '(1 1 1 0 0 0 0 1) '(0 1 1 1 1 1 1 0))
+               "/tmp/mean-kato-5.pbm" :density 10))
