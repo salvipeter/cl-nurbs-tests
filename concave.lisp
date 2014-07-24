@@ -315,3 +315,66 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
   (write-concave-patch *ribbons* 'ribbon "/tmp/proba.ply" :output 'patch)
   (write-concave-patch *ribbons* 'ribbon "/tmp/proba.vtk" :output 'spider)
   (write-concave-patch *ribbons* 'ribbon "/tmp/ribbons.vtk" :output 'ribbons))
+
+
+;;; Try a new blend function.
+;;; This blend function ensures that ribbons vanish for d > 0.
+
+(defun blend (d i)
+  (if (> (elt d i) 1)
+      0
+      (let* ((n (length d))
+             (im (mod (1- i) n))
+             (ip (mod (1+ i) n)))
+        (/ (* (expt (elt d im) *exponent*)
+              (expt (elt d ip) *exponent*)
+              (expt (- 1 (elt d i)) *exponent*))
+           (iter (for k from 0 below n)
+                 (unless (> (elt d k) 1)
+                   (for km = (mod (1- k) n))
+                   (for kp = (mod (1+ k) n))
+                   (sum (* (expt (elt d km) *exponent*)
+                           (expt (elt d kp) *exponent*)
+                           (expt (- 1 (elt d k)) *exponent*)))))))))
+
+#+nil
+(let ((*resolution* 50)
+      (*exponent* 3))
+  (write-patch (points-from-angles '(40 20 60 100 80))
+	       'ribbon
+	       "/tmp/spider.vtk"
+	       :inner-points (points-from-angles '(40 20 60 100 80) 0.5d0)
+	       :heights
+	       '(((0.0d0 0.0d0 0.0d0 0.0d0)
+		  (0.0d0 0.0d0 0.0d0 0.0d0)
+		  (0.0d0 0.0d0 0.0d0 0.0d0)
+		  (0.0d0 0.0d0 0.0d0 0.0d0 0.0d0 0.0d0)
+		  (0.0d0 0.0d0 0.0d0 0.0d0))
+		 ((0.0 0.0)
+		  (0.0 0.0)
+		  (0.0 0.0)
+		  (0.0 0.0)
+		  (0.0 0.0)))
+	       :distance-type 'bilinear
+               :spider nil))
+
+#+nil
+(let ((*resolution* 50)
+      (*exponent* 3))
+  (write-patch (points-from-angles '(40 20 60 100 80))
+	       'ribbon
+	       "/tmp/patch.vtk"
+	       :inner-points (points-from-angles '(40 20 60 100 80) 0.5d0)
+	       :heights
+	       '(((0.0d0 0.1d0 0.1d0 0.0d0)
+		  (0.0d0 0.2d0 0.3d0 0.4d0)
+		  (0.4d0 0.6d0 0.6d0 0.4d0)
+		  (0.4d0 0.5d0 0.6d0 0.4d0 0.2d0 0.0d0)
+		  (0.0d0 0.2d0 0.1d0 0.0d0))
+		 ((0.2 0.2)
+		  (0.2 0.5)
+		  (0.5 0.8)
+		  (0.8 0.2)
+		  (0.2 0.2)))
+	       :distance-type 'bilinear
+               :spider nil))
