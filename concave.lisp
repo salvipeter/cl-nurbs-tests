@@ -491,12 +491,21 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
 (defparameter *convex*
   '((-10 8) (-10 3) (-10 -6) (9 -10) (8 0) (7 4) (6 9)))
 
-(defun peti-test-2 (points p)
+(defun peti-test-concave (points p)
   (declare (ignore points))
   (let ((u (efficient-mean-value *concave* (mapcar #'first *convex*) p))
         (v (efficient-mean-value *concave* (mapcar #'second *convex*) p)))
     (list (elt (compute-parameter 'mean-bilinear 's *convex* (list u v)) 0)
           (elt (compute-parameter 'mean-bilinear 'd *convex* (list u v)) 0))))
 
+(defun peti-test-convex (points p)
+  (declare (ignore points))
+  (list (elt (compute-parameter 'mean-bilinear 's *convex* p) 0)
+        (elt (compute-parameter 'mean-bilinear 'd *convex* p) 0)))
+
 #+nil
-(bitmap-test nil #'peti-test-2 "/tmp/peti.pgm" :object-size 25)
+(setf *wachspressp* nil)
+#+nil
+(bitmap-test nil #'peti-test-concave "/tmp/peti-concave.pgm" :object-size 25)
+#+nil
+(bitmap-test nil #'peti-test-convex "/tmp/peti-convex.pgm" :object-size 25)
