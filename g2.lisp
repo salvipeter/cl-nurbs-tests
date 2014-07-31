@@ -47,7 +47,8 @@
 
 (defun exchange-coords (i j u)
   (let ((result (copy-seq u)))
-    (rotatef (elt result i) (elt result j))))
+    (rotatef (elt result i) (elt result j))
+    result))
 
 (defun in-system (u v p)
   (if (= (second v) 0)
