@@ -323,7 +323,7 @@
 		 (+ (* u (second b)) (* -1 (+ u length) (second a)) (* (- (first a) (first b)) v))
 		 (- (* u (second a)) (* v (first a)))
 		 :min 0 :max 1))
-	     (d (/ v (+ (* (- 1 s) (second a)) (* s (second b))))))
+	     (d (safe-/ v (+ (* (- 1 s) (second a)) (* s (second b))))))
 	(list s d)))))
 
 (defmethod compute-distance ((type (eql 'bilinear)) points segments p dir)
@@ -1586,8 +1586,10 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                                                         (collect (elt A j)))))))))
              (w (if *squared-wachspress-coordinates* (mapcar #'* w w) w))
              (wsum (reduce #'+ w)))
-        (iter (for i from 0 below n)
-              (sum (/ (* (elt values i) (elt w i)) wsum)))))))
+        (if (> wsum 0)
+            (iter (for i from 0 below n)
+                  (sum (/ (* (elt values i) (elt w i)) wsum)))
+            0)))))
 
 (defun mean-blend (points segments p)
   (let ((values (mapcar (lambda (x)
