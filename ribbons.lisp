@@ -248,8 +248,8 @@ This eliminates the singularity problem in the corners."
   "Computes samples by a set of blend functions and writes it in a VTK file.
 The ON-OFF parameter declares which blends should be turned on."
   (let* ((n (length points))
-	 (lines (lines-from-points points))
-	 (*alpha* (compute-alpha lines (v* (reduce #'v+ points) (/ n)) distance-type))
+	 #+nil(lines (lines-from-points points))
+	 (*alpha* 0 #+nil(compute-alpha lines (v* (reduce #'v+ points) (/ n)) distance-type))
 	 (vertices (mapcar (lambda (p)
 			     (let ((d (compute-parameter distance-type 'd points p t)))
 			       (cons (iter (for i from 0 below (length on-off))
