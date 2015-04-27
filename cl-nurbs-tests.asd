@@ -11,7 +11,7 @@
   :author "Peter Salvi"
   :licence "Private"
   :description "Research test environment based on CL-NURBS."
-  :depends-on (:iterate :cffi :cl-nurbs :ieee-floats)
+  :depends-on (:iterate :cffi :cl-nurbs :ieee-floats :gsll :antik)
   :components ((:file "package")
 	       (:file "matrix")
 	       (:file "lu" :depends-on ("matrix"))
@@ -40,4 +40,9 @@
 		      :depends-on ("geomagic-formats"))
 	       (:file "edge-blend-fairing"
 		      :depends-on ("g-krr" "kobbelt" "five-surface"))
-	       (:file "n-patch" :depends-on ("g-krr" "kobbelt"))))
+	       (:file "n-patch" :depends-on ("g-krr" "kobbelt"))
+               (:file "n-sided-paper" :depends-on ("package"))
+               (:file "blends" :depends-on ("n-sided-paper"))
+               (:file "kato-test" :depends-on ("blends"))
+               (:file "ribbons" :depends-on ("kato-test"))
+               (:file "patches" :depends-on ("ribbons"))))

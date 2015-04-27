@@ -1,14 +1,5 @@
 (in-package :cl-nurbs-tests)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (unless (find-package "GSLL")
-    (defpackage gsll (:export make-multi-dimensional-root-solver-fdf
-			      +gnewton-mfdfsolver+ iterate
-			      multiroot-test-residual solution
-			      polynomial-solve)))
-  (unless (find-package "GRID")
-    (defpackage grid (:export make-foreign-array gref))))
-
 ;;; Utils
 (defmacro acond (&rest clauses)
   (if (null clauses)
@@ -28,9 +19,3 @@
 	(t `(destructuring-bind ,(car (first bindings))
 		,(cadr (first bindings))
 	      (dlet* ,(rest bindings) ,@body)))))
-
-;;; Modules
-(load (compile-file "blends"))
-(load (compile-file "kato-test"))
-(load (compile-file "ribbons"))
-(load (compile-file "patches"))
