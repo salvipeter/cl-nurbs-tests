@@ -509,3 +509,138 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
 (bitmap-test nil #'peti-test-concave "/tmp/peti-concave.pgm" :object-size 25)
 #+nil
 (bitmap-test nil #'peti-test-convex "/tmp/peti-convex.pgm" :object-size 25)
+
+
+;;; Returning to the original concept: composite ribbons
+;;; Implementation notes:
+;;; - uses Bezier curves, so no cusp at the concave point
+;;;   (so later we should use B-splines)
+;;; - points: all vertices
+;;; - convex-points: a list of convex polygons covering the whole concave domain
+;;; - lines: all edges, the composite edge counting as one
+;;; - coords: list of (OUTER INNER)
+;;;   - outer: all curves as a list of Bezier control points
+;;;   - inner: all inner ribbon curves as a list of Bezier control points,
+;;;            but without the first and last control point
+;;;            (these are extracted from OUTER)
+
+(defun bezier-to-bspline (curve)
+  (let ((n (length curve)))
+    (make-bspline-curve (1- n)
+                        (append (make-list n :initial-element 0) (make-list n :initial-element 1))
+                        curve)))
+
+(defparameter *points*
+  '((-1 -1) (1 -1) (1 1) (0 1) (0 0) (-1 0)))
+
+(defparameter *convex-points*
+  '(((-1 -1) (1 -1) (1 0) (-1 0))
+    ((1 0) (1 1) (0 1) (0 0))))
+
+(defparameter *lines*
+  '(((-1 0) (-1 -1)) ((-1 -1) (1 -1)) ((1 -1) (1 1)) ((1 1) (0 1)) ((0 1) (0 0) (-1 0))))
+
+(defparameter *coords*
+  '((((-1 0 0) (-1 -0.25 0) (-1 -0.75 0) (-1 -1 0))
+     ((-1 -1 0) (-0.75 -1 0) (0.75 -1 0) (1 -1 0))
+     ((1 -1 0) (1 -0.75 0) (1 0.75 0) (1 1 0))
+     ((1 1 0) (0.75 1 0) (0.25 1 0) (0 1 0))
+     ((0 1 0) (0 0.75 0) (0 0.25 0) (0 0 0) (0 0 0) (-0.25 0 0) (-0.75 0 0) (-1 0 0)))
+    (((-0.75 -0.25 0.2) (-0.75 -0.75 0.2))
+     ((-0.75 -0.75 0.2) (0.75 -0.75 0.2))
+     ((0.75 -0.75 0.2) (0.75 0.75 0.2))
+     ((0.75 0.75 0.2) (0.25 0.75 0.2))
+     ((0.25 0.75 0.2) (0.25 0 0) (0.25 -0.25 0) (0 -0.25 0) (-0.75 -0.25 0.2)))))
+
+(defun lines-next (lst x)
+  (let ((i (position x lst :test 'equal))
+        (n (length lst)))
+    (elt lst (mod (1+ i) n))))
+
+(defun lines-prev (lst x)
+  (let ((i (position x lst :test 'equal))
+        (n (length lst)))
+    (elt lst (mod (1- i) n))))
+
+(defun compute-concave-distance (points lines line p dir)
+  (if (eq dir 's)
+      (let ((dnext (compute-concave-distance points lines (lines-next lines line) p 'd))
+            (dprev (compute-concave-distance points lines (lines-prev lines line) p 'd)))
+        (let ((dd (+ dprev dnext)))
+          (if (< dd *epsilon*)
+              0.5
+              (/ dprev dd))))
+      (let ((values (mapcar (lambda (x) (if (member x line :test 'equal) 0 1)) points)))
+        (mean-value points values p))))
+
+(defun compute-concave-parameter (dir points lines p &optional no-tiny-p)
+  (macrolet ((tiny-lambda ((args) &body body)
+	       `(lambda (,args)
+		  (if no-tiny-p
+		      (let ((result (progn ,@body)))
+			(if (< result *tiny*) 0.0d0 result))
+		      (progn ,@body)))))
+    (mapcar (tiny-lambda (lst) (compute-concave-distance points lines lst p dir)) lines)))
+
+(defun concave-sp-patch-evaluate (patch points lines domain-point)
+  (let* ((n (length lines))
+	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (compute-concave-parameter 'd points lines p t))
+	 (s (compute-concave-parameter 's points lines p t))
+         (*use-gamma* nil))
+    (iter (for i from 0 below n)
+	  (with result = '(0 0 0))
+	  (setf result
+		(v+ result
+                    (v* (ribbon-evaluate patch i s d)
+                        (ribbon-blend d i))))
+	  (finally (return result)))))
+
+(defun write-concave-sp-patch (points convex-points lines coords filename &key spider)
+  (let* ((patch (generate-patch (first coords) (second coords))))
+    (if spider
+	(write-vtk-polylines
+	 (iter (for line in (spider-lines points))
+	       (collect (iter (for domain-point in line)
+			      (collect (concave-sp-patch-evaluate patch points
+                                                                  lines domain-point)))))
+	 filename)
+	(let* ((vertices (mapcar #'vertices convex-points))
+               (triangles (iter (for i from 0 below (length convex-points))
+                                (for j first 0 then (+ j (length (elt vertices (1- i)))))
+                                (for tri = (triangles (length (elt convex-points i))))
+                                (appending (mapcar (lambda (p) (mapcar (lambda (k) (+ k j)) p))
+                                                   tri)))))
+          (write-vtk-indexed-mesh
+           (iter (for domain-point in (reduce #'append vertices))
+                 (collect (concave-sp-patch-evaluate patch points lines domain-point)))
+           triangles filename)))))
+
+#+nil
+(write-constraint-ribbons
+ *points*
+ "/tmp/ribbons4.vtk"
+ :coords *coords*
+ :resolution 20)
+
+#+nil
+(let ((*resolution* 50)
+      (*ribbon-multiplier* 1.0d0)
+      (*wachspressp* nil))
+  (write-concave-sp-patch *points* *convex-points* *lines* *coords*
+                          "/tmp/sp-patch4.vtk" :spider nil))
+
+#+nil
+(flet ((s-fun (i)
+         (lambda (points p)
+           (list (elt (compute-concave-parameter 's points *lines* p) i))))
+       (d-fun (i)
+         (lambda (points p)
+           (list (elt (compute-concave-parameter 'd points *lines* p) i)))))
+  (dotimes (i 5)
+    (bitmap-test *points* (s-fun i)
+                 (format nil "/tmp/~as.pgm" i)
+                 :object-size 2.0d0)
+    (bitmap-test *points* (d-fun i)
+                 (format nil "/tmp/~ad.pgm" i)
+                 :object-size 2.0d0)))
