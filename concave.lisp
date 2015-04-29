@@ -693,3 +693,68 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
         (mean-value points values p))
       (let ((values (mapcar (lambda (x) (if (member x line :test 'equal) 0 1)) points)))
         (mean-value points values p))))
+
+
+;;; U-test
+
+(defparameter *points*
+  '((-1 -1) (1 -1) (1 1/3) (1/3 1/3) (1/3 -1/3) (-1/3 -1/3) (-1/3 1/3) (-1 1/3)))
+
+;;; Neither convex structure is good...
+;; (defparameter *convex-points*
+;;   '(((-1 -1) (1 -1) (1 -1/3) (-1 -1/3))
+;;     ((1 -1/3) (1 1/3) (1/3 1/3) (1/3 -1/3))
+;;     ((-1/3 -1/3) (-1/3 1/3) (-1 1/3) (-1 -1/3))))
+(defparameter *convex-points*
+  '(((-1 -1) (-1/3 -1) (-1/3 1/3) (-1 1/3))
+    ((-1/3 -1) (1/3 -1) (1/3 -1/3) (-1/3 -1/3))
+    ((1/3 -1) (1 -1) (1 1/3) (1/3 1/3))))
+
+(defparameter *lines*
+  '(((-1 1/3) (-1 -1)) ((-1 -1) (1 -1)) ((1 -1) (1 1/3)) ((1 1/3) (1/3 1/3))
+    ((1/3 1/3) (1/3 -1/3) (-1/3 -1/3) (-1/3 1/3)) ((-1/3 1/3) (-1 1/3))))
+
+(defparameter *coords*
+  '((((0 6 0) (0 5 0) (0 1 0) (0 0 0))
+     ((0 0 0) (1 0 0) (8 0 0) (9 0 0))
+     ((9 0 0) (9 1 0) (9 5 0) (9 6 0))
+     ((9 6 0) (8 6 0) (7 6 0) (6 6 0))
+     ((6 6 0) (6 5 0) (6 4 0) (6 3 0)
+      (6 3 0) (5 3 0) (4 3 0) (3 3 0)
+      (3 3 0) (3 4 0) (3 5 0) (3 6 0))
+     ((3 6 0) (2 6 0) (1 6 0) (0 6 0)))
+    (((1 5 1) (1 1 1))
+     ((1 1 1) (8 1 1))
+     ((8 1 1) (8 5 1))
+     ((8 5 1) (7 5 1))
+     ((7 5 1) (7 3 0) (7 2 0) (6 2 0) (3 2 0) (2 2 0) (2 3 0) (2 5 1))
+     ((2 5 1) (1 5 1)))))
+
+#+nil
+(write-constraint-ribbons
+ *points*
+ "/tmp/ribbons5.vtk"
+ :coords *coords*
+ :resolution 20)
+
+#+nil
+(let ((*resolution* 50)
+      (*ribbon-multiplier* 1.0d0)
+      (*wachspressp* nil))
+  (write-concave-sp-patch *points* *convex-points* *lines* *coords*
+                          "/tmp/sp-patch5.vtk" :spider nil))
+
+#+nil
+(flet ((s-fun (i)
+         (lambda (points p)
+           (list (elt (compute-concave-parameter 's points *lines* p) i))))
+       (d-fun (i)
+         (lambda (points p)
+           (list (elt (compute-concave-parameter 'd points *lines* p) i)))))
+  (dotimes (i 6)
+    (bitmap-test *points* (s-fun i)
+                 (format nil "/tmp/~as.pgm" i)
+                 :object-size 2.0d0)
+    (bitmap-test *points* (d-fun i)
+                 (format nil "/tmp/~ad.pgm" i)
+                 :object-size 2.0d0)))
