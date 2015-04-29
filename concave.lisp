@@ -644,3 +644,52 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
     (bitmap-test *points* (d-fun i)
                  (format nil "/tmp/~ad.pgm" i)
                  :object-size 2.0d0)))
+
+
+;;; Another type of s-parameter computation.
+
+(defun side-parameter-values (points lines line)
+  (declare (ignore lines))
+  (let* ((i (position (first line) points :test 'equal))
+         (n (length points))
+         (values (make-array n)))
+    (cond ((= (length line) 2)
+           ;; normal edge
+           (setf (aref values i) 0)
+           (setf (aref values (mod (1+ i) n)) 1)
+           (setf (aref values (mod (+ i 2) n)) 1)
+           (iter (with len = (iter (for j from 3 below n)
+                                   (sum (point-distance (elt points (mod (+ i j) n))
+                                                        (elt points (mod (+ i j -1) n))))))
+                 (for j from 3 below n)
+                 (sum (point-distance (elt points (mod (+ i j) n))
+                                      (elt points (mod (+ i j -1) n)))
+                      into acc)
+                 (setf (aref values (mod (+ i j) n)) (- 1 (/ acc len)))))
+          (t
+           ;; composite edge
+           (let ((len (reduce #'+ (mapcar #'point-distance line (rest line))))
+                 (k (length line)))
+             (setf (aref values i) 0)
+             (iter (for j from 1 below k)
+                   (sum (point-distance (elt points (mod (+ i j) n))
+                                        (elt points (mod (+ i j -1) n)))
+                        into acc)
+                   (setf (aref values (mod (+ i j) n)) (/ acc len)))
+             (setf (aref values (mod (+ i k) n)) 1)
+             (iter (with len = (iter (for j from (1+ k) below n)
+                                     (sum (point-distance (elt points (mod (+ i j) n))
+                                                          (elt points (mod (+ i j -1) n))))))
+                   (for j from (1+ k) below n)
+                   (sum (point-distance (elt points (mod (+ i j) n))
+                                        (elt points (mod (+ i j -1) n)))
+                        into acc)
+                   (setf (aref values (mod (+ i j) n)) (- 1 (/ acc len)))))))
+    (coerce values 'list)))
+
+(defun compute-concave-distance (points lines line p dir)
+  (if (eq dir 's)
+      (let ((values (side-parameter-values points lines line)))
+        (mean-value points values p))
+      (let ((values (mapcar (lambda (x) (if (member x line :test 'equal) 0 1)) points)))
+        (mean-value points values p))))
