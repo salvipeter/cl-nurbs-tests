@@ -687,7 +687,7 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
                    (setf (aref values (mod (+ i j) n)) (- 1 (/ acc len)))))))
     (coerce values 'list)))
 
-(defun compute-concave-distance (points lines line p dir)
+(defun compute-concave-distance-tomi (points lines line p dir)
   (if (eq dir 's)
       (let ((values (side-parameter-values points lines line)))
         (mean-value points values p))
@@ -716,7 +716,7 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
 
 (defparameter *coords*
   '((((0 6 0) (0 5 0) (0 1 0) (0 0 0))
-     ((0 0 0) (1 0 0) (8 0 0) (9 0 0))
+     ((0 0 0) (1 -1 0) (8 -1 0) (9 0 0))
      ((9 0 0) (9 1 0) (9 5 0) (9 6 0))
      ((9 6 0) (8 6 0) (7 6 0) (6 6 0))
      ((6 6 0) (6 5 0) (6 4 0) (6 3 0)
@@ -724,11 +724,55 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
       (3 3 0) (3 4 0) (3 5 0) (3 6 0))
      ((3 6 0) (2 6 0) (1 6 0) (0 6 0)))
     (((1 5 1) (1 1 1))
-     ((1 1 1) (8 1 1))
+     ((1 -0.5 0.5) (8 -0.5 0.5))
      ((8 1 1) (8 5 1))
      ((8 5 1) (7 5 1))
-     ((7 5 1) (7 3 0) (7 2 0) (6 2 0) (3 2 0) (2 2 0) (2 3 0) (2 5 1))
+     ((7 5 1) (7 3 0)
+      (7 2 0) (7 2 0) (7 2 0)
+      (6 2 0) (3 2 0)
+      (2 2 0) (2 2 0) (2 2 0)
+      (2 3 0) (2 5 1))
      ((2 5 1) (1 5 1)))))
+
+(defparameter *bsplines*
+  (list nil nil nil nil
+        (make-bspline-curve
+         3
+         '(0 0 0 0 .3 .3 .3 .4 .4 .4 .6 .6 .6 .7 .7 .7 1 1 1 1)
+         '((6 6 0) (6 5 0) (6 4 0)
+           (6 3 0) (6 3 0) (6 3 0) (6 3 0)
+           (5 3 0) (4 3 0)
+           (3 3 0) (3 3 0) (3 3 0) (3 3 0)
+           (3 4 0) (3 5 0) (3 6 0)))
+        nil))
+
+(defun bezier-or-bspline (lst i u)
+  (if (and *bsplines* (elt *bsplines* i))
+      (bsc-evaluate (elt *bsplines* i) u)
+      (bezier (elt lst i) u)))
+
+;;; Special version of RIBBON-EVALUATE: (HACK!!!)
+;;; uses the corresponding element of *BSPLINES* when non-nil
+(defun ribbon-evaluate (patch i s d)
+  (let* ((base-point (bezier-or-bspline (first patch) i (elt s i)))
+	 (inner-point (bezier (elt (second patch) i) (elt s i)))
+	 (derivative (v* (v- inner-point base-point) 3.0d0))) ;; why x3?
+    (v+ base-point (v* derivative (gamma (elt d i)) *ribbon-multiplier*))))
+
+(defun write-constraint-ribbons (points filename &key (resolution 100) inner-points heights coords)
+  (let* ((patch (or (and coords (generate-patch (first coords) (second coords)))
+		    (generate-patch-from-heights points inner-points heights)))
+	 (curves (iter (for i upfrom 0)
+		       (for curve2 in (second patch))
+		       (for points1 =
+			    (iter (for u from 0 to 1 by (/ resolution))
+				  (collect (bezier-or-bspline (first patch) i u))))
+		       (for points2 =
+			    (iter (for u from 0 to 1 by (/ resolution))
+				  (collect (bezier curve2 u))))
+		       (appending (append (list points1 points2)
+					  (mapcar #'list points1 points2))))))
+    (write-vtk-curves curves filename)))
 
 #+nil
 (write-constraint-ribbons
@@ -758,3 +802,125 @@ OUTPUT is one of (SPIDER RIBBONS PATCH)."
     (bitmap-test *points* (d-fun i)
                  (format nil "/tmp/~ad.pgm" i)
                  :object-size 2.0d0)))
+
+
+;;; Try Gregory patches...
+
+(defun concave-corner-correction (patch i s &optional d)
+  "Correction for the same corner as explained in CORNER-EVALUATE."
+  (let* ((i-1 (mod (1- i) (length s)))
+	 (si-1 (if d (elt d i) (- 1.0d0 (elt s i-1))))
+	 (si (if d (elt d i-1) (elt s i)))
+         (prev-degree (1- (length (elt (first patch) i-1))))
+         (next-degree (1- (length (elt (first patch) i))))
+	 (previous (let ((lst (elt (first patch) i-1)))
+		     (elt lst (- (length lst) 2))))
+	 (corner (first (elt (first patch) i)))
+	 (next (second (elt (first patch) i)))
+	 (twist (second (elt (second patch) i))))
+    (v+ corner
+	(v* (v- previous corner) prev-degree (gamma si-1))
+	(v* (v- next corner) next-degree (gamma si))
+	(v* (v- (v+ corner twist) (v+ previous next))
+            prev-degree next-degree (gamma si-1) (gamma si)))))
+
+(defun concave-corner-evaluate (patch i d)
+  "The corner defined by segments I-1 and I,
+thus containing point I-1 (NOT point I)."
+  (let* ((i-1 (mod (1- i) (length d)))
+	 (si-1 (- 1.0d0 (elt d i)))
+	 (si (elt d i-1))
+	 (ci-1 (bezier-or-bspline (first patch) i-1 si-1))
+	 (ci (bezier-or-bspline (first patch) i si))
+	 (di-1 (v* (v- (bezier (elt (second patch) i-1) si-1) ci-1) 3.0d0))
+	 (di (v* (v- (bezier (elt (second patch) i) si) ci) 3.0d0)))
+    (v+ ci ci-1 (v* di (- 1.0d0 si-1)) (v* di-1 si))))
+
+(defun concave-gc-patch-evaluate (patch points lines domain-point)
+  (let* ((n (length lines))
+	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (compute-concave-parameter 'd points lines p t))
+         (*use-gamma* t))
+    (iter (for i from 0 below n)
+	  (with result = '(0 0 0))
+	  (setf result
+                (v+ result
+                    (v* (v- (concave-corner-evaluate patch i d)
+                            (concave-corner-correction patch i d d))
+                        (corner-blend d (mod (1- i) n)))))
+	  (finally (return result)))))
+
+(defun write-concave-gc-patch (points convex-points lines coords filename &key spider)
+  (let* ((patch (generate-patch (first coords) (second coords))))
+    (if spider
+	(write-vtk-polylines
+	 (iter (for line in (spider-lines points))
+	       (collect (iter (for domain-point in line)
+			      (collect (concave-gc-patch-evaluate patch points
+                                                                  lines domain-point)))))
+	 filename)
+	(let* ((vertices (mapcar #'vertices convex-points))
+               (triangles (iter (for i from 0 below (length convex-points))
+                                (for j first 0 then (+ j (length (elt vertices (1- i)))))
+                                (for tri = (triangles (length (elt convex-points i))))
+                                (appending (mapcar (lambda (p) (mapcar (lambda (k) (+ k j)) p))
+                                                   tri)))))
+          (write-vtk-indexed-mesh
+           (iter (for domain-point in (reduce #'append vertices))
+                 (collect (concave-gc-patch-evaluate patch points lines domain-point)))
+           triangles filename)))))
+
+#+nil
+(let ((*resolution* 50)
+      (*ribbon-multiplier* 1.0d0)
+      (*wachspressp* nil))
+  (write-concave-gc-patch *points* *convex-points* *lines* *coords*
+                          "/tmp/sp-patch5.vtk" :spider nil))
+
+
+;;; Try DC patches...
+
+(defun write-concave-dc-patch (points convex-points lines coords filename &key spider)
+  (let* ((patch (generate-patch (first coords) (second coords))))
+    (if spider
+	(write-vtk-polylines
+	 (iter (for line in (spider-lines points))
+	       (collect (iter (for domain-point in line)
+			      (collect (concave-dc-patch-evaluate patch points
+                                                                  lines domain-point)))))
+	 filename)
+	(let* ((vertices (mapcar #'vertices convex-points))
+               (triangles (iter (for i from 0 below (length convex-points))
+                                (for j first 0 then (+ j (length (elt vertices (1- i)))))
+                                (for tri = (triangles (length (elt convex-points i))))
+                                (appending (mapcar (lambda (p) (mapcar (lambda (k) (+ k j)) p))
+                                                   tri)))))
+          (write-vtk-indexed-mesh
+           (iter (for domain-point in (reduce #'append vertices))
+                 (collect (concave-dc-patch-evaluate patch points lines domain-point)))
+           triangles filename)))))
+
+(defun concave-dc-patch-evaluate (patch points lines domain-point)
+  (let* ((n (length lines))
+	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
+	 (d (compute-concave-parameter 'd points lines p t))
+	 (s (compute-concave-parameter 's points lines p t))
+         (*use-gamma* t))
+    (iter (for i from 0 below n)
+	  (with result = '(0 0 0))
+	  (setf result
+                (v+ result
+                    (v* (ribbon-evaluate patch i s d)
+                        (+ (corner-blend d (mod (1- i) n))
+                           (corner-blend d i)))
+                    (v* (concave-corner-correction patch i s d)
+                        (corner-blend d (mod (1- i) n))
+                        -1.0d0)))
+	  (finally (return result)))))
+
+#+nil
+(let ((*resolution* 50)
+      (*ribbon-multiplier* 1.0d0)
+      (*wachspressp* nil))
+  (write-concave-dc-patch *points* *convex-points* *lines* *coords*
+                          "/tmp/sp-patch5.vtk" :spider nil))
