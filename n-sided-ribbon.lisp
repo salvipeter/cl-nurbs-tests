@@ -120,11 +120,16 @@
 
 (defun n-sided-ribbon-evaluate (ribbons barycoords i)
   (let* ((n (length barycoords))
+         (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
-         (d (- 1 (elt barycoords i-1) (elt barycoords i)))
-         (s (let ((dprev (- 1 (elt barycoords (mod (- i 2) n)) (elt barycoords i-1)))
-                  (dnext (- 1 (elt barycoords i) (elt barycoords (mod (1+ i) n)))))
-              (/ dprev (+ dprev dnext)))))
+         (i+1 (mod (+ i 1) n))
+         ;; what is d (and s), when all local barycentric coordinates are 0?
+         (d (- 1 (safe-/ (+ (elt barycoords i-1) (elt barycoords i))
+                         (+ (elt barycoords i-2) (elt barycoords i-1)
+                            (elt barycoords i) (elt barycoords i+1)))))
+         (s (safe-/ (+ (elt barycoords i) (elt barycoords i+1))
+                    (+ (elt barycoords i-2) (elt barycoords i-1)
+                       (elt barycoords i) (elt barycoords i+1)))))
     (affine-combine (ribbon-evaluate ribbons i
                                      (make-list n :initial-element s)
                                      (make-list n :initial-element d))
@@ -257,8 +262,13 @@
 
 #+nil
 (let ((*barycentric-normalized* t)
-      (*barycentric-type* 'meanvalue)
-      (*use-local-d* nil))
+      (*barycentric-type* 'wachspress)
+      (*use-local-d* t)
+      #+nil(*points* (points-from-angles '(0 30 60 60 80 40 20))) ; 7sided
+      #+nil(*points* (points-from-angles '(20 70 30 70 30))) ; 5sided
+      #+nil(*points* (points-from-angles '(0 60 75 90))) ; 4sided
+      #+nil(*points* (points-from-angles '(0 120 80))) ; 3sided
+      )
   (flet ((s-fun (i)
            (lambda (points p)
              (let ((l (barycentric-coordinates points p)))
@@ -267,7 +277,7 @@
            (lambda (points p)
              (let ((l (barycentric-coordinates points p)))
                (list (compute-nr-parameter l i 'd))))))
-    (dotimes (i 6)
+    (dotimes (i (length *points*))
       (bitmap-test *points* (s-fun i)
                    (format nil "/tmp/side-~a-s-~:[global~;local~]-~(~a~)-~:[~;normalized~].pgm" i *use-local-d* *barycentric-type* *barycentric-normalized*)
                    :object-size 2.0d0)
@@ -276,6 +286,12 @@
                    :object-size 2.0d0))))
 
 ;;; Note: `local' is only meaningful for d-parameters; s is always local
+
+;;; Wachspress & Harmonic are the same, when the points lie
+;;; on a unit circle around the origin (see Floater & Hormann).
+
+;;; Point coordinates on a [0,0]x[400x400] bitmap:
+;;; (mapcar (lambda (p) (v* (v+ p '(1 1)) 200)) *points*)
 
 ;;; Merge with a suitable transparent image of the polygon:
 ;;; for i in side*.pgm; do convert $i background.png -composite ${i%.pgm}.png; done
