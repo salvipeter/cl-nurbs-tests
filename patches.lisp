@@ -554,6 +554,9 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for diff = (point-distance p (bezier curve v)))
 		 (maximize diff))))))
 
+(defun safe-acos (x)
+  (acos (min (max x -1) 1)))
+
 (defun check-patch-normals (points type &key inner-points heights coords
 			     (distance-type 'perpendicular) (step 0.1d-3))
   "Only side interpolation checking for now."
@@ -580,8 +583,8 @@ SEARCH-RESOLUTION parameters are checked for a suitable initial value."
 		 (for v = (bezier-project-point curve p 10 *resolution*))
 		 (for derivative = (vnormalize (bezier curve v 1)))
 		 (for diff =
-		      (vlength
-		       (cross-product
+		      (safe-acos
+		       (scalar-product
 			(vnormalize (cross-product derivative (v- q p)))
 			(vnormalize (cross-product derivative
 						   (v- (bezier inner-curve v)

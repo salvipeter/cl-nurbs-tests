@@ -244,26 +244,28 @@
 
 ;;; New s-parameterization test
 
-(defparameter *use-local-d* t)
+(defparameter *use-local-d* nil)
 (defun compute-nr-parameter (l i dir)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
          (i+1 (mod (+ i 1) n)))
     (if (eq dir 's)
-        (safe-/ (+ (elt l i) (elt l i+1))
-                (+ (elt l i-2) (elt l i-1) (elt l i) (elt l i+1)))
+        (safe-/ (+ (elt l i))
+                (+ (elt l i-1) (elt l i)))
         (if *use-local-d*
             (- 1 (safe-/ (+ (elt l i-1) (elt l i))
                          (+ (elt l i-2) (elt l i-1) (elt l i) (elt l i+1))))
             (- 1 (elt l i-1) (elt l i))))))
+;;; Actually this s is the same as Kato's s function,
+;;; a line sweep on angle bisectors
 
 ;;; See BITMAP-TEST in concave.lisp
 
 #+nil
 (let ((*barycentric-normalized* t)
       (*barycentric-type* 'wachspress)
-      (*use-local-d* t)
+      (*use-local-d* nil)
       #+nil(*points* (points-from-angles '(0 30 60 60 80 40 20))) ; 7sided
       #+nil(*points* (points-from-angles '(20 70 30 70 30))) ; 5sided
       #+nil(*points* (points-from-angles '(0 60 75 90))) ; 4sided
