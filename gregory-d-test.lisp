@@ -44,7 +44,29 @@ thus containing point I-1 (NOT point I)."
            (+ (bernstein 3 0 di)
               (bernstein 3 1 di))))))
 
-;;; Added (temporarily): CORNER[-D][-BARYBLEND] types
+(defun corner-sbaryblend (s i)
+  (let* ((n (length s))
+         (i-1 (mod (1- i) n))
+         (di (- 1 (elt s i-1)))
+         (di-1 (elt s i)))
+    (if *quintic-baryblend-p*
+        (* (+ (bernstein 5 0 di-1)
+              (bernstein 5 1 di-1)
+              (bernstein 5 2 di-1))
+           (+ (bernstein 5 0 di)
+              (bernstein 5 1 di)
+              (bernstein 5 2 di)))
+        (* (+ (bernstein 3 0 di-1)
+              (bernstein 3 1 di-1))
+           (+ (bernstein 3 0 di)
+              (bernstein 3 1 di))))))
+
+(defun corner-normalized-baryblend (d i)
+  (/ (corner-baryblend d i)
+     (iter (for j from 0 below (length d))
+           (sum (corner-baryblend d j)))))
+
+;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
 (defun patch-evaluate (patch points type distance-type domain-point)
   (let* ((n (length points))
 	 (p (mapcar (lambda (x) (or (and (>= (abs x) *tiny*) x) 0.0d0)) domain-point))
@@ -80,6 +102,14 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
                            (corner-baryblend d i)))
+                      (corner-normalized-baryblend
+                       (v* (v- (corner-evaluate patch i s)
+                               (corner-correction patch i s))
+                           (corner-normalized-baryblend d i)))
+                      (corner-sbaryblend
+                       (v* (v- (corner-evaluate patch i s)
+                               (corner-correction patch i s))
+                           (corner-sbaryblend s i)))
                       (corner-d (v* (v- (corner-d-evaluate patch i d)
                                         (corner-d-correction patch i d))
                                     (corner-blend d (mod (1- i) n))))
@@ -87,6 +117,10 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-d-evaluate patch i d)
                                (corner-d-correction patch i d))
                            (corner-baryblend d i)))
+                      (corner-d-normalized-baryblend
+                       (v* (v- (corner-d-evaluate patch i d)
+                               (corner-d-correction patch i d))
+                           (corner-normalized-baryblend d i)))
 		      (hybrid (v- (v* (ribbon-evaluate patch i s d)
 				      (+ (corner-blend d (mod (1- i) n))
 					 (corner-blend d i)))
@@ -194,12 +228,12 @@ thus containing point I-1 (NOT point I)."
       (*wachspressp* t)
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil))
-  (iter (for type in '(corner corner-baryblend corner-d corner-d-baryblend))
+  (iter (for type in '(corner corner-normalized-baryblend corner-d corner-d-normalized-baryblend))
 	(iter (for distance in '(mean-bilinear))
-	      (format t "Maximal  point  deviation using ~a with ~a: ~f~%"
+	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
 		      (check-patch *points* type :coords *coords* :distance-type distance))
-	      (format t "Maximal normal deviation using ~a with ~a: ~f~%"
+	      (format t "TAN [~a / ~a]: ~f~%"
 		      type distance
 		      (/ (* 180 (check-patch-normals *points* type :coords *coords* :distance-type distance :step 1.0d-4)) pi)))))
 
