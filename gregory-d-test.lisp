@@ -66,6 +66,22 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (corner-baryblend d j)))))
 
+(defun side-baryblend (s d i)
+  (let ((si (elt s i))
+        (di (elt d i)))
+    (* (+ (bernstein 3 0 si)
+          (bernstein 3 1 si)
+          (bernstein 3 2 si)
+          (bernstein 3 3 si))
+       (+ (bernstein 3 0 di)
+          (bernstein 3 1 di))
+       1/2)))
+
+(defun side-normalized-baryblend (s d i)
+  (/ (side-baryblend s d i)
+     (iter (for j from 0 below (length d))
+           (sum (side-baryblend s d j)))))
+
 ;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
 (defun patch-evaluate (patch points type distance-type domain-point)
   (let* ((n (length points))
@@ -133,6 +149,18 @@ thus containing point I-1 (NOT point I)."
 					(+ (wachspress-corner-blend points (mod (1- i) n) p)
 					   (wachspress-corner-blend points i p))
 					1/2))
+                      (hybrid-coons-baryblend
+                       (v* (coons-ribbon-evaluate patch i s d)
+                           (side-normalized-baryblend s d i)
+                           #+nil
+                           (/ (+ (corner-normalized-baryblend d (mod (1+ i) n))
+                                 (corner-normalized-baryblend d i))
+                              2)
+                           #+nil
+                           (/ (+ (corner-blend d (mod (1- i) n))
+                                 (corner-blend d i))
+                              2)
+                           ))
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i)))
 		      (sketches-coons (v* (coons-ribbon-evaluate patch i s d)
@@ -228,7 +256,7 @@ thus containing point I-1 (NOT point I)."
       (*wachspressp* t)
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil))
-  (iter (for type in '(corner corner-normalized-baryblend corner-d corner-d-normalized-baryblend))
+  (iter (for type in '(hybrid-coons hybrid-coons-baryblend))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance

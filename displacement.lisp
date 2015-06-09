@@ -247,6 +247,13 @@ and adds displacements to the central control points on all sides."
                   (bernstein 3 3 s))
                (+ (bernstein 3 0 d)
                   (bernstein 3 1 d))))
+      (side-half (* (+ (bernstein 3 0 s)
+                       (bernstein 3 1 s)
+                       (bernstein 3 2 s)
+                       (bernstein 3 3 s))
+                    (+ (bernstein 3 0 d)
+                       (bernstein 3 1 d))
+                    1/2))
       (corner (* (+ (bernstein 3 0 d-1)
                     (bernstein 3 1 d-1))
                  (+ (bernstein 3 0 d)
@@ -298,4 +305,6 @@ and adds displacements to the central control points on all sides."
   (write-barycentric-blends points '(nil nil nil nil t) "/tmp/side0b.vtk"
                             :type 'side)
   (write-barycentric-blends points '(t t t t t) "/tmp/allb.vtk"
-                            :type 'deviation))
+                            :type 'deviation)
+  (write-barycentric-blends points '(t t t t t) "/tmp/allc.vtk"
+                            :type 'side-half))
