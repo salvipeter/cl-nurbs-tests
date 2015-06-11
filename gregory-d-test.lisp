@@ -82,6 +82,32 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (side-baryblend s d j)))))
 
+(defun corner-tomi-blend (barycentric i)
+  (let ((n (length barycentric)))
+    (flet ((l (j &optional (k 1))
+             (let ((lj (elt barycentric (mod (+ i j) n))))
+               (expt (- 1 lj) k))))
+      (+ (* (l 0 3) (l -2 3))                 ; 00
+         (* 3 (l 0 2) (l -1) (l -2 3))        ; 10
+         (* 3 (l 0 3) (l -2 2) (l -1))        ; 01
+         (* 9 (l 0 2) (l -1) (l -2 2) (l -1)) ; 11
+         ))))
+
+(defun side-tomi-blend (barycentric i)
+  (let ((n (length barycentric)))
+    (flet ((l (j &optional (k 1))
+             (let ((lj (elt barycentric (mod (+ i j) n))))
+               (expt (- 1 lj) k))))
+      (+ (* (l 0 3) (l -2 3))                 ; 00
+         (* 3 (l 0 2) (l -1) (l -2 3))        ; 10
+         (* 3 (l 0 1) (l -1 2) (l 1 3))       ; 20
+         (* (l -1 3) (l 1 3))                 ; 30
+         (* 3 (l 0 3) (l -2 2) (l -1))        ; 01
+         (* 9 (l 0 2) (l -1) (l -2 2) (l -1)) ; 11
+         (* 9 (l 0 1) (l -1 2) (l 1 2) (l 0)) ; 21
+         (* 3 (l -1 3) (l 1 2) (l 0))         ; 31
+         ))))
+
 ;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
 (defun patch-evaluate (patch points type distance-type domain-point)
   (let* ((n (length points))
@@ -97,6 +123,8 @@ thus containing point I-1 (NOT point I)."
 		 (compute-parameter 'biquadratic-corner 's points p t)
 		 s))
 	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t)))
+         (barycentric (when (member type '(corner-tomi-blend side-tomi-blend))
+                        (barycentric-coordinates points p)))
          (*use-gamma* (member type '(hybrid hybrid-coons))))
     (iter (for i from 0 below n)
 	  (with result = '(0 0 0))
@@ -118,6 +146,10 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
                            (corner-baryblend d i)))
+                      (corner-tomi-blend
+                       (v* (v- (corner-evaluate patch i s)
+                               (corner-correction patch i s))
+                           (corner-tomi-blend barycentric i)))
                       (corner-normalized-baryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
@@ -161,6 +193,10 @@ thus containing point I-1 (NOT point I)."
                                  (corner-blend d i))
                               2)
                            ))
+                      (side-tomi-blend
+                       (v* (coons-ribbon-evaluate patch i s d)
+                           (side-tomi-blend barycentric i)
+                           1/2))
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i)))
 		      (sketches-coons (v* (coons-ribbon-evaluate patch i s d)
@@ -255,8 +291,10 @@ thus containing point I-1 (NOT point I)."
       (*centralized-line-sweep* nil)
       (*wachspressp* t)
       (*quintic-baryblend-p* nil)
-      (*use-gamma* nil))
-  (iter (for type in '(hybrid-coons hybrid-coons-baryblend))
+      (*use-gamma* nil)
+      (*barycentric-type* 'wachspress)
+      (*barycentric-normalized* t))
+  (iter (for type in '(corner-tomi-blend corner side-tomi-blend hybrid-coons))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
