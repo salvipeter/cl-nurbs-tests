@@ -84,28 +84,34 @@ thus containing point I-1 (NOT point I)."
 
 (defun corner-tomi-blend (barycentric i)
   (let ((n (length barycentric)))
-    (flet ((l (j &optional (k 1))
+    (flet ((li (j k)
+             (let ((lj (elt barycentric (mod (+ i j) n))))
+               (expt lj k)))
+           (l- (j k)
              (let ((lj (elt barycentric (mod (+ i j) n))))
                (expt (- 1 lj) k))))
-      (+ (* (l 0 3) (l -2 3))                 ; 00
-         (* 3 (l 0 2) (l -1) (l -2 3))        ; 10
-         (* 3 (l 0 3) (l -2 2) (l -1))        ; 01
-         (* 9 (l 0 2) (l -1) (l -2 2) (l -1)) ; 11
+      (+ (*   (li -1 1) (l-  0 2)           (li -1 1) (l- -2 2))           ; 00
+         (* 3 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 2))           ; 10
+         (* 3 (li -1 1) (l-  0 2)           (li -1 1) (l- -2 1) (l- -1 1)) ; 01
+         (* 9 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 1) (l- -1 1)) ; 11
          ))))
 
 (defun side-tomi-blend (barycentric i)
   (let ((n (length barycentric)))
-    (flet ((l (j &optional (k 1))
+    (flet ((li (j k)
+             (let ((lj (elt barycentric (mod (+ i j) n))))
+               (expt lj k)))
+           (l- (j k)
              (let ((lj (elt barycentric (mod (+ i j) n))))
                (expt (- 1 lj) k))))
-      (+ (* (l 0 3) (l -2 3))                 ; 00
-         (* 3 (l 0 2) (l -1) (l -2 3))        ; 10
-         (* 3 (l 0 1) (l -1 2) (l 1 3))       ; 20
-         (* (l -1 3) (l 1 3))                 ; 30
-         (* 3 (l 0 3) (l -2 2) (l -1))        ; 01
-         (* 9 (l 0 2) (l -1) (l -2 2) (l -1)) ; 11
-         (* 9 (l 0 1) (l -1 2) (l 1 2) (l 0)) ; 21
-         (* 3 (l -1 3) (l 1 2) (l 0))         ; 31
+      (+ (*   (li -1 1) (l-  0 2)           (li -1 1) (l- -2 2))           ; 00
+         (* 3 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 2))           ; 10
+         (* 3 (li -1 1) (l- -1 2)           (li -1 1) (l-  1 2))           ; 20
+         (*             (l- -1 3)           (li -1 1) (l-  1 2))           ; 30
+         (* 3 (li -1 1) (l-  0 2)           (li -1 1) (l- -2 1) (l- -1 1)) ; 01
+         (* 9 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 1) (l- -1 1)) ; 11
+         (* 9 (li -1 1)           (l- -1 2) (li  0 1) (l-  1 1) (l-  0 1)) ; 21
+         (* 3                     (l- -1 3) (li  0 1) (l-  1 1) (l-  0 1)) ; 31
          ))))
 
 ;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
