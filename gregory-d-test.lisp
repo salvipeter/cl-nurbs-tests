@@ -77,6 +77,17 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (side-baryblend s d j)))))
 
+(defun barycentric-s (l i)
+  (let* ((n (length l))
+         (i-1 (mod (1- i) n)))
+    (safe-/ (elt l i)
+            (+ (elt l i-1) (elt l i)))))
+
+(defun barycentric-d (l i)
+  (let* ((n (length l))
+         (i-1 (mod (1- i) n)))
+    (- 1 (elt l i-1) (elt l i))))
+
 (defun corner-tomi-blend (s d i)
   (let* ((n (length s))
          (i-1 (mod (1- i) n))
@@ -85,11 +96,25 @@ thus containing point I-1 (NOT point I)."
          (si (elt s i))
          (si-1 (- 1 (elt s i-1))))
     (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
-      (if (< (abs (+ di di-1)) *epsilon*)
+      (if (< (abs (+ si si-1)) *epsilon*)
           1
-          (/ (+ (* di (H di) (H si))
-                (* di-1 (H di-1) (H si-1)))
-             (+ di di-1))))))
+          (/ (+ (* si (H di) (H si))
+                (* si-1 (H di-1) (H si-1)))
+             (+ si si-1))))))
+
+(defun corner-tomi-baryblend (l i)
+  (let* ((n (length l))
+         (i-1 (mod (1- i) n))
+         (di (barycentric-d l i))
+         (di-1 (barycentric-d l i-1))
+         (si (barycentric-s l i))
+         (si-1 (- 1 (barycentric-s l i-1))))
+    (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
+      (if (< (abs (+ si si-1)) *epsilon*)
+          1
+          (/ (+ (* si (H di) (H si))
+                (* si-1 (H di-1) (H si-1)))
+             (+ si si-1))))))
 
 (defun side-tomi-blend (barycentric i)
   (let ((n (length barycentric)))
@@ -136,7 +161,8 @@ thus containing point I-1 (NOT point I)."
 		 (compute-parameter 'biquadratic-corner 's points p t)
 		 s))
 	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t)))
-         (barycentric (when (member type '(corner-tomi-blend side-tomi-blend))
+         (barycentric (when (member type '(corner-tomi-baryblend
+                                           side-tomi-blend))
                         (barycentric-coordinates points p)))
          (*use-gamma* (member type '(hybrid hybrid-coons))))
     (iter (for i from 0 below n)
@@ -168,6 +194,10 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
                            (corner-tomi-blend s d i)))
+                      (corner-tomi-baryblend
+                       (v* (v- (corner-evaluate patch i s)
+                               (corner-correction patch i s))
+                           (corner-tomi-baryblend barycentric i)))
                       (corner-normalized-baryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
@@ -313,7 +343,7 @@ thus containing point I-1 (NOT point I)."
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(corner-tomi-blend corner))
+  (iter (for type in '(corner-tomi-blend corner-tomi-baryblend corner))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
