@@ -109,6 +109,18 @@ thus containing point I-1 (NOT point I)."
          (* 3                     (l- -1 3) (li  0 1) (l-  1 1) (l-  0 1)) ; 31
          ))))
 
+(defun simple-corner-evaluate (patch i s d)
+  (let* ((i-1 (mod (1- i) (length s)))
+         (di-1 (expt (elt d i-1) *exponent*))
+         (di (expt (elt d i) *exponent*))
+         (ri (ribbon-evaluate patch i s d))
+         (ri-1 (ribbon-evaluate patch i-1 s d))
+         (denom (+ di-1 di)))
+    (if (< (abs denom) *epsilon*)
+        ri
+        (v* (v+ (v* ri di-1) (v* ri-1 di))
+            (/ denom)))))
+
 ;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
 (defun patch-evaluate (patch points type distance-type domain-point)
   (let* ((n (length points))
@@ -134,6 +146,8 @@ thus containing point I-1 (NOT point I)."
 		    (case type
 		      (ribbon (v* (ribbon-evaluate patch i s d)
 				  (ribbon-blend d i)))
+                      (interior-ribbon (v* (ribbon-evaluate patch i s d)
+                                           (interior-ribbon-blend d i)))
 		      (ribbon-coons (v* (coons-ribbon-evaluate patch i s d)
 					(ribbon-blend d i)))
 		      (corner (if (eq distance-type 'biquadratic)
@@ -143,6 +157,9 @@ thus containing point I-1 (NOT point I)."
 				  (v* (v- (corner-evaluate patch i s)
 					  (corner-correction patch i s))
 				      (corner-blend d (mod (1- i) n)))))
+                      (simple-corner
+                       (v* (simple-corner-evaluate patch i s d)
+                           (corner-normalized-baryblend d i)))
                       (corner-baryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
@@ -294,8 +311,9 @@ thus containing point I-1 (NOT point I)."
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil)
       (*barycentric-type* 'wachspress)
-      (*barycentric-normalized* t))
-  (iter (for type in '(hybrid-coons-baryblend corner-tomi-blend corner side-tomi-blend hybrid-coons))
+      (*barycentric-normalized* t)
+      (*alpha* 0.5))
+  (iter (for type in '(simple-corner corner))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
