@@ -67,15 +67,10 @@ thus containing point I-1 (NOT point I)."
            (sum (corner-baryblend d j)))))
 
 (defun side-baryblend (s d i)
-  (let ((si (elt s i))
-        (di (elt d i)))
-    (* (+ (bernstein 3 0 si)
-          (bernstein 3 1 si)
-          (bernstein 3 2 si)
-          (bernstein 3 3 si))
-       (+ (bernstein 3 0 di)
-          (bernstein 3 1 di))
-       1/2)))
+  (declare (ignore s))
+  (let ((di (elt d i)))
+    (+ (bernstein 3 0 di)
+       (bernstein 3 1 di))))
 
 (defun side-normalized-baryblend (s d i)
   (/ (side-baryblend s d i)
@@ -300,7 +295,7 @@ thus containing point I-1 (NOT point I)."
       (*use-gamma* nil)
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t))
-  (iter (for type in '(corner-tomi-blend corner side-tomi-blend hybrid-coons))
+  (iter (for type in '(hybrid-coons-baryblend corner-tomi-blend corner side-tomi-blend hybrid-coons))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
