@@ -77,19 +77,19 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (side-baryblend s d j)))))
 
-(defun corner-tomi-blend (barycentric i)
-  (let ((n (length barycentric)))
-    (flet ((li (j k)
-             (let ((lj (elt barycentric (mod (+ i j) n))))
-               (expt lj k)))
-           (l- (j k)
-             (let ((lj (elt barycentric (mod (+ i j) n))))
-               (expt (- 1 lj) k))))
-      (+ (*   (li -1 1) (l-  0 2)           (li -1 1) (l- -2 2))           ; 00
-         (* 3 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 2))           ; 10
-         (* 3 (li -1 1) (l-  0 2)           (li -1 1) (l- -2 1) (l- -1 1)) ; 01
-         (* 9 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 1) (l- -1 1)) ; 11
-         ))))
+(defun corner-tomi-blend (s d i)
+  (let* ((n (length s))
+         (i-1 (mod (- i 1) n))
+         (di (elt d i))
+         (di-1 (elt d i-1))
+         (si (elt s i))
+         (si-1 (elt s i-1)))
+    (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
+      (if (< (abs (+ di di-1)) *epsilon*)
+          1
+          (/ (+ (* di-1 (H di) (H si))
+                (* di (H di-1) (H si-1)))
+             (+ di di-1))))))
 
 (defun side-tomi-blend (barycentric i)
   (let ((n (length barycentric)))
@@ -167,7 +167,7 @@ thus containing point I-1 (NOT point I)."
                       (corner-tomi-blend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
-                           (corner-tomi-blend barycentric i)))
+                           (corner-tomi-blend s d i)))
                       (corner-normalized-baryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
@@ -313,7 +313,7 @@ thus containing point I-1 (NOT point I)."
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(simple-corner corner))
+  (iter (for type in '(corner-tomi-blend corner))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
