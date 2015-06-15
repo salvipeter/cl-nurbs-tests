@@ -134,12 +134,17 @@ thus containing point I-1 (NOT point I)."
          (* 3                     (l- -1 3) (li  0 1) (l-  1 1) (l-  0 1)) ; 31
          ))))
 
-(defun simple-corner-evaluate (patch i s d)
-  (let* ((i-1 (mod (1- i) (length s)))
+(defun simple-corner-evaluate (patch i d)
+  (let* ((n (length d))
+         (i-1 (mod (1- i) n))
          (di-1 (expt (elt d i-1) *exponent*))
          (di (expt (elt d i) *exponent*))
-         (ri (ribbon-evaluate patch i s d))
-         (ri-1 (ribbon-evaluate patch i-1 s d))
+         (s- (iter (for i from 0 below n)
+                   (collect (elt d (mod (1- i) n)))))
+         (s+ (iter (for i from 0 below n)
+                   (collect (- 1 (elt d (mod (1+ i) n))))))
+         (ri (ribbon-evaluate patch i s- d))
+         (ri-1 (ribbon-evaluate patch i-1 s+ d))
          (denom (+ di-1 di)))
     (if (< (abs denom) *epsilon*)
         ri
@@ -184,7 +189,7 @@ thus containing point I-1 (NOT point I)."
 					  (corner-correction patch i s))
 				      (corner-blend d (mod (1- i) n)))))
                       (simple-corner
-                       (v* (simple-corner-evaluate patch i s d)
+                       (v* (simple-corner-evaluate patch i d)
                            (corner-normalized-baryblend d i)))
                       (corner-baryblend
                        (v* (v- (corner-evaluate patch i s)
@@ -343,7 +348,7 @@ thus containing point I-1 (NOT point I)."
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(corner-tomi-blend corner-tomi-baryblend corner))
+  (iter (for type in '(corner-tomi-blend simple-corner))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
