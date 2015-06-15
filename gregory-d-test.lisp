@@ -116,24 +116,6 @@ thus containing point I-1 (NOT point I)."
                 (* si-1 (H di-1) (H si-1)))
              (+ si si-1))))))
 
-(defun side-tomi-blend (barycentric i)
-  (let ((n (length barycentric)))
-    (flet ((li (j k)
-             (let ((lj (elt barycentric (mod (+ i j) n))))
-               (expt lj k)))
-           (l- (j k)
-             (let ((lj (elt barycentric (mod (+ i j) n))))
-               (expt (- 1 lj) k))))
-      (+ (*   (li -1 1) (l-  0 2)           (li -1 1) (l- -2 2))           ; 00
-         (* 3 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 2))           ; 10
-         (* 3 (li -1 1) (l- -1 2)           (li -1 1) (l-  1 2))           ; 20
-         (*             (l- -1 3)           (li -1 1) (l-  1 2))           ; 30
-         (* 3 (li -1 1) (l-  0 2)           (li -1 1) (l- -2 1) (l- -1 1)) ; 01
-         (* 9 (li -1 1) (l-  0 1) (l- -1 1) (li -1 1) (l- -2 1) (l- -1 1)) ; 11
-         (* 9 (li -1 1)           (l- -1 2) (li  0 1) (l-  1 1) (l-  0 1)) ; 21
-         (* 3                     (l- -1 3) (li  0 1) (l-  1 1) (l-  0 1)) ; 31
-         ))))
-
 (defun simple-corner-evaluate (patch i d)
   (let* ((n (length d))
          (i-1 (mod (1- i) n))
@@ -248,7 +230,8 @@ thus containing point I-1 (NOT point I)."
                            ))
                       (side-tomi-blend
                        (v* (coons-ribbon-evaluate patch i s d)
-                           (side-tomi-blend barycentric i)
+                           (+ (corner-tomi-baryblend barycentric (mod (1+ i) n))
+                              (corner-tomi-baryblend barycentric i))
                            1/2))
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i)))
@@ -348,7 +331,7 @@ thus containing point I-1 (NOT point I)."
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(corner-tomi-blend simple-corner))
+  (iter (for type in '(side-tomi-blend hybrid-coons))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
