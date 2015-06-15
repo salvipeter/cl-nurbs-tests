@@ -79,16 +79,16 @@ thus containing point I-1 (NOT point I)."
 
 (defun corner-tomi-blend (s d i)
   (let* ((n (length s))
-         (i-1 (mod (- i 1) n))
+         (i-1 (mod (1- i) n))
          (di (elt d i))
          (di-1 (elt d i-1))
          (si (elt s i))
-         (si-1 (elt s i-1)))
+         (si-1 (- 1 (elt s i-1))))
     (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
       (if (< (abs (+ di di-1)) *epsilon*)
           1
-          (/ (+ (* di-1 (H di) (H si))
-                (* di (H di-1) (H si-1)))
+          (/ (+ (* di (H di) (H si))
+                (* di-1 (H di-1) (H si-1)))
              (+ di di-1))))))
 
 (defun side-tomi-blend (barycentric i)
