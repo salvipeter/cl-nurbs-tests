@@ -66,6 +66,11 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (corner-baryblend d j)))))
 
+(defun corner-normalized-sbaryblend (s i)
+  (/ (corner-sbaryblend s i)
+     (iter (for j from 0 below (length s))
+           (sum (corner-sbaryblend s j)))))
+
 (defun side-baryblend (s d i)
   (declare (ignore s))
   (let ((di (elt d i)))
@@ -110,11 +115,16 @@ thus containing point I-1 (NOT point I)."
          (si (barycentric-s l i))
          (si-1 (- 1 (barycentric-s l i-1))))
     (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
-      (if (< (abs (+ si si-1)) *epsilon*)
+      #+nil(if (< (abs (+ si si-1)) *epsilon*)
           1
           (/ (+ (* si (H di) (H si))
                 (* si-1 (H di-1) (H si-1)))
-             (+ si si-1))))))
+             (+ si si-1)))
+      (if (< (abs (+ di di-1)) *epsilon*)
+          1
+          (/ (+ (* di-1 (H di) (H si))
+                (* di (H di-1) (H si-1)))
+             (+ di di-1))))))
 
 (defun simple-corner-evaluate (patch i d)
   (let* ((n (length d))
@@ -189,10 +199,10 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
                            (corner-normalized-baryblend d i)))
-                      (corner-sbaryblend
+                      (corner-normalized-sbaryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
-                           (corner-sbaryblend s i)))
+                           (corner-normalized-sbaryblend s i)))
                       (corner-d (v* (v- (corner-d-evaluate patch i d)
                                         (corner-d-correction patch i d))
                                     (corner-blend d (mod (1- i) n))))
@@ -331,7 +341,7 @@ thus containing point I-1 (NOT point I)."
       (*barycentric-type* 'wachspress)
       (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(side-tomi-blend hybrid-coons))
+  (iter (for type in '(corner-normalized-sbaryblend corner))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
@@ -339,36 +349,3 @@ thus containing point I-1 (NOT point I)."
 	      (format t "TAN [~a / ~a]: ~f~%"
 		      type distance
 		      (/ (* 180 (check-patch-normals *points* type :coords *coords* :distance-type distance :step 1.0d-4)) pi)))))
-
-
-;;; Blend deficit at a given point
-#+nil
-(let ((*quintic-baryblend-p* nil))
-  (iter (for i from 3 to 9)
-        (let* ((points (points-from-angles (uniform-angles i)))
-               (n (length points))
-               (lines (lines-from-points points))
-               (p (affine-combine (affine-combine (first points) 0.5 (second points))
-                                  0.5
-                                  (central-point points lines t)))
-               (d (compute-parameter 'mean-bilinear 'd points p t)))
-          (format t "~d => ~a~%"
-                  i (- 1 (iter (for i from 0 below n)
-                               (print (corner-baryblend d i))
-                               (sum (corner-baryblend d i))))))))
-;;; cubic:
-;; 3 => -0.6460905349794241
-;; 4 => 2.220446049250313e-16
-;; 5 => 0.38048000000000004
-;; 6 => 0.5967078189300408
-;; 7 => 0.7248765395370971
-;; 8 => 0.8046874999999999
-;; 9 => 0.8566614167894461
-;;; quintic:
-;; 3 => -0.8728852309099222
-;; 4 => 2.220446049250313e-16
-;; 5 => 0.4961592320000001
-;; 6 => 0.7357110196616365
-;; 7 => 0.8534301035344867
-;; 8 => 0.9142761230468749
-;; 9 => 0.9474520719011327
