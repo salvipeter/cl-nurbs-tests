@@ -126,6 +126,10 @@ thus containing point I-1 (NOT point I)."
                 (* di (H di-1) (H si-1)))
              (+ di di-1))))))
 
+(defun corner-peti-baryblend (l i)
+  (let ((l2 (mapcar (lambda (x) (* x x)) l)))
+    (/ (elt l2 i) (reduce #'+ l2))))
+
 (defun simple-corner-evaluate (patch i d)
   (let* ((n (length d))
          (i-1 (mod (1- i) n))
@@ -159,6 +163,8 @@ thus containing point I-1 (NOT point I)."
 		 s))
 	 (b (and (eq type 'sketches) (compute-parameter 'perpendicular 'd points p t)))
          (barycentric (when (member type '(corner-tomi-baryblend
+                                           corner-peti-baryblend
+                                           side-peti-baryblend
                                            side-tomi-blend))
                         (barycentric-coordinates points p)))
          (*use-gamma* (member type '(hybrid hybrid-coons))))
@@ -195,6 +201,16 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
                            (corner-tomi-baryblend barycentric i)))
+                      (corner-peti-baryblend
+                       (v* (v- (corner-evaluate patch i s)
+                               (corner-correction patch i s))
+                           (corner-peti-baryblend barycentric
+                                                      (mod (1- i) n))))
+                      (side-peti-baryblend
+                       (v* (coons-ribbon-evaluate patch i s d)
+                           (* (+ (corner-peti-baryblend barycentric i)
+                                 (corner-peti-baryblend barycentric (mod (1- i) n)))
+                              1/2)))
                       (corner-normalized-baryblend
                        (v* (v- (corner-evaluate patch i s)
                                (corner-correction patch i s))
@@ -332,6 +348,34 @@ thus containing point I-1 (NOT point I)."
      ((1.5 1 1) (0.5 2 1))
      ((0.5 2 1) (1 1 1)))))
 
+
+;;; random generated test patch - doesn't work
+(let ((n 3))
+  (defparameter *points*
+    (points-from-angles
+     (cons 3 (iter (repeat (1- n))
+                   (collect (random (floor 360 n)))))))
+  (defparameter *coords*
+    (flet ((random-point () (iter (repeat 3) (collect (random 100)))))
+      (let ((outer (iter (repeat n)
+                         (for prev first nil then next)
+                         (for next
+                              first (iter (repeat 4) (collect (random-point)))
+                              then (cons (car (last prev))
+                                         (iter (repeat 3) (collect (random-point)))))
+                         (collect next)))
+            (inner (iter (repeat n)
+                         (for prev first nil then next)
+                         (for next
+                              first (iter (repeat 2) (collect (random-point)))
+                              then (list (car (last prev)) (random-point)))
+                         (collect next))))
+        (setf (first (last (first (last outer))))
+              (first (first outer)))
+        (setf (first (last (first (last inner))))
+              (first (first inner)))
+        (list outer inner)))))
+
 (let ((*resolution* 100)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* nil)
@@ -339,9 +383,9 @@ thus containing point I-1 (NOT point I)."
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil)
       (*barycentric-type* 'wachspress)
-      (*barycentric-normalized* t)
+      (*barycentric-normalized* nil)
       (*alpha* 0.5))
-  (iter (for type in '(corner-normalized-sbaryblend corner))
+  (iter (for type in '(corner-peti-baryblend side-peti-baryblend))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
