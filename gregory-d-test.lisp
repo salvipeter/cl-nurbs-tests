@@ -382,7 +382,7 @@ thus containing point I-1 (NOT point I)."
       (*wachspressp* t)
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil)
-      (*barycentric-type* 'wachspress)
+      (*barycentric-type* 'harmonic)
       (*barycentric-normalized* nil)
       (*alpha* 0.5))
   (iter (for type in '(corner-peti-baryblend side-peti-baryblend))

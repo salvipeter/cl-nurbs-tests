@@ -25,7 +25,8 @@
                  (harmonic (* x x))
                  (meanvalue x)
                  (wachspress 1))))
-      (let* ((w (iter (for i from 0 below n)
+      (let* ((corner nil)
+             (w (iter (for i from 0 below n)
                       (for Ai = (area-product (list i)))
                       (for Ai-1 = (area-product (list (dec i))))
                       (for Ai-1i = (area-product (list (dec i) i)))
@@ -37,13 +38,17 @@
                       (for ri-1 = (bctype (elt lengths (dec i))))
                       (for ri = (bctype (elt lengths i)))
                       (for ri+1 = (bctype (elt lengths (inc i))))
+                      (when (< ri *epsilon*)
+                        (setf corner i))
                       (collect (+ (* ri-1 Ai-1)
                                   (* ri+1 Ai)
                                   (* -1 ri Bi Ai-1i)))))
              (wsum (reduce #'+ w)))
-        (if *barycentric-normalized*
-            (mapcar (lambda (wi) (/ wi wsum)) w)
-            w)))))
+        (cond (corner (let ((lst (make-list n :initial-element 0)))
+                        (setf (elt lst corner) 1)
+                        lst))
+              (*barycentric-normalized* (mapcar (lambda (wi) (/ wi wsum)) w))
+              (t w))))))
 
 ;;; Test: create a (for now 2D) ribbon with n sides
 
