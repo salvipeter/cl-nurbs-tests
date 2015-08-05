@@ -14,6 +14,7 @@
       p)))
 
 (defun evaluate-part-with-lambda (l)
+  
   (let ((li-2 (elt l 0))
         (li-1 (elt l 1))
         (li   (elt l 2))

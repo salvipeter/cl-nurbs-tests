@@ -130,6 +130,25 @@ thus containing point I-1 (NOT point I)."
   (let ((l2 (mapcar (lambda (x) (* x x)) l)))
     (/ (elt l2 i) (reduce #'+ l2))))
 
+(defun rational-side-blend (l i)
+  (let* ((n (length l))
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (di-1 (barycentric-d l i-1))
+         (di (barycentric-d l i))
+         (di+1 (barycentric-d l i+1))
+         (si (barycentric-s l i)))
+    (if (or (< (+ di-1 di) *epsilon*)
+            (< (+ di di+1) *epsilon*))
+        1/2
+        (flet ((H (x) (+ (bernstein 3 0 x) (bernstein 3 1 x))))
+          (+ (* (/ (expt di-1 *exponent*)
+                   (+ (expt di-1 *exponent*) (expt di *exponent*)))
+                (H si) (H di))
+             (* (/ (expt di+1 *exponent*)
+                   (+ (expt di+1 *exponent*) (expt di *exponent*)))
+                (H (- 1 si)) (H di)))))))
+
 (defun simple-corner-evaluate (patch i d)
   (let* ((n (length d))
          (i-1 (mod (1- i) n))
@@ -146,6 +165,62 @@ thus containing point I-1 (NOT point I)."
         ri
         (v* (v+ (v* ri di-1) (v* ri-1 di))
             (/ denom)))))
+
+(defun displacement-base-corner-evaluate (patch i l)
+  (let* ((n (length l))
+         (i+1 (mod (1+ i) n))
+         (p00 (first (elt (first patch) i+1)))
+         (p01 (second (elt (first patch) i+1)))
+         (p10 (first (elt (second patch) i+1)))
+         (p11 (second (elt (second patch) i+1)))
+         (si+1 (barycentric-s l i+1))
+         (si (barycentric-s l i))
+         (di+1 (barycentric-d l i+1))
+         (di (barycentric-d l i)))
+    (when (< (abs (+ di+1 di)) *epsilon*)
+      (return-from displacement-base-corner-evaluate p00))
+    (flet ((blend (j k)
+             (/ (+ (* di (bernstein 3 j di+1) (bernstein 3 k si+1))
+                   (* di+1 (bernstein 3 k di) (bernstein 3 j (- 1 si))))
+                (+ di+1 di))))
+      (v+ (v* p00 (blend 0 0))
+          (v* p01 (blend 0 1))
+          (v* p10 (blend 1 0))
+          (v* p11 (blend 1 1))))))
+
+(defun displacement-side-evaluate (patch i l)
+  (let* ((n (length l))
+         (i+1 (mod (1+ i) n))
+         (i-1 (mod (1- i) n))
+         (si (barycentric-s l i))
+         (di (barycentric-d l i))
+         (di-1 (barycentric-d l i-1))
+         (di+1 (barycentric-d l i+1)))
+    (cond ((< (+ di di+1) *epsilon*)
+           (v* (elt (elt (first patch) i) 3) 1/2))
+          ((< (+ di di-1) *epsilon*)
+           (v* (elt (elt (first patch) i) 0) 1/2))
+          (t (let ((alpha (/ di-1 (+ di-1 di)))
+                   (beta (/ di+1 (+ di+1 di)))
+                   (blend-s (iter (for j from 0 to 3)
+                                  (collect (bernstein 3 j si))))
+                   (blend-d (iter (for j from 0 to 1)
+                                  (collect (bernstein 3 j di))))
+                   (ab '(1 1 0 0))
+                   (p '(0 0 0)))
+               (iter (for j from 0 to 3)
+                     (iter (for k from 0 to 1)
+                           (for bl = (* (elt blend-s j)
+                                        (elt blend-d k)
+                                        (+ (* alpha (elt ab j))
+                                           (* beta (- 1 (elt ab j))))))
+                           (for cp = (elt (elt (if (= k 0)
+                                                   (first patch)
+                                                   (second patch))
+                                               i)
+                                          j))
+                           (setf p (v+ p (v* cp bl)))))
+               p)))))
 
 ;;; Added (temporarily): CORNER[-D][-[NORMALIZED-][S]BARYBLEND] types
 (defun patch-evaluate (patch points type distance-type domain-point)
@@ -165,7 +240,10 @@ thus containing point I-1 (NOT point I)."
          (barycentric (when (member type '(corner-tomi-baryblend
                                            corner-peti-baryblend
                                            side-peti-baryblend
-                                           side-tomi-blend))
+                                           side-tomi-blend
+                                           rational-side-blend
+                                           displacement-base
+                                           displacement-side))
                         (barycentric-coordinates points p)))
          (*use-gamma* (member type '(hybrid hybrid-coons))))
     (iter (for i from 0 below n)
@@ -230,6 +308,9 @@ thus containing point I-1 (NOT point I)."
                        (v* (v- (corner-d-evaluate patch i d)
                                (corner-d-correction patch i d))
                            (corner-normalized-baryblend d i)))
+                      (rational-side-blend
+                       (v* (ribbon-evaluate patch i s d)
+                           (rational-side-blend barycentric i)))
 		      (hybrid (v- (v* (ribbon-evaluate patch i s d)
 				      (+ (corner-blend d (mod (1- i) n))
 					 (corner-blend d i)))
@@ -262,7 +343,11 @@ thus containing point I-1 (NOT point I)."
 		      (sketches (v* (ribbon-evaluate patch i s d)
 				    (ribbon-blend b i)))
 		      (sketches-coons (v* (coons-ribbon-evaluate patch i s d)
-					  (ribbon-blend b i))))))
+					  (ribbon-blend b i)))
+                      (displacement-base
+                       (displacement-base-corner-evaluate patch i barycentric))
+                      (displacement-side
+                       (displacement-side-evaluate patch i barycentric)))))
 	  (finally (return result)))))
 
 
@@ -377,15 +462,16 @@ thus containing point I-1 (NOT point I)."
         (list outer inner)))))
 
 (let ((*resolution* 100)
+      (*exponent* 2)
       (*ribbon-multiplier* 1.0d0)
       (*centralized-line-sweep* nil)
       (*wachspressp* t)
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil)
-      (*barycentric-type* 'harmonic)
-      (*barycentric-normalized* nil)
+      (*barycentric-type* 'wachspress)
+      (*barycentric-normalized* t)
       (*alpha* 0.5))
-  (iter (for type in '(corner-peti-baryblend side-peti-baryblend))
+  (iter (for type in '(displacement-side))
 	(iter (for distance in '(mean-bilinear))
 	      (format t "POS [~a / ~a]: ~f~%"
 		      type distance
