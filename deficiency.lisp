@@ -2,14 +2,15 @@
 
 ;;; BARYCENTRIC-COORDINATES => see n-sided-ribbon.lisp
 ;;; BARYCENTRIC-S, BARYCENTRIC-D => see gregory-d-test.lisp
-(defun test (n degree &key (position 'center) (use-d t) (weight-type 'everywhere))
+(defun deficiency (n degree &key (position 'center) (use-d t))
   (let* ((points (points-from-angles (uniform-angles n)))
-         (p (ecase position
+         (p (case position
               (center '(0 0))
               (edge-center-mid
                (v* (v+ (first points) (second points)) 1/4))
               (vertex-center-mid
-               (v* (first points) 1/2))))
+               (v* (first points) 1/2))
+              (t position)))
          (l (barycentric-coordinates points p))
          (half-low (floor degree 2))
          (half-up (ceiling degree 2)))
@@ -25,27 +26,28 @@
              (for di+1 = (barycentric-d l i+1))
              (for alpha =
                   (if use-d
-                      (/ di-1 (+ di-1 di))
-                      (/ si (+ si (- 1 si-1)))))
+                      (if (< (+ di-1 di) *epsilon*)
+                          0.5
+                          (/ di-1 (+ di-1 di)))
+                      (if (< (+ si (- 1 si-1)) *epsilon*)
+                          0.5
+                          (/ si (+ si (- 1 si-1))))))
              (for beta =
                   (if use-d
-                      (/ di+1 (+ di+1 di))
-                      (/ (- 1 si) (+ (- 1 si) si+1))))
+                      (if (< (+ di+1 di) *epsilon*)
+                          0.5
+                          (/ di+1 (+ di+1 di)))
+                      (if (< (+ (- 1 si) si+1) *epsilon*)
+                          0.5
+                          (/ (- 1 si) (+ (- 1 si) si+1)))))
              (for blf-sum = 0)
              (iter (for row from 0 below (ceiling degree 2))
                    (iter (for col from 0 to degree)
                          (for blend = (* (bernstein degree row di)
                                          (bernstein degree col si)))
-                         (for mu =
-                              (ecase weight-type
-                                (everywhere
-                                 (cond ((and (evenp degree) (= col half-low)) 1)
-                                       ((< col half-up) alpha)
-                                       ((> col half-low) beta)))
-                                (all-corners
-                                 'todo)
-                                (corners-with-halving
-                                 'todo)))
+                         (for mu = (cond ((and (evenp degree) (= col half-low)) 1)
+                                         ((< col half-up) alpha)
+                                         ((> col half-low) beta)))
                          (incf blf-sum (* mu blend))))
              (sum blf-sum)))))
 
@@ -59,4 +61,4 @@
                   (format t "~a sides:~%" n)
                   (iter (for d from 1 to 7)
                         (format t "deg: ~a => ~a%~%"
-                                d (round (* (test n d :position type :use-d dp) 100)))))))
+                                d (round (* (deficiency n d :position type :use-d dp) 100)))))))

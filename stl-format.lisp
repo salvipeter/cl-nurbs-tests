@@ -181,6 +181,12 @@ the first is a list of points, the second is a list of index tuples."
       (format s "~{~f~^ ~}~%" (elt points i)))
     (dolist (p polygons) (format s "~d~{ ~d~}~%" (length p) p))))
 
+(defun write-obj-indexed-mesh (points polygons filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (dotimes (i (length points))
+      (format s "v~{ ~f~}~%" (elt points i)))
+    (dolist (p polygons) (format s "f~{ ~d~}~%" (mapcar #'1+ p)))))
+
 (defun bss-write-ply (surface filename resolution)
   "Uses triangles instead of quads."
   (unless (listp resolution)
