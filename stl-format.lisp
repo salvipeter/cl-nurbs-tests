@@ -187,6 +187,28 @@ the first is a list of points, the second is a list of index tuples."
       (format s "v~{ ~f~}~%" (elt points i)))
     (dolist (p polygons) (format s "f~{ ~d~}~%" (mapcar #'1+ p)))))
 
+(defun write-ps-indexed-mesh-projection (points triangles stream
+                                         &key (transform #'identity) (axis 0) (lines 0.1))
+  (labels ((coords (p) (funcall transform (mapcar (lambda (i) (elt p i)) (remove axis '(0 1 2)))))
+           (alpha (i j)
+             (let* ((p (elt (elt points i) axis))
+                    (q (elt (elt points j) axis))
+                    (val (* lines (max (floor p lines) (floor q lines)))))
+               (/ (- val p) (- q p))))
+           (write-segment (a b c)
+             "Linearly interpolates in AC and BC."
+             (let ((ac (affine-combine (elt points a) (alpha a c) (elt points c)))
+                   (bc (affine-combine (elt points b) (alpha b c) (elt points c))))
+               (format stream "~{~f ~}moveto ~{~f ~}lineto stroke~%" (coords ac) (coords bc)))))
+    (dolist (tri triangles)
+      (let ((vals (mapcar (lambda (i) (floor (elt (elt points i) axis) lines)) tri)))
+        (cond ((and (= (first vals) (second vals)) (/= (first vals) (third vals)))
+               (write-segment (first tri) (second tri) (third tri)))
+              ((and (= (first vals) (third vals)) (/= (first vals) (second vals)))
+               (write-segment (first tri) (third tri) (second tri)))
+              ((and (= (second vals) (third vals)) (/= (first vals) (third vals)))
+               (write-segment (second tri) (third tri) (first tri))))))))
+
 (defun bss-write-ply (surface filename resolution)
   "Uses triangles instead of quads."
   (unless (listp resolution)

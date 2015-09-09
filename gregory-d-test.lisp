@@ -82,17 +82,6 @@ thus containing point I-1 (NOT point I)."
      (iter (for j from 0 below (length d))
            (sum (side-baryblend s d j)))))
 
-(defun barycentric-s (l i)
-  (let* ((n (length l))
-         (i-1 (mod (1- i) n)))
-    (safe-/ (elt l i)
-            (+ (elt l i-1) (elt l i)))))
-
-(defun barycentric-d (l i)
-  (let* ((n (length l))
-         (i-1 (mod (1- i) n)))
-    (- 1 (elt l i-1) (elt l i))))
-
 (defun corner-tomi-blend (s d i)
   (let* ((n (length s))
          (i-1 (mod (1- i) n))

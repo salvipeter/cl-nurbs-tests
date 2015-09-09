@@ -45,4 +45,5 @@
                (:file "blends" :depends-on ("n-sided-paper"))
                (:file "kato-test" :depends-on ("blends"))
                (:file "ribbons" :depends-on ("kato-test"))
-               (:file "patches" :depends-on ("ribbons"))))
+               (:file "patches" :depends-on ("ribbons"))
+               (:file "barycentric-parameterization" :depends-on ("package"))))

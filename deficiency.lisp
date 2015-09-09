@@ -1,7 +1,5 @@
 (in-package :cl-nurbs-tests)
 
-;;; BARYCENTRIC-COORDINATES => see n-sided-ribbon.lisp
-;;; BARYCENTRIC-S, BARYCENTRIC-D => see gregory-d-test.lisp
 (defun deficiency (n degree &key (position 'center) (use-d t))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
