@@ -1,6 +1,6 @@
 (in-package :cl-nurbs-tests)
 
-(defun deficiency (n degree &key (position 'center) (use-d t))
+(defun deficiency (n degree &key (position 'center) (use-d t) (sides 'one))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -43,7 +43,20 @@
                    (iter (for col from 0 to degree)
                          (for blend = (* (bernstein degree row di)
                                          (bernstein degree col si)))
-                         (for mu = (cond ((and (evenp degree) (= col half-low)) 1)
+                         (for mu = (cond ((and (evenp degree) (= col half-low))
+                                          (ecase sides
+                                            (one 1)
+                                            (zero 0)
+                                            (heuristic
+                                             (let* ((lc (barycentric-coordinates points '(0 0)))
+                                                    (dc (if use-d (barycentric-d lc 0) 0.5))
+                                                    (def1 (deficiency n degree :use-d use-d :sides 'zero))
+                                                    (def2 (deficiency n (1- degree) :use-d use-d))
+                                                    (blends (iter (for row2 from 0 below (ceiling degree 2))
+                                                                  (sum (* (bernstein degree row2 di)
+                                                                          (bernstein degree col si)))))
+                                                    (value (/ (- def1 def2) blends n)))
+                                               (1+ (* (/ (1- value) dc dc) di di))))))
                                          ((< col half-up) alpha)
                                          ((> col half-low) beta)))
                          (incf blf-sum (* mu blend))))
