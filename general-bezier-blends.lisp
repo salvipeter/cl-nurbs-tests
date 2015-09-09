@@ -86,8 +86,8 @@
             (write-ps-indexed-mesh-projection
              (iter (for p in (vertices points))
                    (for def = (deficiency n degree :position p :use-d use-d))
-                   (collect (cons def p)))
-             (triangles n) s :transform #'transform :axis 0 :lines 0.1)
+                   (collect (cons (if (< (abs def) *epsilon*) 0 def) p)))
+             (triangles n) s :transform #'transform :axis 0 :lines density)
             (write-poly s points cp-str)))))))
 
 #+nil
