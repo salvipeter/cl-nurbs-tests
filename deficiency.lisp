@@ -1,6 +1,6 @@
 (in-package :cl-nurbs-tests)
 
-(defun deficiency (n degree &key (position 'center) (use-d t) (sides 'one))
+(defun deficiency (n degree &key (position 'center) (use-d t))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -9,9 +9,7 @@
               (vertex-center-mid
                (v* (first points) 1/2))
               (t position)))
-         (l (barycentric-coordinates points p))
-         (half-low (floor degree 2))
-         (half-up (ceiling degree 2)))
+         (l (barycentric-coordinates points p)))
     (- 1
        (iter (for i from 0 below n)
              (for i-1 = (mod (1- i) n))
@@ -43,26 +41,14 @@
                    (iter (for col from 0 to degree)
                          (for blend = (* (bernstein degree row di)
                                          (bernstein degree col si)))
-                         (for mu = (cond ((and (evenp degree) (= col half-low))
-                                          (ecase sides
-                                            (one 1)
-                                            (zero 0)
-                                            (heuristic
-                                             (let* ((lc (barycentric-coordinates points '(0 0)))
-                                                    (dc (if use-d (barycentric-d lc 0) 0.5))
-                                                    (def1 (deficiency n degree :use-d use-d :sides 'zero))
-                                                    (def2 (deficiency n (1- degree) :use-d use-d))
-                                                    (blends (iter (for row2 from 0 below (ceiling degree 2))
-                                                                  (sum (* (bernstein degree row2 di)
-                                                                          (bernstein degree col si)))))
-                                                    (value (/ (- def1 def2) blends n)))
-                                               (1+ (* (/ (1- value) dc dc) di di))))))
-                                         ((< col half-up) alpha)
-                                         ((> col half-low) beta)))
+                         (for mu = (cond ((and (< row 2) (< col 2)) alpha)
+                                         ((and (< row 2) (> col (- degree 2))) beta)
+                                         ((or (< col row) (> col (- degree row))) 0)
+                                         ((or (= col row) (= col (- degree row))) 1/2)
+                                         (t 1)))
                          (incf blf-sum (* mu blend))))
              (sum blf-sum)))))
 
-;;; 
 #+nil
 (iter (for dp in '(t nil))
       (format t "Using ~:[S~;D~] in alpha/beta:~%" dp)
@@ -73,3 +59,58 @@
                   (iter (for d from 1 to 7)
                         (format t "deg: ~a => ~a%~%"
                                 d (round (* (deficiency n d :position type :use-d dp) 100)))))))
+
+(defun innermost-axis-weight-sum (n degree &key (position 'center))
+  "Weight sum of the innermost axis control points."
+  (assert (> degree 4))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (iter (for i from 0 below n)
+          (for si = (barycentric-s l i))
+          (for di = (barycentric-d l i))
+          (for j = (ceiling degree 2))
+          (sum (* (bernstein degree j di) (bernstein degree j si))))))
+
+(defun inner-weight-sum (n degree &key (position 'center))
+  "Weight sum of all inner control points."
+  (assert (> degree 4))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (iter (for i from 0 below n)
+          (for si = (barycentric-s l i))
+          (for di = (barycentric-d l i))
+          (for blf-sum = 0)
+          (iter (for row from 2 below (ceiling degree 2))
+                (iter (for col from row to (- degree row))
+                      (for blend = (* (bernstein degree row di)
+                                      (bernstein degree col si)))
+                      (if (or (= col row) (= col (- degree row)))
+                          (incf blf-sum (/ blend 2))
+                          (incf blf-sum blend))))
+          (sum blf-sum))))
+
+#+nil
+(let ((n 3)
+      (*resolution* 50))
+  (iter (for degree from 5 to 8)
+        (iter (for p in (vertices (points-from-angles (uniform-angles n))))
+              (for d = (deficiency n degree :position p :use-d t))
+              (for w = (inner-weight-sum n degree :position p))
+              ;(for w = (innermost-axis-weight-sum :position p))
+              (minimizing (+ w d) into min-wd)
+              (maximizing (+ w d) into max-wd)
+              (finally (format t "Degree ~a: [~5f, ~5f]~%" degree min-wd max-wd)))))
