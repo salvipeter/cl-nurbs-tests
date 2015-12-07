@@ -75,7 +75,7 @@
     (iter (for i from 0 below n)
           (for si = (barycentric-s l i))
           (for di = (barycentric-d l i))
-          (for j = (ceiling degree 2))
+          (for j = (1- (ceiling degree 2)))
           (sum (* (bernstein degree j di) (bernstein degree j si))))))
 
 (defun inner-weight-sum (n degree &key (position 'center))
@@ -110,7 +110,7 @@
         (iter (for p in (vertices (points-from-angles (uniform-angles n))))
               (for d = (deficiency n degree :position p :use-d t))
               (for w = (inner-weight-sum n degree :position p))
-              ;(for w = (innermost-axis-weight-sum :position p))
+              ;(for w = (innermost-axis-weight-sum n degree :position p))
               (minimizing (+ w d) into min-wd)
               (maximizing (+ w d) into max-wd)
               (finally (format t "Degree ~a: [~5f, ~5f]~%" degree min-wd max-wd)))))
