@@ -3,7 +3,6 @@
 (defun generalized-bernstein (points p side degree col row &key (use-d t))
   (let* ((n (length points))
          (l (barycentric-coordinates points p))
-         (half-low (floor degree 2))
          (i side)
          (i-1 (mod (1- i) n))
          (i+1 (mod (1+ i) n))
@@ -29,9 +28,11 @@
                        (/ (- 1 si) (+ (- 1 si) si+1)))))
          (blend (* (bernstein degree row di)
                    (bernstein degree col si)))
-         (mu (cond ((and (evenp degree) (= col half-low)) 1)
-                   ((> col half-low) beta)
-                   (t alpha))))
+         (mu (cond ((and (< row 2) (< col 2)) alpha)
+                   ((and (< row 2) (> col (- degree 2))) beta)
+                   ((or (< col row) (> col (- degree row))) 0)
+                   ((or (= col row) (= col (- degree row))) 1/2)
+                   (t 1))))
     (* blend mu)))
 
 ;;; DEFICIENCY => see deficiency.lisp
@@ -43,8 +44,12 @@
                 (with-open-file (s fname :direction :output :if-exists :supersede)
                   (write-obj-indexed-mesh
                    (iter (for p in (vertices points))
-                         (for b = (generalized-bernstein points p 0 degree col row :use-d use-d))
-                         (collect (cons b p)))
+                         (for b = (generalized-bernstein points p 1 degree col row :use-d use-d))
+                         (for bp = (generalized-bernstein points p 0 degree (- degree row) col
+                                                          :use-d use-d))
+                         (for bn = (generalized-bernstein points p 2 degree row (- degree col)
+                                                          :use-d use-d))
+                         (collect (cons (+ b bp bn) p)))
                    (triangles n)
                    fname))))
     (let ((fname (format nil "~a/~asided-deg~a-center.obj" path n degree)))
@@ -78,8 +83,13 @@
                       (for cp-str = (format nil "Blend of control point (~a, ~a)" col row))
                       (write-ps-indexed-mesh-projection
                        (iter (for p in (vertices points))
-                             (for b = (generalized-bernstein points p 0 degree col row :use-d use-d))
-                             (collect (cons b p)))
+                             (for b = (generalized-bernstein points p 1 degree col row
+                                                             :use-d use-d))
+                             (for bp = (generalized-bernstein points p 0 degree (- degree row) col
+                                                          :use-d use-d))
+                             (for bn = (generalized-bernstein points p 2 degree row (- degree col)
+                                                              :use-d use-d))
+                             (collect (cons (+ b bp bn) p)))
                        (triangles n) s :transform #'transform :axis 0 :lines density)
                       (write-poly s points cp-str)))
           (let ((cp-str "Blend of central control point"))
