@@ -127,6 +127,13 @@
                 (/ (* 4 (- *auto-wachspress-central-d* w))
                    (* (- 1 w) w w)))))))
 
+(defmethod compute-distance ((type (eql 'bary-autowp)) points segments p dir)
+  (let* ((i (position (elt segments 2) points :test #'equal))
+         (l (barycentric-coordinates points p)))
+    (if (eq dir 's)
+        (barycentric-s l i)
+        (barycentric-d-autowp l i))))
+
 (defun deficiency-autowp (n degree &key (position 'center) (use-d t))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
@@ -177,12 +184,12 @@
              (sum blf-sum)))))
 
 #+nil
-(let ((*auto-wachspress-central-d* 0.6)
-      (*resolution* 50)
+(let ((degree 3)
+      (*resolution* 100)
       (n 3))
-  (iter (for degree from 1 to 12)
+  (iter (for *auto-wachspress-central-d* from 0.2 to 0.8 by 0.01)
         (for *auto-wachspress-weights* = (make-list n :initial-element (/ (- n 2) n)))
         (for d = (iter (for p in (vertices (points-from-angles (uniform-angles n))))
                        (minimizing (deficiency-autowp n degree :position p :use-d t))))
-        (when (< d -1d-14)
-          (warn "alpha: ~a, degree ~a: ~a" *auto-wachspress-central-d* degree d))))
+        (when (> d -1d-5)
+          (format t "~a => ~a~%" *auto-wachspress-central-d* d))))
