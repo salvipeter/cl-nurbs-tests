@@ -114,3 +114,75 @@
               (minimizing (+ w d) into min-wd)
               (maximizing (+ w d) into max-wd)
               (finally (format t "Degree ~a: [~5f, ~5f]~%" degree min-wd max-wd)))))
+
+
+
+;;; AutoWachspress hack
+
+(defun barycentric-d-autowp (l i)
+  (let* ((s (barycentric-s l i))
+         (d (barycentric-d l i))
+         (w (elt *auto-wachspress-weights* i)))
+    (* d (1+ (* (- 1 s) s (- 1 d) d
+                (/ (* 4 (- *auto-wachspress-central-d* w))
+                   (* (- 1 w) w w)))))))
+
+(defun deficiency-autowp (n degree &key (position 'center) (use-d t))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (- 1
+       (iter (for i from 0 below n)
+             (for i-1 = (mod (1- i) n))
+             (for i+1 = (mod (1+ i) n))
+             (for si = (barycentric-s l i))
+             (for si-1 = (barycentric-s l i-1))
+             (for si+1 = (barycentric-s l i+1))
+             (for di = (barycentric-d-autowp l i))
+             (for di-1 = (barycentric-d-autowp l i-1))
+             (for di+1 = (barycentric-d-autowp l i+1))
+             (for alpha =
+                  (if use-d
+                      (if (< (+ di-1 di) *epsilon*)
+                          0.5
+                          (/ di-1 (+ di-1 di)))
+                      (if (< (+ si (- 1 si-1)) *epsilon*)
+                          0.5
+                          (/ si (+ si (- 1 si-1))))))
+             (for beta =
+                  (if use-d
+                      (if (< (+ di+1 di) *epsilon*)
+                          0.5
+                          (/ di+1 (+ di+1 di)))
+                      (if (< (+ (- 1 si) si+1) *epsilon*)
+                          0.5
+                          (/ (- 1 si) (+ (- 1 si) si+1)))))
+             (for blf-sum = 0)
+             (iter (for row from 0 below (ceiling degree 2))
+                   (iter (for col from 0 to degree)
+                         (for blend = (* (bernstein degree row di)
+                                         (bernstein degree col si)))
+                         (for mu = (cond ((and (< row 2) (< col 2)) alpha)
+                                         ((and (< row 2) (> col (- degree 2))) beta)
+                                         ((or (< col row) (> col (- degree row))) 0)
+                                         ((or (= col row) (= col (- degree row))) 1/2)
+                                         (t 1)))
+                         (incf blf-sum (* mu blend))))
+             (sum blf-sum)))))
+
+#+nil
+(let ((*auto-wachspress-central-d* 0.6)
+      (*resolution* 50)
+      (n 3))
+  (iter (for degree from 1 to 12)
+        (for *auto-wachspress-weights* = (make-list n :initial-element (/ (- n 2) n)))
+        (for d = (iter (for p in (vertices (points-from-angles (uniform-angles n))))
+                       (minimizing (deficiency-autowp n degree :position p :use-d t))))
+        (when (< d -1d-14)
+          (warn "alpha: ~a, degree ~a: ~a" *auto-wachspress-central-d* degree d))))
