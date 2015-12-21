@@ -1647,6 +1647,8 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 
 (defvar *auto-wachspress-weights*)
 
+(defparameter *auto-wachspress-central-d* 0.5)
+
 (defmacro defautowp-distance (distance)
   "Warning: parameters are evaluated multiple times."
   `(defmethod compute-distance ((type (eql ',(intern (format nil "AUTOWP-~:@(~a~)" distance))))
@@ -1658,9 +1660,9 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
                   (i (position (elt segments 2) points :test #'equal))
                   (wi (elt *auto-wachspress-weights* i))
                   (di (mean-distance points segments p))
-                  (alpha (* 4 (- 1 si) si (- 1 di) di)))
-             (* di (+ 1 (* alpha (/ (- 1 (* 2 wi))
-                                    (* 2 (- 1 wi) wi wi))))))))))
+                  (alpha (* (- 1 si) si (- 1 di) di)))
+             (* di (+ 1 (* alpha (/ (* 4 (- *auto-wachspress-central-d* wi))
+                                    (* (- 1 wi) wi wi))))))))))
 
 ;;; bilinear does not work, as the center is not on s=0.5
 #+nil (defautowp-distance bilinear)
@@ -1672,6 +1674,7 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
   (let* ((points (points-from-angles '(40 20 60 100 80)))
          (*wachspressp* t)
          (*auto-wachspress-weights* (auto-wachspress-weights points))
+         (*auto-wachspress-central-d* 0.5)
          (n (length points))
          (segments (iter (for j from -2 below 2)
                          (collect (elt points (mod (+ i j) n))))))
@@ -1680,10 +1683,11 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 #+nil
 (let* ((points (points-from-angles '(40 20 60 100 80)))
        (*wachspressp* t)
-       (*auto-wachspress-weights* (auto-wachspress-weights points)))
+       (*auto-wachspress-weights* (auto-wachspress-weights points))
+       (*auto-wachspress-central-d* 0.5))
   (vectorized-distance-function-test
    points '(nil sd nil nil nil) "/tmp/proba3.ps"
-   :resolution 0.001d0 :density 6 :distance-type 'autowp-line-sweep :color nil))
+   :resolution 0.001d0 :density 10 :distance-type 'autowp-line-sweep :color nil))
 
 (defun quad-wachspress-distances (points)
   (let ((*wachspressp* t)
