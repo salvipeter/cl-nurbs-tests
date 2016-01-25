@@ -105,3 +105,35 @@
   (iter (for n from 3 to 8)
         (iter (for d from 1 to 7)
               (write-bernstein-blend-image "/tmp" n d :density 0.05))))
+
+
+;;; Print the positions where the control points have the largest effect
+(defun control-point-centers (n degree &key (use-d t))
+  (let ((points (points-from-angles (uniform-angles n))))
+    (let ((q (iter (for p in (vertices points))
+                   (for def = (deficiency n degree :position p :use-d use-d))
+                   (finding p maximizing def))))
+      (format t "0 [center]	=>	~{~6,3f~^, ~}~%" q))
+    (iter (with cp = (1+ (* n (1+ (floor degree 2)) (ceiling degree 2))))
+          (with side = 0)
+          (with col = 0)
+          (with row = 0)
+          (for i from 1 below cp)
+          (when (>= col (- degree row))
+            (incf side)
+            (when (>= side n)
+              (setf side 0)
+              (incf row))
+            (setf col row))
+          (for sidem = (mod (1- side) n))
+          (for sidep = (mod (1+ side) n))
+          (for q =
+               (iter (for p in (vertices points))
+                     (for b = (generalized-bernstein points p side degree col row :use-d use-d))
+                     (for bp = (generalized-bernstein points p sidem degree (- degree row) col
+                                                      :use-d use-d))
+                     (for bn = (generalized-bernstein points p sidep degree row (- degree col)
+                                                      :use-d use-d))
+                     (finding p maximizing (+ b bp bn))))
+          (format t "~d [~d,~d,~d]	=>	~{~6,3f~^, ~}~%" i side col row q)
+          (incf col))))
