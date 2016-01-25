@@ -1885,3 +1885,10 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 #+nil
 (let ((points (points-from-angles '(50 60 70 60 70 50))))
   (write-mean-blends points '(nil nil nil nil nil t) "/tmp/proba.vtk"))
+
+(defmethod compute-distance ((type (eql 'wachspress)) points segments p dir)
+  (let ((l (barycentric-coordinates points p))
+        (i (position (third segments) points :test #'equal)))
+    (if (eq dir 's)
+        (barycentric-s l i)
+        (barycentric-d l i))))
