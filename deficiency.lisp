@@ -193,3 +193,41 @@
                        (minimizing (deficiency-autowp n degree :position p :use-d t))))
         (when (> d -1d-5)
           (format t "~a => ~a~%" *auto-wachspress-central-d* d))))
+
+(defun binomial-search-root (fn min max iterations)
+  (let ((mid (/ (+ min max) 2)))
+    (if (zerop iterations)
+        mid
+        (let ((x (funcall fn mid)))
+          (cond ((< (abs x) 1.0d-6) mid)
+                ((< x 0) (binomial-search-root fn mid max (1- iterations)))
+                (t (binomial-search-root fn min mid (1- iterations))))))))
+
+(defun find-autowp-for-deficiency (n d &key (target 0.0) (iterations 100))
+  (flet ((f (x)
+           (let ((*auto-wachspress-central-d* x)
+                 (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
+             (- (deficiency-autowp n d) target))))
+    (binomial-search-root #'f 0.0 1.0 iterations)))
+
+;;; Find autowachspress settings for a given target deficiency
+#+nil
+(iter (for n from 3 to 8)
+      (iter (for d from 3 to 10)
+            (for x = (find-autowp-for-deficiency n d :target 0.1))
+            (format t "n=~d,	d=~d	=>	~9,6f~%" n d x)))
+
+;;; Check also if the patch has negative deficiency somewhere
+#+nil
+(let ((*resolution* 100))
+  (iter (for n from 3 to 8)
+        (iter (for d from 3 to 10)
+              (for x = (find-autowp-for-deficiency n d :target 0.0))
+              (format t "n=~d,	d=~d	=>	~9,6f~%" n d x)
+              (for min =
+                   (let ((*auto-wachspress-central-d* x)
+                         (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
+                     (iter (for p in (vertices (points-from-angles (uniform-angles n))))
+                           (minimizing (deficiency-autowp n d)))))
+              (when (< min -1d-5)
+                (format t "Error: ~a~%" min)))))
