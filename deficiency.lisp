@@ -231,3 +231,29 @@
                            (minimizing (deficiency-autowp n d)))))
               (when (< min -1d-5)
                 (format t "Error: ~a~%" min)))))
+
+
+;;; Deficiency for MP patches
+
+(defun deficiency-midpoint (n &key (position 'center))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (flet ((hermite (x) (+ (expt (- 1 x) 3)
+                           (* 3 (expt (- 1 x) 2) x))))
+      (- 1
+         (iter (for i from 0 below n)
+               (for i-1 = (mod (1- i) n))
+               (for si = (barycentric-s l i))
+               (for si-1* = (- 1 (barycentric-s l i-1)))
+               (for di = (barycentric-d l i))
+               (for di-1 = (barycentric-d l i-1))
+               (sum (/ (+ (* di (hermite si-1*) (hermite di-1))
+                          (* di-1 (hermite si) (hermite di)))
+                       (+ di di-1))))))))
