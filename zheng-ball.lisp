@@ -3,15 +3,35 @@
 ;;; Test implementation of
 ;;; J.J. Zheng, A.A. Ball: Control point surfaces over non-four-sided areas (1996)
 
-(defparameter +side-constants+
-  '(nil nil nil nil nil 1)
-  "A list of c0, c1, ...")
+
+;;; Utilities
+
+(defmacro defmemo (name args &body body)
+  (cl-utilities:with-unique-names (cache rest win val)
+    `(let ((,cache (make-hash-table :test #'equal)))
+       (defun ,name ,args
+         (let ((,rest ,(cons 'list args)))
+           (multiple-value-bind (,val ,win) (gethash ,rest ,cache)
+             (if ,win
+                 ,val
+                 (setf (gethash ,rest ,cache)
+                       (progn ,@body)))))))))
 
 (defun binomial (n k)
   (if (= k 0)
       1
       (* (binomial (1- n) (1- k))
          (/ n k))))
+
+
+;;; Constants
+
+(defparameter +side-constants+
+  '(nil nil nil nil nil 1)
+  "A list of c0, c1, ...")
+
+
+;;; Implementation
 
 (defun boundary-index-p (l)
   "An index is a boundary index if one of its values is zero."
@@ -26,7 +46,7 @@
                        (rec (rest a) (append b (list (first a))))))))
     (rec lst '())))
 
-(defun all-indices (n m)
+(defmemo all-indices (n m)
   "Parameters:
 N: # of sides
 M: degree"
@@ -71,16 +91,18 @@ U: parametric point (a list of n values)"
   (let ((n (length l)))
     (if (boundary-index-p l)
         (zb-blend m l u)
-        (let ((deficiency (1- (reduce #'+
-                                      (mapcar (lambda (l)
-                                                (zb-blend m l u))
-                                              (all-indices n m))))))
+        (let ((deficiency
+               (1- (reduce #'+
+                           (mapcar (lambda (l)
+                                     (zb-blend m l u))
+                                   (all-indices n m))))))
           (- (zb-blend m l u)
              (/ deficiency
                 (if (evenp m)
                     (1+ (/ (* n (- m 2) m) 4))
                     (/ (* n (1- m) (1- m)) 4))))))))
 
+#+nil
 (defun zb-parameters (n resolution)
   "Only works for N=5."
   (assert (= n 5))
@@ -99,12 +121,30 @@ U: parametric point (a list of n values)"
                                        (/ (- 1 u1) u3)
                                        (/ (- 1 u3) u1)))))))))
 
+(defun zb-parameters (n resolution)
+  "Only works for N=5."
+  (assert (= n 5))
+  (append
+   (iter (for u1 from 0 to 1 by (/ resolution))
+         (appending
+          (iter (for u2 from 0 to 1 by (/ resolution))
+                (unless (= u1 u2 1)
+                  (for u4 = (- 1 (* u1 u2)))
+                  (for u5 = (/ (- 1 u2) u4))
+                  (for u3 = (- 1 (* u1 u5)))
+                  (collect (list u1 u2 u3 u4 u5))))))
+   (iter (for u3 from 0 to 1 by (/ resolution))
+         (collect (list 1 1 u3 0 (- 1 u3))))))
+
+
+;;; Testing layer
+
 (defun read-gbp (filename)
   "Reads a Generalized Bezier Patch into a hashtable.
 Special items: SIDES, DEGREE and CENTER.
 All control points are under (SIDE COL ROW).
 Note that for even-degree patches, the center point is listed
-under (SIDE LAYER LAYER) for all sides."
+also under (SIDE LAYER LAYER) for all sides."
   (let ((obj (make-hash-table :test 'equal)))
     (with-open-file (s filename)
       (flet ((read-point ()
@@ -135,9 +175,9 @@ under (SIDE LAYER LAYER) for all sides."
                (let ((p (read-point)))
                  (setf (gethash (list side col row) obj) p)
                  (if (< col l)
-                     (setf (gethash (list side (- d row) col) obj) p)
+                     (setf (gethash (list (mod (1- side) n) (- d row) col) obj) p)
                      (when (< (- d col) l)
-                       (setf (gethash (list side row (- d col)) obj) p))))
+                       (setf (gethash (list (mod (1+ side) n) row (- d col)) obj) p))))
                (incf i)
                (incf col)))))
     obj))
@@ -159,9 +199,36 @@ under (SIDE LAYER LAYER) for all sides."
           (setf result (v+ result (v* cp blend))))
     result))
 
+(defun zb-triangles (n resolution)
+  (assert (= n 5))
+  (let ((base (1- (* (1+ resolution) (1+ resolution)))))
+    (flet ((index (i j) (+ (* i (1+ resolution)) j)))
+      (append
+       (list (list (+ base resolution)
+                   (index (1- resolution) (1- resolution))
+                   (index (1- resolution) resolution))
+             (list (+ base 0)
+                   (index resolution (1- resolution))
+                   (index (1- resolution) (1- resolution))))
+       (iter (for i from 1 to resolution)
+             (collect (list (+ base (1- i))
+                            (+ base i)
+                            (index (1- resolution) (1- resolution)))))
+       (iter (for i from 1 to resolution)
+             (appending
+              (iter (for j from 1 to resolution)
+                    (unless (= i j resolution)
+                      (collect (list (index (1- i) (1- j))
+                                     (index i (1- j))
+                                     (index (1- i) j)))
+                      (collect (list (index (1- i) j)
+                                     (index i (1- j))
+                                     (index i j)))))))))))
+
 
 ;;; Tests
 
 (defparameter *obj* (read-gbp "/home/salvi/project/transfinite/models/cagd86.gbp"))
-(defparameter *points* (zb-parameters 5 30))
+(defparameter *points* (zb-parameters 5 50))
 (defparameter *data* (mapcar (lambda (u) (zb-eval *obj* u)) *points*))
+(write-obj-indexed-mesh *data* (zb-triangles 5 50) "/tmp/proba.obj")
