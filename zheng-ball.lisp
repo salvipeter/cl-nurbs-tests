@@ -87,7 +87,8 @@ U: parametric point (a list of n values)"
   "As in Eq. (4.13). Parameters:
 M: degree
 L: control point index (a list of n values)
-U: parametric point (a list of n values)"
+U: parametric point (a list of n values)
+TODO: This is very inefficient, should not be used."
   (let ((n (length l)))
     (if (boundary-index-p l)
         (zb-blend m l u)
@@ -102,25 +103,42 @@ U: parametric point (a list of n values)"
                     (1+ (/ (* n (- m 2) m) 4))
                     (/ (* n (1- m) (1- m)) 4))))))))
 
-#+nil
+(defun zb-all-blends-without-deficiencies (m u)
+  "Basically like calling ZB-BLEND-WITHOUT-DEFICIENCY for all indices,but more efficient."
+  (let* ((n (length u))
+         (ls (all-indices n m))
+         (blends (mapcar (lambda (l) (zb-blend m l u)) ls))
+         (excess (/ (1- (reduce #'+ blends))
+                    (if (evenp m)
+                        (1+ (/ (* n (- m 2) m) 4))
+                        (/ (* n (1- m) (1- m)) 4)))))
+    (iter (for l in ls)
+          (for blend in blends)
+          (collect (if (boundary-index-p l)
+                       blend
+                       (- blend excess))))))
+
+#-nil
 (defun zb-parameters (n resolution)
   "Only works for N=5."
   (assert (= n 5))
-  (iter (for u1 from 0 to 1 by (/ resolution))
-        (appending
-         (iter (for u3 from (- 1 u1) to 1 by (/ resolution))
-               (cond ((zerop u1)
-                      (collect (list 0 0 1 1 1))
-                      (collect (list 0 1 1 1 0)))
-                     ((zerop u3)
-                      (collect (list 1 0 0 1 1))
-                      (collect (list 1 1 0 0 1)))
-                     (t (collect (list u1
-                                       (/ (1- (+ u1 u3)) (* u1 u3))
-                                       u3
-                                       (/ (- 1 u1) u3)
-                                       (/ (- 1 u3) u1)))))))))
+  (append
+   (list (list 0 1 1 1 0)
+         (list 1 0 0 1 1))
+   (iter (for u1 from 0 to 1 by (/ resolution))
+         (appending
+          (iter (for u3 from (- 1 u1) to 1 by (/ resolution))
+                (cond ((zerop u1)
+                       (collect (list 0 0 1 1 1)))
+                      ((zerop u3)
+                       (collect (list 1 1 0 0 1)))
+                      (t (collect (list u1
+                                        (/ (1- (+ u1 u3)) (* u1 u3))
+                                        u3
+                                        (/ (- 1 u1) u3)
+                                        (/ (- 1 u3) u1))))))))))
 
+#+nil
 (defun zb-parameters (n resolution)
   "Only works for N=5."
   (assert (= n 5))
@@ -190,15 +208,36 @@ also under (SIDE LAYER LAYER) for all sides."
     (list side col row)))
 
 (defun zb-eval (obj u)
-  (let ((n (gethash 'sides obj))
-        (m (gethash 'degree obj))
-        (result '(0 0 0)))
-    (iter (for l in (all-indices n m))
-          (for blend = (zb-blend-without-deficiency m l u))
-          (for cp = (gethash (convert-index l) obj))
-          (setf result (v+ result (v* cp blend))))
-    result))
+  (let* ((n (gethash 'sides obj))
+         (m (gethash 'degree obj))
+         (blends (zb-all-blends-without-deficiencies m u))
+         (cps (mapcar (lambda (l) (gethash (convert-index l) obj))
+                      (all-indices n m))))
+    (reduce #'v+ (mapcar #'v* cps blends))))
 
+#-nil
+(defun zb-triangles (n resolution)
+  (assert (= n 5))
+  (flet ((index (i j) (+ 2 (* i (1+ i) 1/2) (- i resolution) j)))
+    (append
+     (list (list (index 0 resolution)
+                 (index 1 resolution)
+                 0)
+           (list (index resolution 0)
+                 (index (1- resolution) 1)
+                 1))
+     (iter (for i from 1 to resolution)
+           (appending
+            (iter (for j from (1+ (- resolution i)) to resolution)
+                  (collect (list (index i (1- j))
+                                 (index i j)
+                                 (index (1- i) j)))
+                  (unless (<= (1- j) (- resolution i))
+                    (collect (list (index i (1- j))
+                                   (index (1- i) j)
+                                   (index (1- i) (1- j)))))))))))
+
+#+nil
 (defun zb-triangles (n resolution)
   (assert (= n 5))
   (let ((base (1- (* (1+ resolution) (1+ resolution)))))
