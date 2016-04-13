@@ -35,6 +35,41 @@
                    (t 1))))
     (* blend mu)))
 
+(defun generalized-bernstein-autowp (points p side degree col row &key (use-d t))
+  (let* ((n (length points))
+         (l (barycentric-coordinates points p))
+         (i side)
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (si (barycentric-s l i))
+         (si-1 (barycentric-s l i-1))
+         (si+1 (barycentric-s l i+1))
+         (di (barycentric-d-autowp l i))
+         (di-1 (barycentric-d-autowp l i-1))
+         (di+1 (barycentric-d-autowp l i+1))
+         (alpha (if use-d
+                    (if (< (+ di-1 di) *epsilon*)
+                        0.5
+                        (/ di-1 (+ di-1 di)))
+                    (if (< (+ si (- 1 si-1)) *epsilon*)
+                        0.5
+                        (/ si (+ si (- 1 si-1))))))
+         (beta (if use-d
+                   (if (< (+ di+1 di) *epsilon*)
+                       0.5
+                       (/ di+1 (+ di+1 di)))
+                   (if (< (+ (- 1 si) si+1) *epsilon*)
+                       0.5
+                       (/ (- 1 si) (+ (- 1 si) si+1)))))
+         (blend (* (bernstein degree row di)
+                   (bernstein degree col si)))
+         (mu (cond ((and (< row 2) (< col 2)) alpha)
+                   ((and (< row 2) (> col (- degree 2))) beta)
+                   ((or (< col row) (> col (- degree row))) 0)
+                   ((or (= col row) (= col (- degree row))) 1/2)
+                   (t 1))))
+    (* blend mu)))
+
 ;;; DEFICIENCY => see deficiency.lisp
 (defun write-bernstein-blend-mesh (path n degree &key (use-d t))
   (let ((points (points-from-angles (uniform-angles n))))
@@ -137,6 +172,54 @@
                      (finding p maximizing (+ b bp bn))))
           (format t "~d [~d,~d,~d]	=>	~{~6,3f~^, ~}~%" i side col row q)
           (incf col))))
+
+(defun control-point-centers-autowp (n degree &key (use-d t))
+  (let ((points (points-from-angles (uniform-angles n))))
+    (let ((q (iter (for p in (vertices points))
+                   (for def = (deficiency-autowp n degree :position p :use-d use-d))
+                   (finding p maximizing def))))
+      (format t "~{~6,3f~^, ~}	<=	0 [center]~%" q))
+    (iter (with cp = (1+ (* n (1+ (floor degree 2)) (ceiling degree 2))))
+          (with side = 0)
+          (with col = 0)
+          (with row = 0)
+          (for i from 1 below cp)
+          (when (>= col (- degree row))
+            (incf side)
+            (when (>= side n)
+              (setf side 0)
+              (incf row))
+            (setf col row))
+          (for sidem = (mod (1- side) n))
+          (for sidep = (mod (1+ side) n))
+          (for q =
+               (iter (for p in (vertices points))
+                     (for b = (generalized-bernstein-autowp
+                               points p side degree col row :use-d use-d))
+                     (for bp = (generalized-bernstein-autowp
+                                points p sidem degree (- degree row) col :use-d use-d))
+                     (for bn = (generalized-bernstein-autowp
+                                points p sidep degree row (- degree col) :use-d use-d))
+                     (finding p maximizing (+ b bp bn))))
+          (format t "~{~6,3f~^, ~}	<=	~d [~d,~d,~d]~%" q i side col row)
+          (incf col))))
+
+#+nil
+(iter (for n from 5 to 6)
+      (iter (for degree from 3 to 8)
+            (for def = (find-autowp-for-deficiency n degree :target 0))
+            (let ((*auto-wachspress-central-d* def)
+                  (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
+              (with-open-file (s (format nil "/tmp/cp-centers-~a-~a-autowp0" n degree)
+                                 :direction :output :if-exists :supersede)
+                (let ((*standard-output* s))
+                  (control-point-centers-autowp n degree))))
+            (let ((*auto-wachspress-central-d* (/ (- n 2) n))
+                  (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
+              (with-open-file (s (format nil "/tmp/cp-centers-~a-~a" n degree)
+                                 :direction :output :if-exists :supersede)
+                (let ((*standard-output* s))
+                  (control-point-centers-autowp n degree))))))
 
 (defun control-point-centers-cpp (n degree &key (use-d t))
   (format t "{ // ~d,~d~%" n degree)
