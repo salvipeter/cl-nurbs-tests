@@ -4,7 +4,7 @@
 ;;; J.J. Zheng, A.A. Ball: Control point surfaces over non-four-sided areas (1996)
 
 (defparameter +side-constants+
-  '(nil nil nil nil nil 1)
+  '(nil nil nil nil nil 1 2)
   "A list of c0, c1, ...")
 
 (defun boundary-index-p (l)
@@ -19,6 +19,17 @@
                  (cons (append a b)
                        (rec (rest a) (append b (list (first a))))))))
     (rec lst '())))
+
+(defmacro defmemo (name args &body body)
+  (cl-utilities:with-unique-names (cache rest win val)
+    `(let ((,cache (make-hash-table :test #'equal)))
+       (defun ,name ,args
+         (let ((,rest ,(cons 'list args)))
+           (multiple-value-bind (,val ,win) (gethash ,rest ,cache)
+             (if ,win
+                 ,val
+                 (setf (gethash ,rest ,cache)
+                       (progn ,@body)))))))))
 
 (defmemo all-indices (n m)
   "Parameters:
@@ -83,12 +94,12 @@ U: parametric point (a list of n values)"
   "E.g.: 2 (A B C D E) => (C D E A B)."
   (append (nthcdr i lst) (subseq lst 0 i)))
 
-(defun zb-vertices (n)
-  "Only works for N=5.
-The center point is (phi,phi,phi,phi,phi), where phi = (sqrt(5)-1)/2.
+(defgeneric zb-vertices (n))
+
+(defmethod zb-vertices ((n (eql 5)))
+  "The center point is (phi,phi,phi,phi,phi), where phi = (sqrt(5)-1)/2.
 Points on the `axes' are of the form (...,u,u,...), and we linearly
 interpolate between two such values, always respecting the closer variable."
-  (assert (= n 5))
   (let* ((phi (/ (1- (sqrt 5.0d0)) 2))
          (center (make-list n :initial-element phi))
 	 (result (list center)))
@@ -116,6 +127,68 @@ interpolate between two such values, always respecting the closer variable."
                                  (u5 (/ (- 1 u) u4))
                                  (u3 (- 1 (* v u5))))
                             (push (rotate-list k (list v u u3 u4 u5)) result))))))
+    (nreverse result)))
+
+(defun quadratic-solver (a b c min max)
+  (if (< (abs a) *epsilon*)
+      (if (< (abs b) *epsilon*)
+          (error "0-degree equation")
+          (/ (- c) b))
+      (let* ((d (sqrt (- (* b b) (* 4 a c))))
+             (s1 (/ (+ (- b) d) (* 2 a)))
+             (s2 (/ (- (- b) d) (* 2 a)))
+             (s1e (max (- min s1) (- s1 max) 0))
+             (s2e (max (- min s2) (- s2 max) 0)))
+        (if (< s1e s2e)
+            s1
+            s2))))
+
+(defun generate-parameter6 (i x y)
+  (rotate-list (- 6 i)
+   (append (list x y)
+           (cond ((= x 0)
+                  (list 1 1 1 (- 1 y)))
+                 ((= y 0)
+                  (list (- 1 x) 1 1 1))
+                 (t (iter (repeat 4)
+                          (for u1 first x then u2)
+                          (for u2 first y then r)
+                          (for a = (* (- 1 (* u1 u2)) (- 1 (* 2 u1 u2))))
+                          (for b = (+ (* 2 u1) (* -3 u1 u1 u2) (* u1 u2 u2)))
+                          (for c = (1- (* u1 u1)))
+                          (for r = (quadratic-solver a b c 0 1))
+                          (collect r)))))))
+
+(defun parameter6-on-segment-half (u)
+  "Finds the parameter X such that (X U X ...) is valid."
+  (iter (for x from 0.5 to (/ (sqrt 2) 2) by 1.0d-5)
+        (finding x minimizing (abs (- x (elt (generate-parameter6 6 x u) 2))))))
+
+(defmethod zb-vertices ((n (eql 6)))
+  "The center point is (eta,eta,eta,eta,eta), where eta = sqrt(2)/2.
+Points on the `axes' are of the form (...,u,u,...), and we linearly
+interpolate between two such values, always respecting the closer variable."
+  (let* ((eta (/ (sqrt 2.0d0) 2))
+         (center (make-list n :initial-element eta))
+	 (result (list center)))
+    (iter (for j from 1 to *resolution*)
+	  (for u = (* (- 1 (/ j *resolution*)) eta))
+          (for u-to = (parameter6-on-segment-half u))
+          (for vlst = (let ((lst (iter (with max = (floor j 2))
+                                       (with len = (if (or (<= j 2) (oddp j))
+                                                       (- u-to u)
+                                                       (* (- u-to u) (/ (- j 1) (- j 2)))))
+                                       (for i from 0 below max)
+                                       (collect (+ u (* (/ i max) len))))))
+                        (append
+                         (mapcar (lambda (x) (cons t x)) lst)
+                         (if (evenp j) '() (list (cons t u-to)))
+                         (nreverse (mapcar (lambda (x) (cons nil x)) lst)))))
+	  (iter (for k from 0 below n)
+		(iter (for (type . v) in vlst)
+                      (if type
+                          (push (generate-parameter6 k v u) result)
+                          (push (generate-parameter6 (1+ k) u v) result)))))
     (nreverse result)))
 
 
@@ -185,10 +258,11 @@ also under (SIDE LAYER LAYER) for all sides."
 #+nil
 (defparameter *obj* (read-gbp "/home/salvi/project/transfinite/models/cagd86.gbp"))
 #+nil
-(defparameter *obj* (read-gbp "/home/salvi/Dropbox/Shares/GrafGeo/EuroGraphics/5sided.gbp"))
+(defparameter *obj* (read-gbp "/home/salvi/Dropbox/Shares/GrafGeo/EuroGraphics/6sided-2.gbp"))
 
 #+nil
 (let* ((*resolution* 30)
-       (points (zb-vertices 5))
+       (n (gethash 'sides *obj*))
+       (points (zb-vertices n))
        (data (mapcar (lambda (u) (zb-eval *obj* u)) points)))
-  (write-obj-indexed-mesh data (triangles 5) "/tmp/proba.obj"))
+  (write-obj-indexed-mesh data (triangles n) "/tmp/proba.obj"))
