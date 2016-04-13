@@ -50,28 +50,19 @@ M: degree"
          (/ n k))))
 
 (defun zb-blend (m l u)
-  "As in Eq. (4.5). Parameters:
+  "As in Eq. (4.5); see also Ball-Zheng (2001) for this shorter form. Parameters:
 M: degree
 L: control point index (a list of n values)
 U: parametric point (a list of n values)"
-  (if (boundary-index-p l)
-      (let* ((n (length l))
-             (i (position 0 l))
-             (i-1 (mod (1- i) n))
-             (i+1 (mod (1+ i) n))
-             (k (elt l i-1)))
-        (* (binomial m k)
-           (expt (elt u i-1) k)
-           (expt (elt u i+1) (- m k))
-           (iter (for j from 0 below n)
-                 (unless (member j (list i-1 i i+1))
-                   (multiply (expt (elt u j) m))))
-           (- 1 (* m (elt +side-constants+ n) (reduce #'* u)))))
-      (let* ((min1 (reduce #'min l))
-             (min2 (reduce #'min (remove min1 l :count 1))))
-        (* (binomial m min1)
-           (binomial m min2)
-           (reduce #'* (mapcar #'expt u l))))))
+  (let* ((min1 (reduce #'min l))
+         (min2 (reduce #'min (remove min1 l :count 1))))
+    (* (binomial m min1)
+       (binomial m min2)
+       (reduce #'* (mapcar #'expt u l))
+       (if (zerop min1)
+           (- 1 (* m (elt +side-constants+ (length l))
+                   (reduce #'* u)))
+           1))))
 
 (defun zb-all-blends-without-deficiencies (m u)
   "As in Eq. (4.13), called for all indices, returning a list. Parameters:
