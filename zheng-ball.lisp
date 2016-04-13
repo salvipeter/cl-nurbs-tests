@@ -185,12 +185,31 @@ interpolate between two such values, always respecting the closer variable."
 
 ;;; Testing layer
 
+(defun gbp-set-center (obj p)
+  (let ((n (gethash 'sides obj))
+        (d (gethash 'degree obj)))
+    (setf (gethash 'center obj) p)
+    (when (evenp d)
+      (iter (with l = (gethash 'layers obj))
+            (for s from 0 below n)
+            (setf (gethash (list s l l) obj) p)))))
+
+(defun gbp-set-cp (obj side col row p)
+  (let ((n (gethash 'sides obj))
+        (d (gethash 'degree obj))
+        (l (gethash 'layers obj)))
+    (setf (gethash (list side col row) obj) p)
+    (if (< col l)
+        (setf (gethash (list (mod (1- side) n) (- d row) col) obj) p)
+        (when (< (- d col) l)
+          (setf (gethash (list (mod (1+ side) n) row (- d col)) obj) p)))))
+
 (defun read-gbp (filename)
   "Reads a Generalized Bezier Patch into a hashtable.
-Special items: SIDES, DEGREE and CENTER.
+Special items: SIDES, DEGREE, LAYERS and CENTER.
 All control points are under (SIDE COL ROW).
 Note that for even-degree patches, the center point is listed
-also under (SIDE LAYER LAYER) for all sides."
+also under (SIDE LAYERS LAYERS) for all sides."
   (let ((obj (make-hash-table :test 'equal)))
     (with-open-file (s filename)
       (flet ((read-point ()
@@ -205,12 +224,10 @@ also under (SIDE LAYER LAYER) for all sides."
                (side 0)
                (col 0)
                (row 0))
-          (setf (gethash 'sides obj) n)
-          (setf (gethash 'degree obj) d)
-          (setf (gethash 'center obj) center)
-          (when (evenp d)
-            (iter (for s from 0 below n)
-                  (setf (gethash (list s l l) obj) center)))
+          (setf (gethash 'sides obj) n
+                (gethash 'degree obj) d
+                (gethash 'layers obj) l)
+          (gbp-set-center obj center)
           (loop while (< i cp) do
                (when (>= col (- d row))
                  (incf side)
@@ -218,15 +235,33 @@ also under (SIDE LAYER LAYER) for all sides."
                    (setf side 0)
                    (incf row))
                  (setf col row))
-               (let ((p (read-point)))
-                 (setf (gethash (list side col row) obj) p)
-                 (if (< col l)
-                     (setf (gethash (list (mod (1- side) n) (- d row) col) obj) p)
-                     (when (< (- d col) l)
-                       (setf (gethash (list (mod (1+ side) n) row (- d col)) obj) p))))
+               (gbp-set-cp obj side col row (read-point))
                (incf i)
                (incf col)))))
     obj))
+
+(defun write-gbp (obj filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (let* ((n (gethash 'sides obj))
+           (d (gethash 'degree obj))
+           (l (gethash 'layers obj))
+           (cp (1+ (* n (1+ (floor d 2)) l)))
+           (i 1)
+           (side 0)
+           (col 0)
+           (row 0))
+      (format s "~a ~a~%" n d)
+      (format s "~{~f~^ ~}~%" (gethash 'center obj))
+      (loop while (< i cp) do
+           (when (>= col (- d row))
+             (incf side)
+             (when (>= side n)
+               (setf side 0)
+               (incf row))
+             (setf col row))
+           (format s "~{~f~^ ~}~%" (gethash (list side col row) obj))
+           (incf i)
+           (incf col)))))
 
 (defun convert-index (l)
   "Converts a Zheng-Ball type index into a (SIDE COL ROW) representation."
@@ -242,6 +277,49 @@ also under (SIDE LAYER LAYER) for all sides."
          (cps (mapcar (lambda (l) (gethash (convert-index l) obj))
                       (all-indices n m))))
     (reduce #'v+ (mapcar #'v* cps blends))))
+
+
+;;; Degree elevation
+
+;;; see: Ball-Zheng: Degree elevation for n-sided surfaces (2001)
+
+(defun zb-elevate-odd (obj)
+  "As in Eq. (11). Only goes from odd to even degrees.
+This is exactly the same algorithm as ours for GB patches."
+  (let ((result (make-hash-table :test 'equal))
+        (n (gethash 'sides obj))
+        (d (1+ (gethash 'degree obj)))
+        (l (gethash 'layers obj)))
+    (setf (gethash 'sides result) n
+          (gethash 'degree result) d
+          (gethash 'layers result) l)
+    (let ((inner-cps (iter (for i from 0 below n)
+                           (collect (gethash (list i (1- l) (1- l)) obj)))))
+      (gbp-set-center result (v* (reduce #'v+ inner-cps) (/ n))))
+    (iter (for i from 0 below n)
+          (gbp-set-cp result i 0 0 (gethash (list i 0 0) obj))
+          (iter (for k from 1 below d)
+                (for p = (v* (v+ (v* (gethash (list i (1- k) 0) obj) k)
+                                 (v* (gethash (list i k 0) obj) (- d k)))
+                             (/ d)))
+                (gbp-set-cp result i k 0 p))
+          (iter (for j from 1 below l)
+                (iter (for k from 1 to l)
+                      (for p = (v* (v+ (v* (gethash (list i (1- k) (1- j)) obj) k j)
+                                       (v* (gethash (list i (1- k) j) obj) k (- d j))
+                                       (v* (gethash (list i k (1- j)) obj) (- d k) j)
+                                       (v* (gethash (list i k j) obj) (- d k) (- d j)))
+                                   (/ 1 d d)))
+                      (gbp-set-cp result i k j p))))
+    result))
+
+(defun zb-elevate-even (obj)
+  (error "TODO"))
+
+(defun zb-elevate (obj)
+  (if (oddp (gethash 'degree obj))
+      (zb-elevate-odd obj)
+      (zb-elevate-even obj)))
 
 
 ;;; Tests
