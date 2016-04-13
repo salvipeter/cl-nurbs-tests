@@ -83,28 +83,10 @@ U: parametric point (a list of n values)"
            (binomial m min2)
            (reduce #'* (mapcar #'expt u l))))))
 
-(defun zb-blend-without-deficiency (m l u)
-  "As in Eq. (4.13). Parameters:
-M: degree
-L: control point index (a list of n values)
-U: parametric point (a list of n values)
-TODO: This is very inefficient, should not be used."
-  (let ((n (length l)))
-    (if (boundary-index-p l)
-        (zb-blend m l u)
-        (let ((deficiency
-               (1- (reduce #'+
-                           (mapcar (lambda (l)
-                                     (zb-blend m l u))
-                                   (all-indices n m))))))
-          (- (zb-blend m l u)
-             (/ deficiency
-                (if (evenp m)
-                    (1+ (/ (* n (- m 2) m) 4))
-                    (/ (* n (1- m) (1- m)) 4))))))))
-
 (defun zb-all-blends-without-deficiencies (m u)
-  "Basically like calling ZB-BLEND-WITHOUT-DEFICIENCY for all indices,but more efficient."
+  "As in Eq. (4.13), called for all indices, returning a list. Parameters:
+M: degree
+U: parametric point (a list of n values)"
   (let* ((n (length u))
          (ls (all-indices n m))
          (blends (mapcar (lambda (l) (zb-blend m l u)) ls))
@@ -118,41 +100,43 @@ TODO: This is very inefficient, should not be used."
                        blend
                        (- blend excess))))))
 
-#-nil
-(defun zb-parameters (n resolution)
-  "Only works for N=5."
-  (assert (= n 5))
-  (append
-   (list (list 0 1 1 1 0)
-         (list 1 0 0 1 1))
-   (iter (for u1 from 0 to 1 by (/ resolution))
-         (appending
-          (iter (for u3 from (- 1 u1) to 1 by (/ resolution))
-                (cond ((zerop u1)
-                       (collect (list 0 0 1 1 1)))
-                      ((zerop u3)
-                       (collect (list 1 1 0 0 1)))
-                      (t (collect (list u1
-                                        (/ (1- (+ u1 u3)) (* u1 u3))
-                                        u3
-                                        (/ (- 1 u1) u3)
-                                        (/ (- 1 u3) u1))))))))))
+(defun rotate-list (i lst)
+  (append (nthcdr i lst) (subseq lst 0 i)))
 
-#+nil
-(defun zb-parameters (n resolution)
-  "Only works for N=5."
+(defun zb-vertices (n)
+  "Only works for N=5.
+The center point is (phi,phi,phi,phi,phi), where phi = (sqrt(5)-1)/2.
+Points on the `axes' are of the form (...,u,u,...), and we linearly
+interpolate between two such values, always respecting the closer variable."
   (assert (= n 5))
-  (append
-   (iter (for u1 from 0 to 1 by (/ resolution))
-         (appending
-          (iter (for u2 from 0 to 1 by (/ resolution))
-                (unless (= u1 u2 1)
-                  (for u4 = (- 1 (* u1 u2)))
-                  (for u5 = (/ (- 1 u2) u4))
-                  (for u3 = (- 1 (* u1 u5)))
-                  (collect (list u1 u2 u3 u4 u5))))))
-   (iter (for u3 from 0 to 1 by (/ resolution))
-         (collect (list 1 1 u3 0 (- 1 u3))))))
+  (let* ((phi (/ (1- (sqrt 5.0d0)) 2))
+         (center (make-list n :initial-element phi))
+	 (result (list center)))
+    (iter (for j from 1 to *resolution*)
+	  (for u = (* (- 1 (/ j *resolution*)) phi))
+          (for u-to = (/ (1+ (sqrt (- 1 u)))))
+          (for vlst = (let ((lst (iter (with max = (floor j 2))
+                                       (with len = (if (or (<= j 2) (oddp j))
+                                                       (- u-to u)
+                                                       (* (- u-to u) (/ (- j 1) (- j 2)))))
+                                       (for i from 0 below max)
+                                       (collect (+ u (* (/ i max) len))))))
+                        (append
+                         (mapcar (lambda (x) (cons t x)) lst)
+                         (if (evenp j) '() (list (cons t u-to)))
+                         (nreverse (mapcar (lambda (x) (cons nil x)) lst)))))
+	  (iter (for k from 0 below n)
+		(iter (for (type . v) in vlst)
+                      (if type
+                          (let* ((u5 (- 1 (* u v)))
+                                 (u1 (/ (- 1 v) u5))
+                                 (u4 (- 1 (* u u1))))
+                            (push (rotate-list k (list u1 u v u4 u5)) result))
+                          (let* ((u4 (- 1 (* v u)))
+                                 (u5 (/ (- 1 u) u4))
+                                 (u3 (- 1 (* v u5))))
+                            (push (rotate-list k (list v u u3 u4 u5)) result))))))
+    (nreverse result)))
 
 
 ;;; Testing layer
@@ -215,59 +199,16 @@ also under (SIDE LAYER LAYER) for all sides."
                       (all-indices n m))))
     (reduce #'v+ (mapcar #'v* cps blends))))
 
-#-nil
-(defun zb-triangles (n resolution)
-  (assert (= n 5))
-  (flet ((index (i j) (+ 2 (* i (1+ i) 1/2) (- i resolution) j)))
-    (append
-     (list (list (index 0 resolution)
-                 (index 1 resolution)
-                 0)
-           (list (index resolution 0)
-                 (index (1- resolution) 1)
-                 1))
-     (iter (for i from 1 to resolution)
-           (appending
-            (iter (for j from (1+ (- resolution i)) to resolution)
-                  (collect (list (index i (1- j))
-                                 (index i j)
-                                 (index (1- i) j)))
-                  (unless (<= (1- j) (- resolution i))
-                    (collect (list (index i (1- j))
-                                   (index (1- i) j)
-                                   (index (1- i) (1- j)))))))))))
-
-#+nil
-(defun zb-triangles (n resolution)
-  (assert (= n 5))
-  (let ((base (1- (* (1+ resolution) (1+ resolution)))))
-    (flet ((index (i j) (+ (* i (1+ resolution)) j)))
-      (append
-       (list (list (+ base resolution)
-                   (index (1- resolution) (1- resolution))
-                   (index (1- resolution) resolution))
-             (list (+ base 0)
-                   (index resolution (1- resolution))
-                   (index (1- resolution) (1- resolution))))
-       (iter (for i from 1 to resolution)
-             (collect (list (+ base (1- i))
-                            (+ base i)
-                            (index (1- resolution) (1- resolution)))))
-       (iter (for i from 1 to resolution)
-             (appending
-              (iter (for j from 1 to resolution)
-                    (unless (= i j resolution)
-                      (collect (list (index (1- i) (1- j))
-                                     (index i (1- j))
-                                     (index (1- i) j)))
-                      (collect (list (index (1- i) j)
-                                     (index i (1- j))
-                                     (index i j)))))))))))
-
 
 ;;; Tests
 
+#+nil
 (defparameter *obj* (read-gbp "/home/salvi/project/transfinite/models/cagd86.gbp"))
-(defparameter *points* (zb-parameters 5 50))
-(defparameter *data* (mapcar (lambda (u) (zb-eval *obj* u)) *points*))
-(write-obj-indexed-mesh *data* (zb-triangles 5 50) "/tmp/proba.obj")
+#+nil
+(defparameter *obj* (read-gbp "/home/salvi/Dropbox/Shares/GrafGeo/EuroGraphics/5sided.gbp"))
+
+#+nil
+(let* ((*resolution* 30)
+       (points (zb-vertices 5))
+       (data (mapcar (lambda (u) (zb-eval *obj* u)) points)))
+  (write-obj-indexed-mesh data (triangles 5) "/tmp/proba.obj"))
