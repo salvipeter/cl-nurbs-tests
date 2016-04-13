@@ -3,35 +3,9 @@
 ;;; Test implementation of
 ;;; J.J. Zheng, A.A. Ball: Control point surfaces over non-four-sided areas (1996)
 
-
-;;; Utilities
-
-(defmacro defmemo (name args &body body)
-  (cl-utilities:with-unique-names (cache rest win val)
-    `(let ((,cache (make-hash-table :test #'equal)))
-       (defun ,name ,args
-         (let ((,rest ,(cons 'list args)))
-           (multiple-value-bind (,val ,win) (gethash ,rest ,cache)
-             (if ,win
-                 ,val
-                 (setf (gethash ,rest ,cache)
-                       (progn ,@body)))))))))
-
-(defun binomial (n k)
-  (if (= k 0)
-      1
-      (* (binomial (1- n) (1- k))
-         (/ n k))))
-
-
-;;; Constants
-
 (defparameter +side-constants+
   '(nil nil nil nil nil 1)
   "A list of c0, c1, ...")
-
-
-;;; Implementation
 
 (defun boundary-index-p (l)
   "An index is a boundary index if one of its values is zero."
@@ -57,6 +31,12 @@ M: degree"
                                             (make-list (- n 4)
                                                        :initial-element (- m (min l2 l3))))))))))
     (delete-duplicates (mapcan #'all-shifts base) :test #'equal)))
+
+(defun binomial (n k)
+  (if (= k 0)
+      1
+      (* (binomial (1- n) (1- k))
+         (/ n k))))
 
 (defun zb-blend (m l u)
   "As in Eq. (4.5). Parameters:
@@ -101,6 +81,7 @@ U: parametric point (a list of n values)"
                        (- blend excess))))))
 
 (defun rotate-list (i lst)
+  "E.g.: 2 (A B C D E) => (C D E A B)."
   (append (nthcdr i lst) (subseq lst 0 i)))
 
 (defun zb-vertices (n)
