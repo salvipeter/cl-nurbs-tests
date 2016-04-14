@@ -1,4 +1,4 @@
-(in-package :cl-nurbs-test)
+(in-package :cl-nurbs-tests)
 
 ;;; Test implementation of
 ;;; J.J. Zheng, A.A. Ball: Control point surfaces over non-four-sided areas (1996)
@@ -314,6 +314,7 @@ This is exactly the same algorithm as ours for GB patches."
     result))
 
 (defun zb-elevate-even (obj)
+  (declare (ignore obj))
   (error "TODO"))
 
 (defun zb-elevate (obj)
