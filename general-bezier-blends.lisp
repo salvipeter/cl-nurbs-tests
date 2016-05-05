@@ -141,6 +141,49 @@
         (iter (for d from 1 to 7)
               (write-bernstein-blend-image "/tmp" n d :density 0.05))))
 
+(defun write-bernstein-blend-image-autowp (path n degree &key (use-d t) (density 0.1))
+  (labels ((transform (p) (list (+ (* (first p) 250) 250) (- 500 (* (second p) 250))))
+           (write-poly (stream points msg)
+             (format stream "~{~f ~}moveto~%~{~{~f ~}lineto~%~}closepath stroke~%"
+                     (transform (first points)) (mapcar #'transform (rest points)))
+             (format stream "10 790 moveto (~a, interval between lines: ~a) show showpage~%"
+                     msg density)))
+    (let ((fname (format nil "~a/~asided-deg~a.ps" path n degree)))
+      (with-open-file (s fname :direction :output :if-exists :supersede)
+        (format s "%!PS~%/Times-Roman findfont 15 scalefont setfont~%")
+        (let ((points (points-from-angles (uniform-angles n))))
+          (iter (for row from 0 below (ceiling degree 2))
+                (iter (for col from 0 to degree)
+                      (for cp-str = (format nil "Blend of control point (~a, ~a)" col row))
+                      (write-ps-indexed-mesh-projection
+                       (iter (for p in (vertices points))
+                             (for b = (generalized-bernstein-autowp
+                                       points p 1 degree col row :use-d use-d))
+                             (for bp = (generalized-bernstein-autowp
+                                        points p 0 degree (- degree row) col :use-d use-d))
+                             (for bn = (generalized-bernstein-autowp
+                                        points p 2 degree row (- degree col) :use-d use-d))
+                             (collect (cons (+ b bp bn) p)))
+                       (triangles n) s :transform #'transform :axis 0 :lines density)
+                      (write-poly s points cp-str)))
+          (let ((cp-str "Blend of central control point"))
+            (write-ps-indexed-mesh-projection
+             (iter (for p in (vertices points))
+                   (for def = (deficiency-autowp n degree :position p :use-d use-d))
+                   (when (< def (- *epsilon*))
+                     (warn "Negative deficiency: ~a" def))
+                   (collect (cons (if (< (abs def) *epsilon*) 0 def) p)))
+             (triangles n) s :transform #'transform :axis 0 :lines density)
+            (write-poly s points cp-str)))))))
+
+#+nil
+(let* ((*resolution* 60)
+       (n 5)
+       (degree 5)
+       (*auto-wachspress-central-d* (find-autowp-for-deficiency n degree :target 0))
+       (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
+  (write-bernstein-blend-image-autowp "/tmp" n degree :density 0.05))
+
 
 ;;; Print the positions where the control points have the largest effect
 (defun control-point-centers (n degree &key (use-d t))
