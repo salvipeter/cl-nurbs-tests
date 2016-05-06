@@ -1,7 +1,8 @@
 (in-package :cl-nurbs-tests)
 
 (defparameter *barycentric-type* 'wachspress) ; or: meanvalue / harmonic
-(defparameter *barycentric-normalized* t)
+(defparameter *barycentric-normalized-p* t)
+(defparameter *barycentric-squared-p* nil) ; if T then treats *BARYCENTRIC-NORMALIZED-P* as T
 (defun barycentric-coordinates (points p)
   (let* ((vectors (mapcar (lambda (x) (v- p x)) points))
          (lengths (mapcar #'vlength vectors))
@@ -47,7 +48,11 @@
         (cond (corner (let ((lst (make-list n :initial-element 0)))
                         (setf (elt lst corner) 1)
                         lst))
-              (*barycentric-normalized* (mapcar (lambda (wi) (/ wi wsum)) w))
+              (*barycentric-squared-p*
+               (let* ((w2 (mapcar (lambda (x) (* x x)) w))
+                      (wsum2 (reduce #'+ w2)))
+                 (mapcar (lambda (wi) (/ wi wsum2)) w2)))
+              (*barycentric-normalized-p* (mapcar (lambda (wi) (/ wi wsum)) w))
               (t w))))))
 
 (defun barycentric-s (l i)
@@ -60,3 +65,10 @@
   (let* ((n (length l))
          (i-1 (mod (1- i) n)))
     (- 1 (elt l i-1) (elt l i))))
+
+(defmethod compute-distance ((type (eql 'bary)) points segments p dir)
+  (let* ((i (position (elt segments 2) points :test #'equal))
+         (l (barycentric-coordinates points p)))
+    (if (eq dir 's)
+        (barycentric-s l i)
+        (barycentric-d l i))))

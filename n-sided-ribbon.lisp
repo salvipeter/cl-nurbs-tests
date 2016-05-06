@@ -218,7 +218,7 @@
 ;;; See BITMAP-TEST in concave.lisp
 
 #+nil
-(let ((*barycentric-normalized* t)
+(let ((*barycentric-normalized-p* t)
       (*barycentric-type* 'wachspress)
       (*use-local-d* nil)
       #+nil(*points* (points-from-angles '(0 30 60 60 80 40 20))) ; 7sided
@@ -236,10 +236,10 @@
                (list (compute-nr-parameter l i 'd))))))
     (dotimes (i (length *points*))
       (bitmap-test *points* (s-fun i)
-                   (format nil "/tmp/side-~a-s-~:[global~;local~]-~(~a~)-~:[~;normalized~].pgm" i *use-local-d* *barycentric-type* *barycentric-normalized*)
+                   (format nil "/tmp/side-~a-s-~:[global~;local~]-~(~a~)-~:[~;normalized~].pgm" i *use-local-d* *barycentric-type* *barycentric-normalized-p*)
                    :object-size 2.0d0)
       (bitmap-test *points* (d-fun i)
-                   (format nil "/tmp/side-~a-d-~:[global~;local~]-~(~a~)-~:[~;normalized~].pgm" i *use-local-d* *barycentric-type* *barycentric-normalized*)
+                   (format nil "/tmp/side-~a-d-~:[global~;local~]-~(~a~)-~:[~;normalized~].pgm" i *use-local-d* *barycentric-type* *barycentric-normalized-p*)
                    :object-size 2.0d0))))
 
 ;;; Note: `local' is only meaningful for d-parameters; s is always local

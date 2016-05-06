@@ -458,7 +458,7 @@ thus containing point I-1 (NOT point I)."
       (*quintic-baryblend-p* nil)
       (*use-gamma* nil)
       (*barycentric-type* 'wachspress)
-      (*barycentric-normalized* t)
+      (*barycentric-normalized-p* t)
       (*alpha* 0.5))
   (iter (for type in '(displacement-side))
 	(iter (for distance in '(mean-bilinear))

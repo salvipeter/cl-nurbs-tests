@@ -135,7 +135,7 @@ and adds displacements to the central control points on all sides."
 #+nil
 (let ((*resolution* 100)
       (*barycentric-type* 'wachspress)
-      (*barycentric-normalized* t)
+      (*barycentric-normalized-p* t)
       (*use-local-d* nil)
       ; (points '((0 0) (1 0) (1 1) (0 1)))
       (points '((0 0.3) (0.8 0) (1 0.9) (0.1 0.1))))
@@ -145,7 +145,7 @@ and adds displacements to the central control points on all sides."
 
 
 ;;; Blend function plots
-(let ((*barycentric-normalized* t)
+(let ((*barycentric-normalized-p* t)
       (*barycentric-type* 'wachspress)
       (*use-local-d* nil)
       (*points* (points-from-angles '(20 70 30 70 30))))

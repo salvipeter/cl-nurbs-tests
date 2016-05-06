@@ -34,7 +34,7 @@
 
 (let ((*resolution* 100)
       (*barycentric-type* 'wachspress)
-      (*barycentric-normalized* t)
+      (*barycentric-normalized-p* t)
       (step 1d-4)
       (angles #+nil'(60 20 110 60 110) 5))
   (let* ((points (if (listp angles)
