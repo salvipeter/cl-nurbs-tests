@@ -135,6 +135,9 @@
         (barycentric-s l i)
         (barycentric-d-autowp l i))))
 
+(defparameter *gb-diagonal-weight* 1)
+(defparameter *gb-side-weight* 1/2)
+
 (defun deficiency-autowp (n degree &key (position 'center) (use-d t))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
@@ -179,9 +182,9 @@
                          (for mu = (cond ((and (< row 2) (< col 2)) alpha)
                                          ((and (< row 2) (> col (- degree 2))) beta)
                                          ((or (< col row) (> col (- degree row))) 0)
-                                         ((or (= col row) (= col (- degree row))) 1/2)
+                                         ((or (= col row) (= col (- degree row))) *gb-diagonal-weight*)
                                          ((< row 2) 1)
-                                         (t 1)))
+                                         (t *gb-side-weight*)))
                          (incf blf-sum (* mu blend))))
              (sum blf-sum)))))
 
