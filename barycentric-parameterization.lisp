@@ -72,3 +72,10 @@
     (if (eq dir 's)
         (barycentric-s l i)
         (barycentric-d l i))))
+
+(defmethod compute-distance ((type (eql 'bary-lambda)) points segments p dir)
+  (let* ((i (position (elt segments 2) points :test #'equal))
+         (l (barycentric-coordinates points p)))
+    (if (eq dir 's)
+        (error "No S in this distance function")
+        (elt l i))))
