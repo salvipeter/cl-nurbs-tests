@@ -59,6 +59,18 @@
         (when (< def (- *epsilon*))
           (return def))))
 
+(defun find-dilation-negative-boundary (n d min max &key (iterations 100) (use-d t))
+  (flet ((f (x)
+           (let ((*barycentric-dilation* x))
+             (- (or (deficiency-negative-p n d :use-d use-d) 1)))))
+    (binomial-search-root #'f min max iterations)))
+
+(defun find-dilation-for-deficiency (n d &key (target 0.0) (iterations 100))
+  (flet ((f (x)
+           (let ((*barycentric-dilation* x))
+             (- target (deficiency n d)))))
+    (binomial-search-root #'f 0.0 20.0 iterations)))
+
 (defun write-bernstein-blend (path n degree &key (use-d t) &allow-other-keys)
   (let ((fname (format nil "~a/~asided-deg~a.obj" path n degree))
         (points (points-from-angles (uniform-angles n))))
@@ -171,3 +183,25 @@
 ;; | 8 | 7 |           12 |             7% |
 ;; | 8 | 8 |           13 |            16% |
 ;; |---+---+--------------+----------------|
+
+;;; Some specific values:
+;; |---+---+--------+--------|
+;; | n | d |    10% |    20% |
+;; |---+---+--------+--------|
+;; | 5 | 5 |  1.581 |  0.756 |
+;; | 5 | 6 |  2.676 |  1.959 |
+;; | 5 | 7 |  2.013 |  1.319 |
+;; | 5 | 8 |  2.716 |  2.090 |
+;; | 6 | 5 |  4.020 |  3.042 |
+;; | 6 | 6 |  5.649 |  4.791 |
+;; | 6 | 7 |  4.835 |  4.005 |
+;; | 6 | 8 |  5.881 |  5.128 |
+;; | 7 | 5 |  6.761 |  5.604 |
+;; | 7 | 6 |  9.027 |  8.005 |
+;; | 7 | 7 |  8.039 |  7.049 |
+;; | 7 | 8 |  9.496 |  8.597 |
+;; | 8 | 5 |  9.832 |  8.477 |
+;; | 8 | 6 | 12.839 | 11.634 |
+;; | 8 | 7 | 11.656 | 10.490 |
+;; | 8 | 8 | 13.596 | 12.533 |
+;; |---+---+--------+--------|
