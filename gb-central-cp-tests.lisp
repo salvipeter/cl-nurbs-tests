@@ -214,7 +214,7 @@
            (let ((*auto-wachspress-central-d* x)
                  (*auto-wachspress-weights* (make-list n :initial-element (/ (- n 2) n))))
              (or (deficiency-autowp-negative-p n d :use-d use-d) 1))))
-    (binomial-search-root #'f min max iterations)))
+    (bisection-search-root #'f min max iterations)))
 
 (let* ((n 8)
        (d 8)

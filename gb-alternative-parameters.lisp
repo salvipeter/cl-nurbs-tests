@@ -63,13 +63,13 @@
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
              (- (or (deficiency-negative-p n d :use-d use-d) 1)))))
-    (binomial-search-root #'f min max iterations)))
+    (bisection-search-root #'f min max iterations)))
 
 (defun find-dilation-for-deficiency (n d &key (target 0.0) (iterations 100))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
              (- target (deficiency n d)))))
-    (binomial-search-root #'f 0.0 20.0 iterations)))
+    (bisection-search-root #'f 0.0 20.0 iterations)))
 
 (defun write-bernstein-blend (path n degree &key (use-d t) &allow-other-keys)
   (let ((fname (format nil "~a/~asided-deg~a.obj" path n degree))
