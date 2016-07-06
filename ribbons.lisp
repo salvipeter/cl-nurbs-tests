@@ -403,9 +403,10 @@ The ON-OFF parameter declares which blends should be turned on."
 			      :distance-type 'line-sweep)
 
 (defun generate-colors (n)
-  (assert (<= n 6) (n) "Only N <= 6 is supported.")
+  (assert (<= n 7) (n) "Only N <= 7 is supported.")
   (subseq '((255 0 0) (0 255 0) (0 0 255)
-            (255 255 0) (255 0 255) (0 255 255))
+            (255 255 0) (255 0 255) (0 255 255)
+            (0 0 0))
           0 n))
 
 (defun write-color-blend-test (points filename r &key (blend-function #'ribbon-blend)

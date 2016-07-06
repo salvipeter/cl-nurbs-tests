@@ -1892,3 +1892,21 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
     (if (eq dir 's)
         (barycentric-s l i)
         (barycentric-d l i))))
+
+(defmethod compute-distance ((type (eql 'pisti)) points segments p dir)
+  (if (eq dir 's)
+      (compute-distance 'bary points segments p 's)
+      (let* ((s (compute-distance 'bary points segments p 's))
+             (d (compute-distance 'bary points segments p 'd))
+             (s-1 (compute-distance 'bary points (segments-prev points segments) p 's))
+             (s+1 (compute-distance 'bary points (segments-next points segments) p 's))
+             (lst (list d (- 1 s) (- 1 d) s)))
+        (+ (* d (+ (ribbon-blend lst 0) (ribbon-blend lst 2)))
+           (* s+1 (ribbon-blend lst 1))
+           (* (- 1 s-1) (ribbon-blend lst 3))))))
+
+#+nil
+(let* ((points (points-from-angles (uniform-angles 7))))
+  (vectorized-distance-function-test
+   points '(s d s nil nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 20 :distance-type 'pisti :color t))
