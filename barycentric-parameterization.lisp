@@ -79,3 +79,22 @@
     (if (eq dir 's)
         (error "No S in this distance function")
         (elt l i))))
+
+(defmethod compute-distance ((type (eql 'bary-constr)) points segments p dir)
+  "Constrained barycentric parameterization."
+  (if (eq dir 's)
+      (compute-distance 'bary points segments p 's)
+      (let* ((s (compute-distance 'bary points segments p 's))
+             (d (compute-distance 'bary points segments p 'd))
+             (s-1 (compute-distance 'bary points (segments-prev points segments) p 's))
+             (s+1 (compute-distance 'bary points (segments-next points segments) p 's))
+             (lst (list d (- 1 s) (- 1 d) s)))
+        (+ (* d (+ (ribbon-blend lst 0) (ribbon-blend lst 2)))
+           (* s+1 (ribbon-blend lst 1))
+           (* (- 1 s-1) (ribbon-blend lst 3))))))
+
+#+nil
+(let* ((points (points-from-angles (uniform-angles 7))))
+  (vectorized-distance-function-test
+   points '(s d s nil nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 20 :distance-type 'bary-constr :color t))
