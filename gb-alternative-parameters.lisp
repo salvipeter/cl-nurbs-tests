@@ -53,9 +53,11 @@
 ;;; Helper functions
 ;;; (basically the same as in gb-central-cp-tests, but without autowp)
 
+(defparameter *deficiency-function* #'deficiency)
+
 (defun deficiency-negative-p (n d &key (use-d t))
   (iter (for p in (vertices (points-from-angles (uniform-angles n))))
-        (for def = (deficiency n d :position p :use-d use-d))
+        (for def = (funcall *deficiency-function* n d :position p :use-d use-d))
         (when (< def (- *epsilon*))
           (return def))))
 
@@ -65,10 +67,30 @@
              (- (or (deficiency-negative-p n d :use-d use-d) 1)))))
     (bisection-search-root #'f min max iterations)))
 
+(defun deficiency-monotone-p (n d &key (use-d t))
+  (let ((points (points-from-angles (uniform-angles n))))
+    (iter (for i from 0 to *resolution*)
+          (for x = (/ i *resolution*))
+          (for p = (affine-combine (elt points 0) x (elt points 1)))
+          (iter (for j from 0 to *resolution*)
+                (for y = (/ j *resolution*))
+                (for q = (v* p y))
+                (for defic1 first nil then defic)
+                (for defic = (funcall *deficiency-function* n d :position q :use-d use-d))
+                (when (or (< defic (- *epsilon*)) (and defic1 (> defic defic1)))
+                  (return-from deficiency-monotone-p nil)))))
+  t)
+
+(defun find-dilation-monotone-boundary (n d min max &key (iterations 100) (use-d t))
+  (flet ((f (x)
+           (let ((*barycentric-dilation* x))
+             (if (deficiency-monotone-p n d :use-d use-d) -1 1))))
+    (bisection-search-root #'f min max iterations)))
+
 (defun find-dilation-for-deficiency (n d &key (target 0.0) (iterations 100))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
-             (- target (deficiency n d)))))
+             (- target (funcall *deficiency-function* n d)))))
     (bisection-search-root #'f 0.0 20.0 iterations)))
 
 (defun write-bernstein-blend (path n degree &key (use-d t) &allow-other-keys)

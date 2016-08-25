@@ -262,3 +262,202 @@
                (sum (/ (+ (* di (hermite si-1*) (hermite di-1))
                           (* di-1 (hermite si) (hermite di)))
                        (+ di di-1))))))))
+
+
+;;; for bary-constr
+
+(defun deficiency1 (n degree &key (position 'center) (use-d t) (parameterization 'bary))
+  "Might be slower, but uses COMPUTE-PARAMETER, so this can be used with BARY-CONSTR."
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (s (compute-parameter parameterization 's points p))
+         (d (compute-parameter parameterization 'd points p)))
+    (- 1
+       (iter (for i from 0 below n)
+             (for i-1 = (mod (1- i) n))
+             (for i+1 = (mod (1+ i) n))
+             (for si = (elt s i))
+             (for si-1 = (elt s i-1))
+             (for si+1 = (elt s i+1))
+             (for di = (elt d i))
+             (for di-1 = (elt d i-1))
+             (for di+1 = (elt d i+1))
+             (for alpha =
+                  (if use-d
+                      (if (< (+ di-1 di) *epsilon*)
+                          0.5
+                          (/ di-1 (+ di-1 di)))
+                      (if (< (+ si (- 1 si-1)) *epsilon*)
+                          0.5
+                          (/ si (+ si (- 1 si-1))))))
+             (for beta =
+                  (if use-d
+                      (if (< (+ di+1 di) *epsilon*)
+                          0.5
+                          (/ di+1 (+ di+1 di)))
+                      (if (< (+ (- 1 si) si+1) *epsilon*)
+                          0.5
+                          (/ (- 1 si) (+ (- 1 si) si+1)))))
+             (for blf-sum = 0)
+             (iter (for row from 0 below (ceiling degree 2))
+                   (iter (for col from 0 to degree)
+                         (for blend = (* (bernstein degree row di)
+                                         (bernstein degree col si)))
+                         (for mu = (cond ((and (< row 2) (< col 2)) alpha)
+                                         ((and (< row 2) (> col (- degree 2))) beta)
+                                         ((or (< col row) (> col (- degree row))) 0)
+                                         ((or (= col row) (= col (- degree row))) 1/2)
+                                         ((< row 2) 1)
+                                         (t 1)))
+                         (incf blf-sum (* mu blend))))
+             (sum blf-sum)))))
+
+
+(defun deficiency-squared (n degree &key (position 'center) (use-d t))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (flet ((sqr (x) (* x x)))
+      (- 1
+         (iter (for i from 0 below n)
+               (for i-1 = (mod (1- i) n))
+               (for i+1 = (mod (1+ i) n))
+               (for si = (barycentric-s l i))
+               (for si-1 = (barycentric-s l i-1))
+               (for si+1 = (barycentric-s l i+1))
+               (for di = (barycentric-d l i))
+               (for di-1 = (barycentric-d l i-1))
+               (for di+1 = (barycentric-d l i+1))
+               (for alpha =
+                    (if use-d
+                        (if (< (+ di-1 di) *epsilon*)
+                            0.5
+                            (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
+                        (if (< (+ si (- 1 si-1)) *epsilon*)
+                            0.5
+                            (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
+               (for beta =
+                    (if use-d
+                        (if (< (+ di+1 di) *epsilon*)
+                            0.5
+                            (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
+                        (if (< (+ (- 1 si) si+1) *epsilon*)
+                            0.5
+                            (/ (sqr (- 1 si)) (+ (sqr (- 1 si)) (sqr si+1))))))
+               (for blf-sum = 0)
+               (iter (for row from 0 below (ceiling degree 2))
+                     (iter (for col from 0 to degree)
+                           (for blend = (* (bernstein degree row di)
+                                           (bernstein degree col si)))
+                           (for mu = (cond ((and (< row 2) (< col 2)) alpha)
+                                           ((and (< row 2) (> col (- degree 2))) beta)
+                                           ((or (< col row) (> col (- degree row))) 0)
+                                           ((or (= col row) (= col (- degree row))) 1/2)
+                                           ((< row 2) 1)
+                                           (t 1)))
+                           (incf blf-sum (* mu blend))))
+               (sum blf-sum))))))
+
+(defun deficiency-squared-no0 (n degree &key (position 'center) (use-d t))
+  (let* ((points (points-from-angles (uniform-angles n)))
+         (p (case position
+              (center '(0 0))
+              (edge-center-mid
+               (v* (v+ (first points) (second points)) 1/4))
+              (vertex-center-mid
+               (v* (first points) 1/2))
+              (t position)))
+         (l (barycentric-coordinates points p)))
+    (flet ((sqr (x) (* x x)))
+      (- 1
+         (iter (for i from 0 below n)
+               (for i-1 = (mod (1- i) n))
+               (for i+1 = (mod (1+ i) n))
+               (for si = (barycentric-s l i))
+               (for si-1 = (barycentric-s l i-1))
+               (for si+1 = (barycentric-s l i+1))
+               (for di = (barycentric-d l i))
+               (for di-1 = (barycentric-d l i-1))
+               (for di+1 = (barycentric-d l i+1))
+               (for alpha =
+                    (if use-d
+                        (if (< (+ di-1 di) *epsilon*)
+                            0.5
+                            (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
+                        (if (< (+ si (- 1 si-1)) *epsilon*)
+                            0.5
+                            (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
+               (for beta =
+                    (if use-d
+                        (if (< (+ di+1 di) *epsilon*)
+                            0.5
+                            (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
+                        (if (< (+ (- 1 si) si+1) *epsilon*)
+                            0.5
+                            (/ (sqr (- 1 si)) (+ (sqr (- 1 si)) (sqr si+1))))))
+               (for blf-sum = 0)
+               (iter (for row from 0 below (ceiling degree 2))
+                     (iter (for col from 0 to degree)
+                           (for blend = (* (bernstein degree row di)
+                                           (bernstein degree col si)))
+                           (for mu = (cond ((< col (/ degree 2)) alpha)
+                                           ((> col (/ degree 2)) beta)
+                                           (t 1)))
+                           (incf blf-sum (* mu blend))))
+               (sum blf-sum))))))
+
+#+nil
+(iter (for n from 4 to 8)
+      (iter (for d from 5 to 10)
+            (format t "n = ~a, deg = ~a~%" n d)
+            (let ((*barycentric-dilation* 0))
+              (format t "  Deficiency at the center with d=0:~%~
+                           - normal:             ~a~%~
+                           - squared:            ~a~%~
+                           - squared with no 0s: ~a~%"
+                      (deficiency n d)
+                      (deficiency-squared n d)
+                      (deficiency-squared-no0 n d)))))
+
+#+nil
+(iter (for n from 5 to 8)
+      (iter (for d from 5 to 10)
+            (format t "n = ~a, deg = ~a~%" n d)
+            (format t "  Maximum non-negative d:~%~
+                           - normal:             ~a~%~
+                           - squared:            ~a~%~
+                           - squared with no 0s: ~a~%"
+                    (let ((*deficiency-function* #'deficiency))
+                      (find-dilation-negative-boundary n d 0.0 30.0))
+                    (let ((*deficiency-function* #'deficiency-squared))
+                      (find-dilation-negative-boundary n d 0.0 30.0))
+                    (let ((*deficiency-function* #'deficiency-squared-no0))
+                      (find-dilation-negative-boundary n d 0.0 30.0)))))
+
+#+nil
+(let ((*resolution* 40))
+  (iter (for n from 5 to 8)
+        (iter (for d from 5 to 10)
+              (format t "n = ~a, deg = ~a~%" n d)
+              (format t "  Maximum monotone d:~%~
+                           - normal:             ~a~%~
+                           - squared:            ~a~%~
+                           - squared with no 0s: ~a~%"
+                      (let ((*deficiency-function* #'deficiency))
+                        (find-dilation-monotone-boundary n d 0.0 30.0))
+                      (let ((*deficiency-function* #'deficiency-squared))
+                        (find-dilation-monotone-boundary n d 0.0 30.0))
+                      (let ((*deficiency-function* #'deficiency-squared-no0))
+                        (find-dilation-monotone-boundary n d 0.0 30.0))))))
