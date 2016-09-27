@@ -53,7 +53,7 @@
                  (incf blf-sum
                        (* (bernstein degree (/ degree 2) di)
                           (bernstein degree (/ degree 2) si)
-                          (/ n))))
+                          (/ 4))))
                (sum blf-sum))))))
 
 #+nil

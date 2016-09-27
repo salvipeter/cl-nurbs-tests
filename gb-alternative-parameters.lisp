@@ -3,12 +3,25 @@
 (defvar *barycentric-dilation*)
 
 (defun barycentric-d (l i)
+  "Peti version."
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
          (i+1 (mod (+ i 1) n)))
     (* (- 1 (elt l i-1) (elt l i))
        (- 1 (* (elt l i-2) (elt l i+1)
+               *barycentric-dilation*)))))
+
+#+nil
+(defun barycentric-d (l i)
+  "Tomi version - does not work well in 3D."
+  (let* ((n (length l))
+         (i-2 (mod (- i 2) n))
+         (i-1 (mod (- i 1) n))
+         (i+1 (mod (+ i 1) n)))
+    (* (- 1 (elt l i-1) (elt l i))
+       (- 1 (* (+ (* (elt l i-2) (elt l i))
+                  (* (elt l i+1) (elt l i-1)))
                *barycentric-dilation*)))))
 
 #+nil
