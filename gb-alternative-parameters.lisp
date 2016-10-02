@@ -14,6 +14,64 @@
 
 #+nil
 (defun barycentric-d (l i)
+  "Pisti version 2 (sum x sum)."
+  (let* ((n (length l))
+         (m (floor (1- n) 2)))
+    (flet ((li (k) (elt l (mod (+ i k) n))))
+      (- 1 (li 0) (li -1)
+         (* 2
+            (iter (for j from (- m) to (- 2))
+                  (sum (li j)))
+            (iter (for j from 1 to (1- m))
+                  (sum (li j))))
+         (if (oddp n)
+             (- (+ (* (li 1) (li (- m)))
+                   (* (li -2) (li (1- m)))))
+             0)
+         (if (= n 5)
+             (* (li 1) (li (- 2)))
+             0)
+         (* *barycentric-dilation* (li -2) (li 1)
+            (- 1 (li -2) (li -1) (li 0) (li 1)))))))
+
+#+nil
+(defun barycentric-d (l i)
+  "Pisti version - not bad, but not necessarily better."
+  (let* ((n (length l))
+         (i-2 (mod (- i 2) n))
+         (i-1 (mod (- i 1) n))
+         (i+1 (mod (+ i 1) n)))
+    (- 1 (elt l i-1) (elt l i)
+       (* (elt l i-2) (elt l i+1)
+          *barycentric-dilation*))))
+
+#+nil
+(defun barycentric-d (l i)
+  "Tomi-Pisti version - not very good."
+  (let* ((n (length l))
+         (i-2 (mod (- i 2) n))
+         (i-1 (mod (- i 1) n))
+         (i+1 (mod (+ i 1) n)))
+    (- 1 (elt l i-1) (elt l i)
+       (* *barycentric-dilation*
+          (elt l i-2) (elt l i+1)
+          (- 1 (elt l i-2) (elt l i-1) (elt l i) (elt l i+1))))))
+
+#+nil
+(defun barycentric-d (l i)
+  "Tomi version 2 - also does not work well in 3D."
+  (let* ((n (length l))
+         (i-2 (mod (- i 2) n))
+         (i-1 (mod (- i 1) n))
+         (i+1 (mod (+ i 1) n)))
+    (- 1 (elt l i-1) (elt l i)
+       (* *barycentric-dilation*
+          (+ (* (elt l i-2) (elt l i))
+             (* (elt l i-1) (elt l i+1))
+             (* (elt l i-2) (elt l i+1)))))))
+
+#+nil
+(defun barycentric-d (l i)
   "Tomi version - does not work well in 3D."
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
@@ -104,7 +162,7 @@
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
              (- target (funcall *deficiency-function* n d)))))
-    (bisection-search-root #'f 0.0 20.0 iterations)))
+    (bisection-search-root #'f -20.0 20.0 iterations)))
 
 (defun write-bernstein-blend (path n degree &key (use-d t) &allow-other-keys)
   (let ((fname (format nil "~a/~asided-deg~a.obj" path n degree))
