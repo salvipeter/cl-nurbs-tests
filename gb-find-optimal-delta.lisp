@@ -34,7 +34,7 @@
                     f2 (funcall f x2)))
           (finally (return x)))))
 
-(defun find-optimal-delta (n &key (iterations 100) (min 0.0d0) (max 20.0d0))
+(defun find-optimal-delta (n &key (iterations 100) (min -20.0d0) (max 20.0d0))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
              (tangent-error n))))

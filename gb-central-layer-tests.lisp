@@ -48,6 +48,7 @@
                                            ((or (= col row) (= col (- degree row))) 1/2)
                                            ((< row 2) 1)
                                            (t 1)))
+                           #+nil(format t "~f	<-	~a,~a,~a~%" (* mu blend) i col row)
                            (incf blf-sum (* mu blend))))
                (when (evenp degree)
                  (incf blf-sum

@@ -12,9 +12,18 @@
        (- 1 (* (elt l i-2) (elt l i+1)
                *barycentric-dilation*)))))
 
+(defun barycentric-d (l i)
+  "Peti version 2"
+  (let ((n (length l)))
+    (flet ((li (k) (elt l (mod (+ i k) n))))
+      (- 1
+         (* (+ (li 0) (li -1))
+            (1+ (* *barycentric-dilation*
+                   (- 1 (li -2) (li -1) (li 0) (li 1)))))))))
+
 #+nil
 (defun barycentric-d (l i)
-  "Pisti version 2 (sum x sum)."
+  "Pisti version 3 (sum x sum)."
   (let* ((n (length l))
          (m (floor (1- n) 2)))
     (flet ((li (k) (elt l (mod (+ i k) n))))
@@ -24,6 +33,30 @@
                   (sum (li j)))
             (iter (for j from 1 to (1- m))
                   (sum (li j))))
+         (if (oddp n)
+             (- (+ (* (li 1) (li (- m)))
+                   (* (li -2) (li (1- m)))))
+             0)
+         (if (= n 5)
+             (* (li 1) (li (- 2)))
+             0)
+         (* *barycentric-dilation* (li -2) (li 1)
+            (- 1 (li -2) (li -1) (li 0) (li 1)))))))
+
+#+nil
+(defun barycentric-d (l i)
+  "Pisti version 2 (sum + sum)."
+  (let* ((n (length l))
+         (m (floor (1- n) 2)))
+    (flet ((li (k) (elt l (mod (+ i k) n))))
+      (- 1 (li 0) (li -1)
+         (* 2
+            (+ (* (li 1)
+                  (iter (for j from (- m) to (- 2))
+                        (sum (li j))))
+               (* (li -2)
+                  (iter (for j from 2 to (1- m))
+                        (sum (li j))))))
          (if (oddp n)
              (- (+ (* (li 1) (li (- m)))
                    (* (li -2) (li (1- m)))))
@@ -298,3 +331,23 @@
 ;; | 8 | 7 | 11.656 | 10.490 |
 ;; | 8 | 8 | 13.596 | 12.533 |
 ;; |---+---+--------+--------|
+
+;;; Table of deficiency values:
+#+nil
+(iter (for n from 5 to 10)
+      (for *barycentric-dilation* = (find-optimal-delta n))
+      (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
+      (iter (for d from 3 to 10)
+            (format t "|~a|~a|~,3f|~%" n d (deficiency-squared-central-layer n d))))
+
+;;; Check non-negativity:
+#+nil
+(iter (with *resolution* = 100)
+      (for n from 5 to 10)
+      (for *barycentric-dilation* = -4 #+nil(find-optimal-delta n))
+      (iter (for d from 3 to 10)
+            (format t "n = ~a, d = ~a~%" n d)
+            (iter (for p in (vertices (points-from-angles (uniform-angles n))))
+                  (for x = (deficiency-squared-central-layer n d :position p))
+                  (when (< x (- *epsilon*))
+                    (warn "Negative: ~f at ~{~,3f, ~,3f~}" x p)))))
