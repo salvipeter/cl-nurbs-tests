@@ -67,3 +67,10 @@ N is the length of the continued fraction used in the algorithm."
          (iter (for i from (+ (ceiling p 2) (if ok 0 1)) to p)
                (for y = (eval-continued-fraction (reverse (cons i (rest fr)))))
                (collect (cons y (abs (- x y))))))))
+
+(defun rational-approximations-below (x denom)
+  (iter (for n upfrom 2)
+        (for lst = (best-rational-approximations x n))
+        (for d = (denominator (caar (last lst))))
+        (while (< d denom))
+        (finally (return (remove-if-not (lambda (x) (<= (denominator (car x)) denom)) lst)))))
