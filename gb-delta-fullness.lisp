@@ -1,7 +1,6 @@
 (in-package :cl-nurbs-tests)
 
-(defun fullness-height (n)
-  "Circle version"
+(defun fullness-height-circle (n)
   (let* ((alpha (/ (* 2 pi) n))
          (beta (- (/ pi 2) alpha))
          (OQ (cos (/ alpha 2)))
@@ -11,11 +10,15 @@
          (RT (+ TC RC)))
     (- RT OQ)))
 
-(defun fullness-height (n)
-  "Parabola version"
+(defun fullness-height-parabola (n)
   (let* ((alpha (/ (* 2 pi) n)) 
          (OQ (cos (/ alpha 2))))
     (- (* OQ (cos alpha) 0.5))))
+
+(defparameter *fullness-height-function* #'fullness-height-circle)
+
+(defun fullness-height (n)
+  (funcall *fullness-height-function* n))
 
 (defun find-fullness-delta (n)
   (let* ((x (fullness-height n))

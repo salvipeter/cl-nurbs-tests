@@ -1,6 +1,6 @@
 (in-package :n-test)
 
-(defun deficiency-squared-central-layer (n degree &key (position 'center) (use-d t))
+(defun deficiency-squared-central-layer (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -22,7 +22,7 @@
                (for di-1 = (barycentric-d l i-1))
                (for di+1 = (barycentric-d l i+1))
                (for alpha =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di-1 di) *epsilon*)
                             0.5
                             (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
@@ -30,7 +30,7 @@
                             0.5
                             (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
                (for beta =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di+1 di) *epsilon*)
                             0.5
                             (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
@@ -57,7 +57,7 @@
                           (/ 4))))
                (sum blf-sum))))))
 
-(defun deficiency-squared-central-layer-nondiagonal (n degree &key (position 'center) (use-d t))
+(defun deficiency-squared-central-layer-nondiagonal (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -79,7 +79,7 @@
                (for di-1 = (barycentric-d l i-1))
                (for di+1 = (barycentric-d l i+1))
                (for alpha =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di-1 di) *epsilon*)
                             0.5
                             (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
@@ -87,7 +87,7 @@
                             0.5
                             (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
                (for beta =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di+1 di) *epsilon*)
                             0.5
                             (/ (sqr di+1) (+ (sqr di+1) (sqr di))))

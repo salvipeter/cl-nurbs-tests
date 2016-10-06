@@ -1,6 +1,8 @@
 (in-package :cl-nurbs-tests)
 
-(defun deficiency (n degree &key (position 'center) (use-d t))
+(defparameter *deficiency-use-d* t)
+
+(defun deficiency (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -21,7 +23,7 @@
              (for di-1 = (barycentric-d l i-1))
              (for di+1 = (barycentric-d l i+1))
              (for alpha =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di-1 di) *epsilon*)
                           0.5
                           (/ di-1 (+ di-1 di)))
@@ -29,7 +31,7 @@
                           0.5
                           (/ si (+ si (- 1 si-1))))))
              (for beta =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di+1 di) *epsilon*)
                           0.5
                           (/ di+1 (+ di+1 di)))
@@ -51,7 +53,7 @@
              (sum blf-sum)))))
 
 #+nil
-(iter (for dp in '(t nil))
+(iter (for *deficiency-use-d* in '(t nil))
       (format t "Using ~:[S~;D~] in alpha/beta:~%" dp)
       (iter (for type in '(center edge-center-mid vertex-center-mid))
             (format t "~a:~%" type)
@@ -59,7 +61,7 @@
                   (format t "~a sides:~%" n)
                   (iter (for d from 1 to 7)
                         (format t "deg: ~a => ~a%~%"
-                                d (round (* (deficiency n d :position type :use-d dp) 100)))))))
+                                d (round (* (deficiency n d :position type) 100)))))))
 
 (defun innermost-axis-weight-sum (n degree &key (position 'center))
   "Weight sum of the innermost axis control points."
@@ -109,7 +111,7 @@
       (*resolution* 50))
   (iter (for degree from 5 to 8)
         (iter (for p in (vertices (points-from-angles (uniform-angles n))))
-              (for d = (deficiency n degree :position p :use-d t))
+              (for d = (deficiency n degree :position p))
               (for w = (inner-weight-sum n degree :position p))
               ;(for w = (innermost-axis-weight-sum n degree :position p))
               (minimizing (+ w d) into min-wd)
@@ -138,7 +140,7 @@
 (defparameter *gb-diagonal-weight* 1)
 (defparameter *gb-side-weight* 1/2)
 
-(defun deficiency-autowp (n degree &key (position 'center) (use-d t))
+(defun deficiency-autowp (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -159,7 +161,7 @@
              (for di-1 = (barycentric-d-autowp l i-1))
              (for di+1 = (barycentric-d-autowp l i+1))
              (for alpha =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di-1 di) *epsilon*)
                           0.5
                           (/ di-1 (+ di-1 di)))
@@ -167,7 +169,7 @@
                           0.5
                           (/ si (+ si (- 1 si-1))))))
              (for beta =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di+1 di) *epsilon*)
                           0.5
                           (/ di+1 (+ di+1 di)))
@@ -195,7 +197,7 @@
   (iter (for *auto-wachspress-central-d* from 0.2 to 0.8 by 0.01)
         (for *auto-wachspress-weights* = (make-list n :initial-element (/ (- n 2) n)))
         (for d = (iter (for p in (vertices (points-from-angles (uniform-angles n))))
-                       (minimizing (deficiency-autowp n degree :position p :use-d t))))
+                       (minimizing (deficiency-autowp n degree :position p))))
         (when (> d -1d-5)
           (format t "~a => ~a~%" *auto-wachspress-central-d* d))))
 
@@ -266,7 +268,7 @@
 
 ;;; for bary-constr
 
-(defun deficiency1 (n degree &key (position 'center) (use-d t) (parameterization 'bary-constr))
+(defun deficiency1 (n degree &key (position 'center) (parameterization 'bary-constr))
   "Might be slower, but uses COMPUTE-PARAMETER, so this can be used with BARY-CONSTR."
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
@@ -289,7 +291,7 @@
              (for di-1 = (elt d i-1))
              (for di+1 = (elt d i+1))
              (for alpha =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di-1 di) *epsilon*)
                           0.5
                           (/ di-1 (+ di-1 di)))
@@ -297,7 +299,7 @@
                           0.5
                           (/ si (+ si (- 1 si-1))))))
              (for beta =
-                  (if use-d
+                  (if *deficiency-use-d*
                       (if (< (+ di+1 di) *epsilon*)
                           0.5
                           (/ di+1 (+ di+1 di)))
@@ -318,7 +320,7 @@
                          (incf blf-sum (* mu blend))))
              (sum blf-sum)))))
 
-(defun deficiency1-squared (n degree &key (position 'center) (use-d t) (parameterization 'bary-constr))
+(defun deficiency1-squared (n degree &key (position 'center) (parameterization 'bary-constr))
   "Might be slower, but uses COMPUTE-PARAMETER, so this can be used with BARY-CONSTR."
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
@@ -342,7 +344,7 @@
                (for di-1 = (elt d i-1))
                (for di+1 = (elt d i+1))
                (for alpha =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di-1 di) *epsilon*)
                             0.5
                             (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
@@ -350,7 +352,7 @@
                             0.5
                             (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
                (for beta =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di+1 di) *epsilon*)
                             0.5
                             (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
@@ -372,7 +374,7 @@
                (sum blf-sum))))))
 
 
-(defun deficiency-squared (n degree &key (position 'center) (use-d t))
+(defun deficiency-squared (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -394,7 +396,7 @@
                (for di-1 = (barycentric-d l i-1))
                (for di+1 = (barycentric-d l i+1))
                (for alpha =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di-1 di) *epsilon*)
                             0.5
                             (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
@@ -402,7 +404,7 @@
                             0.5
                             (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
                (for beta =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di+1 di) *epsilon*)
                             0.5
                             (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
@@ -423,7 +425,7 @@
                            (incf blf-sum (* mu blend))))
                (sum blf-sum))))))
 
-(defun deficiency-squared-no0 (n degree &key (position 'center) (use-d t))
+(defun deficiency-squared-no0 (n degree &key (position 'center))
   (let* ((points (points-from-angles (uniform-angles n)))
          (p (case position
               (center '(0 0))
@@ -445,7 +447,7 @@
                (for di-1 = (barycentric-d l i-1))
                (for di+1 = (barycentric-d l i+1))
                (for alpha =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di-1 di) *epsilon*)
                             0.5
                             (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
@@ -453,7 +455,7 @@
                             0.5
                             (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
                (for beta =
-                    (if use-d
+                    (if *deficiency-use-d*
                         (if (< (+ di+1 di) *epsilon*)
                             0.5
                             (/ (sqr di+1) (+ (sqr di+1) (sqr di))))

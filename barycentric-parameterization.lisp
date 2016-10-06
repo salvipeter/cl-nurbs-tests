@@ -61,10 +61,15 @@
     (safe-/ (elt l i)
             (+ (elt l i-1) (elt l i)))))
 
-(defun barycentric-d (l i)
+(defun barycentric-d-original (l i)
   (let* ((n (length l))
          (i-1 (mod (1- i) n)))
     (- 1 (elt l i-1) (elt l i))))
+
+(defparameter *barycentric-d-function* #'barycentric-d-original)
+
+(defun barycentric-d (l i)
+  (funcall *barycentric-d-function* l i))
 
 (defmethod compute-distance ((type (eql 'bary)) points segments p dir)
   (let* ((i (position (elt segments 2) points :test #'equal))

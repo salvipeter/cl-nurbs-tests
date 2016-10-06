@@ -1,9 +1,8 @@
 (in-package :cl-nurbs-tests)
 
-(defvar *barycentric-dilation*)
+(defvar *barycentric-dilation* 0)
 
-(defun barycentric-d (l i)
-  "Peti version."
+(defun barycentric-d-1minus (l i)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
@@ -12,8 +11,7 @@
        (- 1 (* (elt l i-2) (elt l i+1)
                *barycentric-dilation*)))))
 
-(defun barycentric-d (l i)
-  "Peti version 2"
+(defun barycentric-d-peti (l i)
   (let ((n (length l)))
     (flet ((li (k) (elt l (mod (+ i k) n))))
       (- 1
@@ -21,9 +19,7 @@
             (1+ (* *barycentric-dilation*
                    (- 1 (li -2) (li -1) (li 0) (li 1)))))))))
 
-#+nil
-(defun barycentric-d (l i)
-  "Pisti version 3 (sum x sum)."
+(defun barycentric-d-pisti-all-multiplication (l i)
   (let* ((n (length l))
          (m (floor (1- n) 2)))
     (flet ((li (k) (elt l (mod (+ i k) n))))
@@ -43,8 +39,7 @@
          (* *barycentric-dilation* (li -2) (li 1)
             (- 1 (li -2) (li -1) (li 0) (li 1)))))))
 
-#+nil
-(defun barycentric-d (l i)
+(defun barycentric-d-pisti-all (l i)
   "Pisti version 2 (sum + sum)."
   (let* ((n (length l))
          (m (floor (1- n) 2)))
@@ -67,9 +62,7 @@
          (* *barycentric-dilation* (li -2) (li 1)
             (- 1 (li -2) (li -1) (li 0) (li 1)))))))
 
-#+nil
-(defun barycentric-d (l i)
-  "Pisti version - not bad, but not necessarily better."
+(defun barycentric-d-1term (l i)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
@@ -78,9 +71,7 @@
        (* (elt l i-2) (elt l i+1)
           *barycentric-dilation*))))
 
-#+nil
-(defun barycentric-d (l i)
-  "Tomi-Pisti version - not very good."
+(defun barycentric-d-tomi-pisti (l i)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
@@ -90,9 +81,7 @@
           (elt l i-2) (elt l i+1)
           (- 1 (elt l i-2) (elt l i-1) (elt l i) (elt l i+1))))))
 
-#+nil
-(defun barycentric-d (l i)
-  "Tomi version 2 - also does not work well in 3D."
+(defun barycentric-d-tomi2 (l i)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
@@ -103,9 +92,7 @@
              (* (elt l i-1) (elt l i+1))
              (* (elt l i-2) (elt l i+1)))))))
 
-#+nil
-(defun barycentric-d (l i)
-  "Tomi version - does not work well in 3D."
+(defun barycentric-d-tomi (l i)
   (let* ((n (length l))
          (i-2 (mod (- i 2) n))
          (i-1 (mod (- i 1) n))
@@ -114,21 +101,6 @@
        (- 1 (* (+ (* (elt l i-2) (elt l i))
                   (* (elt l i+1) (elt l i-1)))
                *barycentric-dilation*)))))
-
-#+nil
-(defun barycentric-d (l i)
-  "With warning for negative values"
-  (let* ((n (length l))
-         (i-2 (mod (- i 2) n))
-         (i-1 (mod (- i 1) n))
-         (i+1 (mod (+ i 1) n))
-         (d1 (- 1 (elt l i-1) (elt l i)))
-         (d (* (max 0 d1)
-               (- 1 (* (elt l i-2) (elt l i+1)
-                       *barycentric-dilation*)))))
-    (when (< d (- *epsilon*))
-      (warn "Negative d with l = ~a, i = ~a" l i))
-    d))
 
 
 ;;; s_i similar to h_i (not used)
@@ -144,7 +116,7 @@
 ;; valamint az $i-1$-es oldal kozeleben $s_i$ ugy viselkedik, mint $h_{i-1}$,
 ;; az $i+1$-es oldalon kozeleben pedig ugy, mint $h_{i+1}$.
 
-(defun barycentric-s (l i)
+(defun barycentric-s-alternative (l i)
   (let* ((n (length l))
          (i-1 (mod (1- i) n))
          (i+1 (mod (1+ i) n))
@@ -159,19 +131,19 @@
 
 (defparameter *deficiency-function* #'deficiency)
 
-(defun deficiency-negative-p (n d &key (use-d t))
+(defun deficiency-negative-p (n d)
   (iter (for p in (vertices (points-from-angles (uniform-angles n))))
-        (for def = (funcall *deficiency-function* n d :position p :use-d use-d))
+        (for def = (funcall *deficiency-function* n d :position p))
         (when (< def (- *epsilon*))
           (return def))))
 
-(defun find-dilation-negative-boundary (n d min max &key (iterations 100) (use-d t))
+(defun find-dilation-negative-boundary (n d min max &key (iterations 100))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
-             (- (or (deficiency-negative-p n d :use-d use-d) 1)))))
+             (- (or (deficiency-negative-p n d) 1)))))
     (bisection-search-root #'f min max iterations)))
 
-(defun deficiency-monotone-p (n d &key (use-d t))
+(defun deficiency-monotone-p (n d)
   (let ((points (points-from-angles (uniform-angles n))))
     (iter (for i from 0 to *resolution*)
           (for x = (/ i *resolution*))
@@ -180,35 +152,35 @@
                 (for y = (/ j *resolution*))
                 (for q = (v* p y))
                 (for defic1 first nil then defic)
-                (for defic = (funcall *deficiency-function* n d :position q :use-d use-d))
+                (for defic = (funcall *deficiency-function* n d :position q))
                 (when (or (< defic (- *epsilon*)) (and defic1 (> defic defic1)))
                   (return-from deficiency-monotone-p nil)))))
   t)
 
-(defun find-dilation-monotone-boundary (n d min max &key (iterations 100) (use-d t))
+(defun find-dilation-monotone-boundary (n d min max &key (iterations 100))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
-             (if (deficiency-monotone-p n d :use-d use-d) -1 1))))
+             (if (deficiency-monotone-p n d) -1 1))))
     (bisection-search-root #'f min max iterations)))
 
-(defun find-dilation-for-deficiency (n d &key (target 0.0) (iterations 100))
+(defun find-dilation-for-deficiency (n d &key (min -20.0) (max 20.0) (target 0.0) (iterations 100))
   (flet ((f (x)
            (let ((*barycentric-dilation* x))
              (- target (funcall *deficiency-function* n d)))))
-    (bisection-search-root #'f -20.0 20.0 iterations)))
+    (bisection-search-root #'f min max iterations)))
 
-(defun write-bernstein-blend (path n degree &key (use-d t) &allow-other-keys)
+(defun write-bernstein-blend (path n degree &key &allow-other-keys)
   (let ((fname (format nil "~a/~asided-deg~a.obj" path n degree))
         (points (points-from-angles (uniform-angles n))))
     (write-obj-indexed-mesh
      (iter (for p in (vertices points))
-           (for def = (deficiency n degree :position p :use-d use-d))
+           (for def = (deficiency n degree :position p))
            (when (< def (- *epsilon*))
              (warn "Negative deficiency: ~a" def))
            (collect (cons (if (< (abs def) *epsilon*) 0 def) p)))
      (triangles n) fname)))
 
-(defun gb-blend-maximums (n degree filename &key (use-d t))
+(defun gb-blend-maximums (n degree filename)
   (let ((data '())
         weights)
     (flet ((merge-maximums ()
@@ -238,7 +210,7 @@
                        (for di-1 = (barycentric-d l i-1))
                        (for di+1 = (barycentric-d l i+1))
                        (for alpha =
-                            (if use-d
+                            (if *deficiency-use-d*
                                 (if (< (+ di-1 di) *epsilon*)
                                     0.5
                                     (/ di-1 (+ di-1 di)))
@@ -246,7 +218,7 @@
                                     0.5
                                     (/ si (+ si (- 1 si-1))))))
                        (for beta =
-                            (if use-d
+                            (if *deficiency-use-d*
                                 (if (< (+ di+1 di) *epsilon*)
                                     0.5
                                     (/ di+1 (+ di+1 di)))
@@ -331,23 +303,3 @@
 ;; | 8 | 7 | 11.656 | 10.490 |
 ;; | 8 | 8 | 13.596 | 12.533 |
 ;; |---+---+--------+--------|
-
-;;; Table of deficiency values:
-#+nil
-(iter (for n from 5 to 10)
-      (for *barycentric-dilation* = (find-optimal-delta n))
-      (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
-      (iter (for d from 3 to 10)
-            (format t "|~a|~a|~,3f|~%" n d (deficiency-squared-central-layer n d))))
-
-;;; Check non-negativity:
-#+nil
-(iter (with *resolution* = 100)
-      (for n from 5 to 10)
-      (for *barycentric-dilation* = -4 #+nil(find-optimal-delta n))
-      (iter (for d from 3 to 10)
-            (format t "n = ~a, d = ~a~%" n d)
-            (iter (for p in (vertices (points-from-angles (uniform-angles n))))
-                  (for x = (deficiency-squared-central-layer n d :position p))
-                  (when (< x (- *epsilon*))
-                    (warn "Negative: ~f at ~{~,3f, ~,3f~}" x p)))))
