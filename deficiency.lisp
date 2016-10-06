@@ -201,15 +201,6 @@
         (when (> d -1d-5)
           (format t "~a => ~a~%" *auto-wachspress-central-d* d))))
 
-(defun bisection-search-root (fn min max iterations)
-  (let ((mid (/ (+ min max) 2)))
-    (if (zerop iterations)
-        mid
-        (let ((x (funcall fn mid)))
-          (cond ((< (abs x) 1.0d-6) mid)
-                ((< x 0) (bisection-search-root fn mid max (1- iterations)))
-                (t (bisection-search-root fn min mid (1- iterations))))))))
-
 (defun find-autowp-for-deficiency (n d &key (target 0.0) (iterations 100))
   (flet ((f (x)
            (let ((*auto-wachspress-central-d* x)

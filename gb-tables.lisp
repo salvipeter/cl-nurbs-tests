@@ -1,49 +1,38 @@
 (in-package :cl-nurbs-tests)
 
-(defparameter *delta-setter-function* nil)
-
-(defun gb-print-info ()
-  (format t "Parameterization: ~a~%" *barycentric-d-function*)
-  (format t "Fullness: ~a~%" *fullness-height-function*)
-  (if *delta-setter-function*
-      (format t "Delta: ~a~%" *delta-setter-function*)
-      (format t "Delta: ~,3f~%" *barycentric-dilation*))
-  (format t "Deficiency: ~a~%" *deficiency-function*)
-  (format t "Use S: ~a~%" (not *deficiency-use-d*))
-  (format t "Resolution: ~a~%" *resolution*)
-  (format t "Epsilon: ~f~%" *epsilon*))
-
 ;;; Deficiency table
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-peti)
+(let ((*barycentric-d-function* #'barycentric-d-pisti-all-multiplication)
       (*fullness-height-function* #'fullness-height-circle)
       (*barycentric-dilation* 0)
-      (*delta-setter-function* #'find-optimal-delta)
-      (*deficiency-function* #'deficiency-squared-central-layer)
+      (delta-setter-function #'find-fullness-delta)
+      (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
       (*deficiency-use-d* t))
-  (gb-print-info)
+  (dprint *barycentric-dilation* *fullness-height-function* *barycentric-dilation*
+          delta-setter-function *deficiency-function* *deficiency-use-d*)
   (iter (for n from 5 to 10)
-        (when *delta-setter-function*
-          (setf *barycentric-dilation* (funcall *delta-setter-function* n)))
+        (when delta-setter-function
+          (setf *barycentric-dilation* (funcall delta-setter-function n)))
         (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
         (iter (for d from 3 to 10)
               (format t "|~a|~a|~,3f|~%" n d (funcall *deficiency-function* n d)))))
 
-;;; Negativity
+;;; Negativity / Monotonity / Target deficiency
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-peti)
+(let ((*barycentric-d-function* #'barycentric-d-peti-fullness)
       (*fullness-height-function* #'fullness-height-circle)
       (*barycentric-dilation* 0)
-      (*delta-setter-function* #'find-optimal-delta)
+      (delta-setter-function #'find-optimal-delta)
       (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
       (*deficiency-use-d* t)
-      (*resolution* 30)
+      (*resolution* 50)
       (*epsilon* 1.0d-8))
-  (gb-print-info)
+  (dprint *barycentric-dilation* *fullness-height-function* *barycentric-dilation*
+          delta-setter-function *deficiency-function* *deficiency-use-d* *resolution* *epsilon*)
   (iter (for n from 5 to 10)
         (for points = (points-from-angles (uniform-angles n)))
-        (when *delta-setter-function*
-          (setf *barycentric-dilation* (funcall *delta-setter-function* n)))
+        (when delta-setter-function
+          (setf *barycentric-dilation* (funcall delta-setter-function n)))
         (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
         (iter (for d from 3 to 10)
               (format t "Checking d = ~a...~%" d)
@@ -54,20 +43,20 @@
 
 ;;; Boundary search
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-peti)
+(let ((*barycentric-d-function* #'barycentric-d-pisti-all)
       (*fullness-height-function* #'fullness-height-circle)
-      (*barycentric-dilation* 0)
-      (*delta-setter-function* #'find-dilation-negative-boundary)
-      (*deficiency-function* #'deficiency-squared-central-layer)
+      (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
       (*deficiency-use-d* t)
       (*resolution* 50)
       (*epsilon* 1.0d-5)
-      (type 'target)                  ; negativity / monotonity / target
-      (min -20.0)
-      (max 20.0)
+      (type 'monotonity)                  ; negativity / monotonity / target
+      (min -10.0)
+      (max 10.0)
       (target 0.0)
       (iterations 20))
-  (gb-print-info)
+  (dprint *barycentric-dilation* *fullness-height-function* *deficiency-function*
+          *deficiency-use-d* *resolution* *epsilon* min max target iterations)
+  (format t "Delta values for ~a:~%" type)
   (iter (for n from 5 to 10)
         (iter (for d from 3 to 10)
               (format t "|~a|~a|~,3f|~%" n d

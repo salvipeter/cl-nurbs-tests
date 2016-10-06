@@ -19,6 +19,23 @@
             (1+ (* *barycentric-dilation*
                    (- 1 (li -2) (li -1) (li 0) (li 1)))))))))
 
+(defun barycentric-d-peti-1minus (l i)
+  (let ((n (length l)))
+    (flet ((li (k) (elt l (mod (+ i k) n))))
+      (* (- 1 (li 0) (li -1))
+         (- 1 (* *barycentric-dilation*
+                 (+ (li 0) (li -1))
+                 (- 1 (li -2) (li -1) (li 0) (li 1))))))))
+
+(defun barycentric-d-peti-fullness (l i)
+  (let ((n (length l)))
+    (flet ((li (k) (elt l (mod (+ i k) n)))
+           (sqr (x) (* x x)))
+      (- 1 (li 0) (li -1)
+         (* *barycentric-dilation*
+            (+ (li 0) (li -1) (li -2) (li 1))
+            (- 1 (li -2) (li -1) (li 0) (li 1)))))))
+
 (defun barycentric-d-pisti-all-multiplication (l i)
   (let* ((n (length l))
          (m (floor (1- n) 2)))
@@ -47,7 +64,7 @@
       (- 1 (li 0) (li -1)
          (* 2
             (+ (* (li 1)
-                  (iter (for j from (- m) to (- 2))
+                  (iter (for j from (- m) to -2)
                         (sum (li j))))
                (* (li -2)
                   (iter (for j from 2 to (1- m))
@@ -57,7 +74,7 @@
                    (* (li -2) (li (1- m)))))
              0)
          (if (= n 5)
-             (* (li 1) (li (- 2)))
+             (* (li 1) (li -2))
              0)
          (* *barycentric-dilation* (li -2) (li 1)
             (- 1 (li -2) (li -1) (li 0) (li 1)))))))
