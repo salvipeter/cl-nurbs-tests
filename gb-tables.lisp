@@ -15,7 +15,7 @@
           (setf *barycentric-dilation* (funcall delta-setter-function n)))
         (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
         (iter (for d from 3 to 10)
-              (format t "|~a|~a|~,3f|~%" n d (funcall *deficiency-function* n d)))))
+              (format t "|~a|~a|~,3f|~%" n d (funcall *deficiency-function* n d :position '(0.3 0.5))))))
 
 ;;; Negativity / Monotonity / Target deficiency
 #+nil

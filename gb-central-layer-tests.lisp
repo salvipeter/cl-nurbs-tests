@@ -102,12 +102,11 @@
                                            (bernstein degree col si)))
                            (for mu = (cond ((< col layers) alpha)
                                            ((> col (- degree layers)) beta)
-                                           (t 1)))
+                                           (t (/ (+ alpha beta) 2))))
                            (incf blf-sum (* mu blend))))
                (when (evenp degree)
                  (incf blf-sum
                        (* (bernstein degree (/ degree 2) di)
-                          (bernstein degree (/ degree 2) si)
                           (/ 4))))
                (sum blf-sum))))))
 
