@@ -2,15 +2,15 @@
 
 ;;; Deficiency table
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-pisti-all-multiplication)
-      (*fullness-height-function* #'fullness-height-circle)
-      (*barycentric-dilation* 0)
-      (delta-setter-function #'find-fullness-delta)
-      (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
+(let ((*barycentric-d-function* #'barycentric-d-triangle)
+      (*fullness-height-function* #'fullness-height-parabola)
+      (*barycentric-dilation* 5)
+      (delta-setter-function nil)
+      (*deficiency-function* #'deficiency-squared-central-layer)
       (*deficiency-use-d* t))
   (dprint *barycentric-dilation* *fullness-height-function* *barycentric-dilation*
           delta-setter-function *deficiency-function* *deficiency-use-d*)
-  (iter (for n from 5 to 10)
+  (iter (for n from 3 to 3)
         (when delta-setter-function
           (setf *barycentric-dilation* (funcall delta-setter-function n)))
         (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
@@ -19,17 +19,17 @@
 
 ;;; Negativity / Monotonity / Target deficiency
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-peti-fullness)
-      (*fullness-height-function* #'fullness-height-circle)
-      (*barycentric-dilation* 0)
-      (delta-setter-function #'find-optimal-delta)
-      (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
+(let ((*barycentric-d-function* #'barycentric-d-triangle)
+      (*fullness-height-function* #'fullness-height-parabola)
+      (*barycentric-dilation* 5.25)
+      (delta-setter-function nil)
+      (*deficiency-function* #'deficiency-squared-central-layer)
       (*deficiency-use-d* t)
       (*resolution* 50)
       (*epsilon* 1.0d-8))
   (dprint *barycentric-dilation* *fullness-height-function* *barycentric-dilation*
           delta-setter-function *deficiency-function* *deficiency-use-d* *resolution* *epsilon*)
-  (iter (for n from 5 to 10)
+  (iter (for n from 3 to 3)
         (for points = (points-from-angles (uniform-angles n)))
         (when delta-setter-function
           (setf *barycentric-dilation* (funcall delta-setter-function n)))

@@ -30,6 +30,16 @@
       (/ (- h 0.5) (li -2) (li 1)
          (- 1 (li -2) (li -1) (li 0) (li 1))))))
 
+(defun find-fullness-delta-triangle (n)
+  (assert (= n 3))
+  (let* ((x (fullness-height n))
+         (points (points-from-angles (cons (+ 270 (/ 180 n)) (rest (uniform-angles n)))))
+         (l (barycentric-coordinates points (list 0 x)))
+         (h (let ((*barycentric-dilation* 0))
+              (barycentric-d l 0))))
+    (flet ((li (i) (elt l (mod i n))))
+      (/ (- 0.5 h) (- 1 (li 1)) (li -1) (li 0) (li 1)))))
+
 (defun find-point-on-05-with-h (points h)
   (bisection-search-root (lambda (x)
                            (- (barycentric-d (barycentric-coordinates points `(0 ,x)) 0) h))
