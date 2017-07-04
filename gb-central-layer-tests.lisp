@@ -54,7 +54,7 @@
                  (incf blf-sum
                        (* (bernstein degree (/ degree 2) di)
                           (bernstein degree (/ degree 2) si)
-                          (/ 4))))
+                          (/ n))))
                (sum blf-sum))))))
 
 (defun deficiency-squared-central-layer-nondiagonal (n degree &key (position 'center))
@@ -102,12 +102,13 @@
                                            (bernstein degree col si)))
                            (for mu = (cond ((< col layers) alpha)
                                            ((> col (- degree layers)) beta)
-                                           (t (/ (+ alpha beta) 2))))
+                                           (t 1)))
                            (incf blf-sum (* mu blend))))
                (when (evenp degree)
                  (incf blf-sum
                        (* (bernstein degree (/ degree 2) di)
-                          (/ 4))))
+                          (bernstein degree (/ degree 2) si)
+                          (/ n))))
                (sum blf-sum))))))
 
 #+nil

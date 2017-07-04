@@ -1892,3 +1892,28 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
     (if (eq dir 's)
         (barycentric-s l i)
         (barycentric-d l i))))
+
+(defparameter *alyn-perpendicular-exponent* 2)
+
+(defmethod compute-distance ((type (eql 'alyn)) points segments p dir)
+  (if (eq dir 's)
+      (let ((di-1 (point-line-distance p (list (elt segments 0) (elt segments 1))))
+            (di+1 (point-line-distance p (list (elt segments 2) (elt segments 3)))))
+        (/ di-1 (+ di-1 di+1)))
+      (let ((di (point-line-distance p (list (elt segments 1) (elt segments 2)))))
+        (/ di
+           (expt (iter (with n = (length points))
+                       (with index = (position (elt segments 1) points))
+                       (for i from 0 below n)
+                       (for ip = (mod (1+ i) n))
+                       (unless (or (= i (1- index)) (= i (1+ index)))
+                         (let ((d (point-line-distance p (list (elt points i) (elt points ip)))))
+                           (sum (expt d *alyn-perpendicular-exponent*)))))
+                 (/ *alyn-perpendicular-exponent*))))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80)))
+      (*wachspressp* nil))
+  (vectorized-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps"
+   :resolution 0.001d0 :density 6 :distance-type 'alyn :color nil))

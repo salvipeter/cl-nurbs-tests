@@ -2,20 +2,20 @@
 
 ;;; Deficiency table
 #+nil
-(let ((*barycentric-d-function* #'barycentric-d-pisti-all-multiplication)
+(let ((*barycentric-d-function* #'barycentric-d-original)
       (*fullness-height-function* #'fullness-height-circle)
       (*barycentric-dilation* 0)
-      (delta-setter-function #'find-fullness-delta)
-      (*deficiency-function* #'deficiency-squared-central-layer-nondiagonal)
+      (delta-setter-function nil)
+      (*deficiency-function* #'deficiency-squared-central-layer)
       (*deficiency-use-d* t))
-  (dprint *barycentric-dilation* *fullness-height-function* *barycentric-dilation*
+  (dprint *barycentric-d-function* *fullness-height-function* *barycentric-dilation*
           delta-setter-function *deficiency-function* *deficiency-use-d*)
   (iter (for n from 5 to 10)
         (when delta-setter-function
           (setf *barycentric-dilation* (funcall delta-setter-function n)))
         (format t "|~a|delta=|~,3f|~%" n *barycentric-dilation*)
         (iter (for d from 3 to 10)
-              (format t "|~a|~a|~,3f|~%" n d (funcall *deficiency-function* n d :position '(0.3 0.5))))))
+              (format t "|~a|~a|~,3f|~%" n d (funcall *deficiency-function* n d)))))
 
 ;;; Negativity / Monotonity / Target deficiency
 #+nil
