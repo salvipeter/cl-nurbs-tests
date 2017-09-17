@@ -1916,6 +1916,83 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
 #+nil
 (let ((points (points-from-angles '(40 20 60 100 80)))
       (*wachspressp* nil))
-  (vectorized-distance-function-test
-   points '(nil sd nil nil nil) "/tmp/proba.ps"
-   :resolution 0.001d0 :density 12 :distance-type 'alyn :color nil))
+  (sliced-distance-function-test
+   points '(nil sd nil nil nil) "/tmp/proba.ps" :distance-type 'alyn :color nil))
+
+(defun slice-mesh (vertices triangles density)
+  (let ((segments '()))
+    (labels ((slice (i j)
+               (let ((x (car (elt vertices i)))
+                     (y (car (elt vertices j))))
+                 (when (> y x)
+                   (rotatef x y)
+                   (rotatef i j))
+                 (let ((q1 (floor x density))
+                       (q2 (floor y density)))
+                   (when (= (- q1 q2) 1)
+                     (affine-combine (elt vertices j)
+                                     (/ (- (* density q1) y) (- x y))
+                                     (elt vertices i)))))))
+      (dolist (tri triangles)
+        (let ((ab (slice (elt tri 0) (elt tri 1)))
+              (ac (slice (elt tri 0) (elt tri 2)))
+              (bc (slice (elt tri 1) (elt tri 2))))
+          (let ((lst (remove-if-not #'identity (list ab ac bc))))
+            (when lst
+              (push lst segments))))))
+    segments))
+
+(defun sliced-distance-function-test (points line-types filename
+                                      &key (resolution 30) (density 0.1)
+                                        (distance-type 'perpendicular) (color t) other-center)
+  "LINE-TYPES is a list of symbols, each of which can be S, D or SD."
+  (flet ((map-point (p)
+	   (list (* (+ (first p) 1.0d0) 200)
+		 (* (+ (second p) 1.0d0) 200))))
+    (let* ((n (length points)) 
+	   (lines (lines-from-points points))
+	   (colors (or (and color (generate-colors n))
+		       (iter (repeat n) (collect '(0 0 0)))))
+	   (center (or other-center (central-point points lines t)))
+           (*resolution* resolution))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+	(format s "%!PS~%")
+	(format s "~{~f ~}3 0 360 arc fill~%" (map-point center))
+	(iter (with triangles = (triangles n))
+              (with vertices = (vertices points))
+              (for i from 0 below n)
+	      (for color in colors)
+	      (for line in lines)
+	      (for line-type in line-types)
+	      (format s "% Segment: ~a~%" i)
+	      (format s "~{~d ~}setrgbcolor~%" color)
+	      (format s "2 setlinewidth~%~
+                         newpath~%~
+                         ~{~f ~}moveto~%~
+                         ~{~f ~}lineto~%~
+                         stroke~%~
+                         1 setlinewidth~%"
+		      (map-point (first line))
+		      (map-point (second line)))
+	      (iter (for type in (case line-type (s '(s)) (d '(d)) (sd '(s d))))
+		    (format s "% Type: ~a~%" type)
+                    (for mesh =
+                         (mapcar (lambda (p)
+                                   (cons (elt (compute-parameter distance-type type points p t) i)
+                                         p))
+                                 vertices))
+                    (for segments = (slice-mesh mesh triangles density))
+		    (iter (for segment in segments)
+			  (format s "newpath~%~
+                                     ~{~f ~}moveto~%~
+                                     ~{~f ~}lineto~%~
+                                     stroke~%"
+				  (map-point (cdr (first segment)))
+				  (map-point (cdr (second segment)))))))
+	(format s "showpage~%")))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80)))
+      (*wachspressp* t))
+  (sliced-distance-function-test points '(nil sd nil nil nil)
+                                 "/tmp/proba.ps" :distance-type 'mean-bilinear :color nil))
