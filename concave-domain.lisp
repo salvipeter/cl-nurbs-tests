@@ -1,0 +1,48 @@
+(in-package :cl-nurbs-tests)
+
+(defun concavep (points i)
+  "Assumes that POINTS is given in positive order, i.e. `matter' is on the left side."
+  (let* ((n (length points))
+         (im (mod (1- i) n))
+         (ip (mod (1+ i) n))
+         (u (v- (elt points ip) (elt points i)))
+         (v (v- (elt points im) (elt points i))))
+    (>= (- (* (elt u 0) (elt v 1))
+           (* (elt u 1) (elt v 0)))
+       0)))
+
+(defun snip-triangle (points i)
+  (append (subseq points 0 i)
+          (subseq points (1+ i))))
+
+(defun mesh-triangle (points i)
+  (let* ((n (length points))
+         (a (elt points (mod (1- i) n)))
+         (b (elt points i))
+         (c (elt points (mod (1+ i) n))))
+    (iter (for i from 1 to *resolution*)
+          (for u = (/ i *resolution*))
+          (for p = (affine-combine a u b))
+          (for q = (affine-combine c u b))
+          (for row = (iter (for j from 0 below i)
+                           (collect (list (affine-combine p (/ j i) q)
+                                          (affine-combine p (/ (1+ j) i) q)
+                                          (elt (elt row j) 0))))) ;TODO
+          (appending row))))
+
+(defun mesh-concave (points)
+  (iter (with points = (copy-list points))
+        (while (>= (length points) 3))
+        (for i = (or (iter (with n = (length points))
+                           (for j from 0 below n)
+                           (when (and (not (concavep points j))
+                                      (or (concavep points (mod (1- j) n))
+                                          (concavep points (mod (1+ j) n))))))
+                     0))
+        (collect (mesh-triangle points i))
+        (setf points (snip-triangle points i))))
+
+#+nil
+(let ((*resolution* 5)
+      (points '((2 5) (3 3) (5 3) (6 5) (8 3) (7 0) (1 0) (0 3))))
+  (mesh-concave points))
