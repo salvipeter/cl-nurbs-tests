@@ -312,18 +312,74 @@ Returns parameters for which the Bezier patch given by CPTS evaluates to P."
              (elt (find (list i j k) gbp :key (lambda (x) (subseq x 0 3)) :test #'equal) 3)))
       (iter (with n = (reduce #'max gbp :key #'first))
             (with d = (reduce #'max gbp :key #'second))
-            (for i from 0 below n)
+            (for i from 0 to n)
             (collect (iter (for k from 0 to 1)
                            (collect (iter (for j from 0 to d)
                                           (collect (c i j k))))))))))
 
 (defun mirror-concave-corner (ribbons i)
-  "Creates a twist-compatible, coherent corner at sides I-1 and I."
-  )
+  "Creates a twist-compatible, coherent concave corner at sides I-1 and I.
+Destructively modifies RIBBONS, and returns the two newly created bilinear patch,
+the first one is to use with ribbon I-1, the second is with ribbon I."
+  (flet ((mirror (p o) (v+ o (v- o p)))
+         (p (i j k) (elt (elt (elt ribbons i) k) j))
+         (setp (i j k p) (setf (elt (elt (elt ribbons i) k) j) p)))
+    (let* ((n (length ribbons))
+           (i-1 (mod (1- i) n))
+           (corner (p i 0 0))
+           (twist (p i 1 1)))
+      (setp i-1 2 1 (mirror twist (p i-1 2 0)))
+      (setp  i  1 1 (mirror twist (p i 1 0)))
+      (setp i-1 3 1 (mirror (p i 1 0) corner))
+      (setp  i  0 1 (mirror (p i-1 2 0) corner))
+      (let ((inner-twist (mirror (p i 1 1) (p i 0 1))))
+        (list (list (list corner (p i 0 1))
+                    (list (p i-1 3 1) inner-twist))
+              (list (list (p i-1 3 1) corner)
+                    (list inner-twist (p i 0 1))))))))
+
+(defun write-bezier-ribbon-control-points (ribbons filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)))
+
+(defvar *dropbox* "/home/salvi/Dropbox")
 
 #+nil
-(let ((ribbons (load-ribbons "/home/salvi/Dropbox/Shares/GrafGeo/Polar/bezier-ribbon/GBTest2_Cubic.gbp")))
-  ribbons)
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest2_Cubic.gbp")))
+       (bilinears (mirror-concave-corner ribbons 5)))
+  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
+  (let ((*resolution* 40)
+        (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
+        (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
+        (linear '(((3 2) (3 3)) ((2 2) (2 3))))
+        (cubic3d (elt ribbons 5))
+        (linear3d (elt bilinears 1)))
+    (flet ((ribbon (p)
+             (if (<= (second p) 3)      ; works only on this domain...
+                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
+                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
+      (write-stl (eval3d-on-concave-domain domain #'ribbon)
+                 "/tmp/proba.stl" :ascii t))))
+
+#+nil
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest2_Cubic.gbp")))
+       (bilinears (mirror-concave-corner ribbons 5)))
+  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
+  (let ((*resolution* 40)
+        (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
+        (cubic '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
+        (linear '(((3 3) (2 3)) ((3 2) (2 2))))
+        (cubic3d (elt ribbons 4))
+        (linear3d (elt bilinears 0)))
+    (flet ((ribbon (p)
+             (if (and (<= (second p) 3) (>= (first p) 3)) ; works only on this domain...
+                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p))
+                 (bezier-surface linear3d (reverse-bilinear-parameters linear p)))))
+      (write-stl (eval3d-on-concave-domain domain #'ribbon)
+                 "/tmp/proba.stl" :ascii t))))
+
+
+;;; Only parameterization
 
 #+nil
 (let ((*resolution* 40)
@@ -337,6 +393,9 @@ Returns parameters for which the Bezier patch given by CPTS evaluates to P."
                  (elt (reverse-cubic-parameters cubic p) sd)))))
     (write-stl (eval-on-concave-domain domain (param 0))
                "/tmp/proba.stl" :ascii t)))
+
+
+;;; Testing 3D ribbons
 
 #+nil
 (let ((*resolution* 40)
