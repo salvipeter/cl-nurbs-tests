@@ -317,22 +317,23 @@ Returns parameters for which the Bezier patch given by CPTS evaluates to P."
                            (collect (iter (for j from 0 to d)
                                           (collect (c i j k))))))))))
 
-(defun mirror-concave-corner (ribbons i)
+(defun mirror-concave-corner (ribbons i &optional (alpha 1) (beta 1))
   "Creates a twist-compatible, coherent concave corner at sides I-1 and I.
 Destructively modifies RIBBONS, and returns the two newly created bilinear patch,
-the first one is to use with ribbon I-1, the second is with ribbon I."
-  (flet ((mirror (p o) (v+ o (v- o p)))
+the first one is to use with ribbon I-1, the second is with ribbon I.
+ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribbon I."
+  (flet ((mirror (p o s) (v+ o (v* (v- o p) s)))
          (p (i j k) (elt (elt (elt ribbons i) k) j))
          (setp (i j k p) (setf (elt (elt (elt ribbons i) k) j) p)))
     (let* ((n (length ribbons))
            (i-1 (mod (1- i) n))
            (corner (p i 0 0))
            (twist (p i 1 1)))
-      (setp i-1 2 1 (mirror twist (p i-1 2 0)))
-      (setp  i  1 1 (mirror twist (p i 1 0)))
-      (setp i-1 3 1 (mirror (p i 1 0) corner))
-      (setp  i  0 1 (mirror (p i-1 2 0) corner))
-      (let ((inner-twist (mirror (p i 1 1) (p i 0 1))))
+      (setp i-1 2 1 (mirror twist (p i-1 2 0) beta))
+      (setp  i  1 1 (mirror twist (p i 1 0) alpha))
+      (setp i-1 3 1 (mirror (p i 1 0) corner beta))
+      (setp  i  0 1 (mirror (p i-1 2 0) corner alpha))
+      (let ((inner-twist (mirror (p i 1 1) (p i 0 1) beta)))
         (list (list (list corner (p i 0 1))
                     (list (p i-1 3 1) inner-twist))
               (list (list (p i-1 3 1) corner)
@@ -345,8 +346,8 @@ the first one is to use with ribbon I-1, the second is with ribbon I."
 (defvar *dropbox* "/home/salvi/Dropbox")
 
 #+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest2_Cubic.gbp")))
-       (bilinears (mirror-concave-corner ribbons 5)))
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
+       (bilinears (mirror-concave-corner ribbons 5 1 1)))
   (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
   (let ((*resolution* 40)
         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
@@ -362,8 +363,8 @@ the first one is to use with ribbon I-1, the second is with ribbon I."
                  "/tmp/proba.stl" :ascii t))))
 
 #+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest2_Cubic.gbp")))
-       (bilinears (mirror-concave-corner ribbons 5)))
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
+       (bilinears (mirror-concave-corner ribbons 5 1 1)))
   (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
   (let ((*resolution* 40)
         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
