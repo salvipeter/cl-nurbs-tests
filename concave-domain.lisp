@@ -253,17 +253,17 @@ Returns parameters for which the Bezier patch given by CPTS evaluates to P."
            (v (second p))
            (p0 (+ (* (- (c 0 1 x)) v) (* (c 0 0 x) v) (* (c 0 1 y) u) (* (- (c 0 0 y)) u) (* (- (c 0 0 x)) (c 0 1 y)) (* (c 0 0 y) (c 0 1 x))))
            (p1 (+ (* (- (c 1 1 x)) v) (* (c 1 0 x) v) (* (c 0 1 x) v) (* (- (c 0 0 x)) v) (* (c 1 1 y) u) (* (- (c 1 0 y)) u) (* (- (c 0 1 y)) u) (* (c 0 0 y) u) (* (- (c 0 0 x)) (c 1 1 y)) (* (c 0 0 y) (c 1 1 x)) (* (c 0 1 x) (c 1 0 y)) (* (- (c 0 1 y)) (c 1 0 x)) (* 2 (c 0 0 x) (c 0 1 y)) (* (- 2) (c 0 0 y) (c 0 1 x))))
-           (p2 (+ (* (- (c 1 0 x)) (c 1 1 y)) (* (c 0 0 x) (c 1 1 y)) (* (c 1 0 y) (c 1 1 x)) (* (- (c 0 0 y)) (c 1 1 x)) (* (- (c 0 1 x)) (c 1 0 y)) (* (c 0 1 y) (c 1 0 x)) (* (- (c 0 0 x)) (c 0 1 y)) (* (c 0 0 y) (c 0 1 x))))
-           (real-s nil))
+           (p2 (+ (* (- (c 1 0 x)) (c 1 1 y)) (* (c 0 0 x) (c 1 1 y)) (* (c 1 0 y) (c 1 1 x)) (* (- (c 0 0 y)) (c 1 1 x)) (* (- (c 0 1 x)) (c 1 0 y)) (* (c 0 1 y) (c 1 0 x)) (* (- (c 0 0 x)) (c 0 1 y)) (* (c 0 0 y) (c 0 1 x)))))
       (flet ((try (s x u)
-               (let ((denom (+ (* (+ (elt (elt (elt cpts 1) 1) x) (- (elt (elt (elt cpts 0) 1) x)) (- (elt (elt (elt cpts 1) 0) x)) (elt (elt (elt cpts 0) 0) x)) s) (elt (elt (elt cpts 1) 0) x) (- (elt (elt (elt cpts 0) 0) x)))))
-                 (when (> (abs denom) *epsilon*)
-                   (setf real-s s)
-                   (/ (+ u (- (* (elt (elt (elt cpts 0) 1) x) s)) (* (elt (elt (elt cpts 0) 0) x) s) (- (* (elt (elt (elt cpts 0) 0) x))))
-                      denom)))))
+               (when s
+                 (let ((denom (+ (* (+ (elt (elt (elt cpts 1) 1) x) (- (elt (elt (elt cpts 0) 1) x)) (- (elt (elt (elt cpts 1) 0) x)) (elt (elt (elt cpts 0) 0) x)) s) (elt (elt (elt cpts 1) 0) x) (- (elt (elt (elt cpts 0) 0) x)))))
+                   (when (> (abs denom) *epsilon*)
+                     (list (list s (/ (+ u (- (* (elt (elt (elt cpts 0) 1) x) s)) (* (elt (elt (elt cpts 0) 0) x) s) (- (* (elt (elt (elt cpts 0) 0) x))))
+                                      denom))))))))
         (multiple-value-bind (s1 s2) (second-degree-solver p2 p1 p0)
-          (let ((d (or (try s1 0 u) (try s1 1 v) (try s2 0 u) (try s2 1 v))))
-            (list real-s d)))))))
+          (let ((results (append (try s1 0 u) (try s1 1 v) (try s2 0 u) (try s2 1 v))))
+            (iter (for sd in results)
+                  (finding sd minimizing (vlength sd)))))))))
 
 ;;; (reverse-bilinear-parameters '(((0 0) (1 0)) ((0 2) (2 3))) '(1.7 0.3))
 
@@ -339,11 +339,106 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
               (list (list (p i-1 3 1) corner)
                     (list inner-twist (p i 0 1))))))))
 
+(defun extend-ribbons (ribbons i)
+  "Creates a coherent concave corner at sides I-1 and I.
+Destructively modifies RIBBONS, and returns the two newly created bilinear patch,
+the first one is to use with ribbon I-1, the second is with ribbon I."
+  (flet ((p (i j k) (elt (elt (elt ribbons i) k) j))
+         (setp (i j k p) (setf (elt (elt (elt ribbons i) k) j) p)))
+    (let* ((n (length ribbons))
+           (i-1 (mod (1- i) n)))
+      (setp i-1 2 1 (v+ (p i-1 1 1) (v- (p i-1 2 0) (p i-1 1 0))))
+      (setp  i  1 1 (v+ (p  i  2 1) (v- (p  i  1 0) (p  i  2 0))))
+      (setp i-1 3 1 (v+ (p i-1 2 1) (v- (p i-1 3 0) (p i-1 2 0))))
+      (setp  i  0 1 (v+ (p  i  1 1) (v- (p  i  0 0) (p  i  1 0))))
+      (list (list (list (p i-1 2 0) (p i-1 3 0))
+                  (list (p i-1 2 1) (p i-1 3 1)))
+            (list (list (p  i  0 0) (p  i  1 0))
+                  (list (p  i  0 1) (p  i  1 1)))))))
+
 (defun write-bezier-ribbon-control-points (ribbons filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)))
 
 (defvar *dropbox* "/home/salvi/Dropbox")
+
+
+;;; Not mirroring
+
+#+nil
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
+       (bilinears (extend-ribbons ribbons 5)))
+  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
+  (let* ((*resolution* 40)
+         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
+         (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
+         (linear (list (subseq (elt cubic 0) 0 2)
+                       (subseq (elt cubic 1) 0 2)))
+         (cubic3d (elt ribbons 5))
+         (linear3d (elt bilinears 1)))
+    (flet ((ribbon (p)
+             (if (<= (second p) 3)      ; works only on this domain...
+                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
+                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
+      (write-stl (eval3d-on-concave-domain domain #'ribbon)
+                 "/tmp/proba.stl" :ascii t))))
+
+#+nil
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
+       (bilinears (extend-ribbons ribbons 5)))
+  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
+  (let* ((*resolution* 40)
+         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
+         (cubic '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
+         (linear (list (subseq (elt cubic 0) 2)
+                       (subseq (elt cubic 1) 2)))
+         (cubic3d (elt ribbons 4))
+         (linear3d (elt bilinears 0)))
+    (flet ((ribbon (p)
+             (if (<= (first p) 3) ; works only on this domain...
+                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
+                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
+      (write-stl (eval3d-on-concave-domain domain #'ribbon)
+                 "/tmp/proba.stl" :ascii t))))
+
+
+;;; Combining ribbons
+
+#+nil
+(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
+       (bilinears (extend-ribbons ribbons 5)))
+  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
+  (let* ((*resolution* 40)
+         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
+         (cubic1 '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
+         (linear1 (list (subseq (elt cubic1 0) 0 2)
+                        (subseq (elt cubic1 1) 0 2)))
+         (cubic3d1 (elt ribbons 5))
+         (linear3d1 (elt bilinears 1))
+         (cubic2 '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
+         (linear2 (list (subseq (elt cubic2 0) 2)
+                        (subseq (elt cubic2 1) 2)))
+         (cubic3d2 (elt ribbons 4))
+         (linear3d2 (elt bilinears 0)))
+    (labels ((ribbon1 (p)
+               (if (<= (second p) 3)    ; works only on this domain...
+                   (bezier-surface linear3d1 (reverse-bilinear-parameters linear1 p))
+                   (bezier-surface cubic3d1 (reverse-cubic-parameters cubic1 p))))
+             (ribbon2 (p)
+               (if (<= (first p) 3)     ; works only on this domain...
+                   (bezier-surface linear3d2 (reverse-bilinear-parameters linear2 p))
+                   (bezier-surface cubic3d2 (reverse-cubic-parameters cubic2 p))))
+             (combine (p)
+               (let ((r1 (ribbon1 p))
+                     (r2 (ribbon2 p))
+                     (m1 (funcall (mean-kato domain 2) p))
+                     (m2 (funcall (mean-kato domain 3) p)))
+                 (v+ (v* r1 m1) (v* r2 m2)))))
+      (write-stl (eval3d-on-concave-domain domain #'combine)
+                 "/tmp/proba.stl" :ascii t))))
+
+
+;;; Mirroring
 
 #+nil
 (let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
