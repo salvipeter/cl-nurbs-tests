@@ -166,7 +166,7 @@
                     (for i from 0 below n)
                     (for i-1 = (mod (1- i) n))
                     (collect (- 1 (elt l i-1) (elt l i))))))
-      (assert (every (lambda (x) (>= x -1.0d-6)) d))
+      ;; (assert (every (lambda (x) (>= x -1.0d-6)) d))
       (ribbon-blend d i))))
 
 (defun mean-sweep (points i)
@@ -340,9 +340,7 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                     (list inner-twist (p i 0 1))))))))
 
 (defun extend-ribbons (ribbons i)
-  "Creates a coherent concave corner at sides I-1 and I.
-Destructively modifies RIBBONS, and returns the two newly created bilinear patch,
-the first one is to use with ribbon I-1, the second is with ribbon I."
+  "Destructively modifies RIBBONS."
   (flet ((p (i j k) (elt (elt (elt ribbons i) k) j))
          (setp (i j k p) (setf (elt (elt (elt ribbons i) k) j) p)))
     (let* ((n (length ribbons))
@@ -350,170 +348,81 @@ the first one is to use with ribbon I-1, the second is with ribbon I."
       (setp i-1 2 1 (v+ (p i-1 1 1) (v- (p i-1 2 0) (p i-1 1 0))))
       (setp  i  1 1 (v+ (p  i  2 1) (v- (p  i  1 0) (p  i  2 0))))
       (setp i-1 3 1 (v+ (p i-1 2 1) (v- (p i-1 3 0) (p i-1 2 0))))
-      (setp  i  0 1 (v+ (p  i  1 1) (v- (p  i  0 0) (p  i  1 0))))
-      (list (list (list (p i-1 2 0) (p i-1 3 0))
-                  (list (p i-1 2 1) (p i-1 3 1)))
-            (list (list (p  i  0 0) (p  i  1 0))
-                  (list (p  i  0 1) (p  i  1 1)))))))
+      (setp  i  0 1 (v+ (p  i  1 1) (v- (p  i  0 0) (p  i  1 0)))))))
 
 (defun write-bezier-ribbon-control-points (ribbons filename)
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)))
 
+(defstruct concave-domain points ribbons extensions)
+
+(defparameter *domain*
+  (make-concave-domain
+   :points '((0 6) (0 0) (6 0) (6 3) (3 3) (3 6))
+   :ribbons '((((3 6) (2 6) (1 6) (0 6))
+               ((3 5) (2 5) (1 5) (0 5)))
+              (((0 6) (0 4) (0 2) (0 0))
+               ((1 6) (1 4) (1 2) (1 0)))
+              (((0 0) (2 0) (4 0) (6 0))
+               ((0 1) (2 1) (4 1) (6 1)))
+              (((6 0) (6 1) (6 2) (6 3))
+               ((5 0) (5 1) (5 2) (5 3)))
+              (((6 3) (5 3) (4 3) (3 3))
+               ((6 2) (5 2) (4 2) (3 2)))
+              (((3 3) (3 4) (3 5) (3 6))
+               ((2 3) (2 4) (2 5) (2 6))))
+   :extensions (list (lambda (p) (when (>= (first p) 3) 'start))
+                     (lambda (p) (declare (ignore p)) nil)
+                     (lambda (p) (declare (ignore p)) nil)
+                     (lambda (p) (when (>= (second p) 3) 'end))
+                     (lambda (p) (when (<= (first p) 3) 'end))
+                     (lambda (p) (when (<= (second p) 3) 'start)))))
+
+(defun concave-patch-test (ribbons concave-domain points-file ribbons-file patch-file)
+  (let ((domain (concave-domain-points concave-domain))
+        (domain-ribbons (concave-domain-ribbons concave-domain))
+        (ribbon-extensions (concave-domain-extensions concave-domain)))
+    (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
+    (labels ((eval-ribbon (i)
+               (lambda (p)
+                 (let ((ribbon (elt ribbons i))
+                       (domain-ribbon (elt domain-ribbons i))
+                       (extension (funcall (elt ribbon-extensions i) p)))
+                   (ecase extension
+                     (start (let* ((bilinear (list (subseq (elt ribbon 0) 0 2)
+                                                   (subseq (elt ribbon 1) 0 2)))
+                                   (domain-bilinear (list (subseq (elt domain-ribbon 0) 0 2)
+                                                          (subseq (elt domain-ribbon 1) 0 2)))
+                                   (uv (reverse-bilinear-parameters domain-bilinear p)))
+                              (bezier-surface bilinear uv)))
+                     (end (let* ((bilinear (list (subseq (elt ribbon 0) 2)
+                                                 (subseq (elt ribbon 1) 2)))
+                                 (domain-bilinear (list (subseq (elt domain-ribbon 0) 2)
+                                                        (subseq (elt domain-ribbon 1) 2)))
+                                 (uv (reverse-bilinear-parameters domain-bilinear p)))
+                            (bezier-surface bilinear uv)))
+                     ((nil) (bezier-surface ribbon (reverse-cubic-parameters domain-ribbon p)))))))
+             (eval-patch (p)
+               (let ((result '(0 0 0)))
+                 (dotimes (i (length ribbons))
+                   (let ((point (funcall (eval-ribbon i) p))
+                         (weight (funcall (mean-kato domain i) p)))
+                     (setf result (v+ result (v* point weight)))))
+                 result)))
+      (dotimes (i (length ribbons))
+        (format t "Writing ribbon ~a...~%" i)
+        (write-stl (eval3d-on-concave-domain (reverse domain) (eval-ribbon i))
+                   (format nil "~a-~d.stl" ribbons-file i) :ascii t))
+      (format t "Writing the combined patch...~%")
+      (write-stl (eval3d-on-concave-domain (reverse domain) #'eval-patch)
+                 (format nil "~a.stl" patch-file) :ascii t))))
+
+
 (defvar *dropbox* "/home/salvi/Dropbox")
 
-
-;;; Not mirroring
-
 #+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
-       (bilinears (extend-ribbons ribbons 5)))
-  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
-  (let* ((*resolution* 40)
-         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-         (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
-         (linear (list (subseq (elt cubic 0) 0 2)
-                       (subseq (elt cubic 1) 0 2)))
-         (cubic3d (elt ribbons 5))
-         (linear3d (elt bilinears 1)))
-    (flet ((ribbon (p)
-             (if (<= (second p) 3)      ; works only on this domain...
-                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
-                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
-      (write-stl (eval3d-on-concave-domain domain #'ribbon)
-                 "/tmp/proba.stl" :ascii t))))
-
-#+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
-       (bilinears (extend-ribbons ribbons 5)))
-  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
-  (let* ((*resolution* 40)
-         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-         (cubic '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
-         (linear (list (subseq (elt cubic 0) 2)
-                       (subseq (elt cubic 1) 2)))
-         (cubic3d (elt ribbons 4))
-         (linear3d (elt bilinears 0)))
-    (flet ((ribbon (p)
-             (if (<= (first p) 3) ; works only on this domain...
-                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
-                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
-      (write-stl (eval3d-on-concave-domain domain #'ribbon)
-                 "/tmp/proba.stl" :ascii t))))
-
-
-;;; Combining ribbons
-
-#+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
-       (bilinears (extend-ribbons ribbons 5)))
-  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
-  (let* ((*resolution* 40)
-         (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-         (cubic1 '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
-         (linear1 (list (subseq (elt cubic1 0) 0 2)
-                        (subseq (elt cubic1 1) 0 2)))
-         (cubic3d1 (elt ribbons 5))
-         (linear3d1 (elt bilinears 1))
-         (cubic2 '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
-         (linear2 (list (subseq (elt cubic2 0) 2)
-                        (subseq (elt cubic2 1) 2)))
-         (cubic3d2 (elt ribbons 4))
-         (linear3d2 (elt bilinears 0)))
-    (labels ((ribbon1 (p)
-               (if (<= (second p) 3)    ; works only on this domain...
-                   (bezier-surface linear3d1 (reverse-bilinear-parameters linear1 p))
-                   (bezier-surface cubic3d1 (reverse-cubic-parameters cubic1 p))))
-             (ribbon2 (p)
-               (if (<= (first p) 3)     ; works only on this domain...
-                   (bezier-surface linear3d2 (reverse-bilinear-parameters linear2 p))
-                   (bezier-surface cubic3d2 (reverse-cubic-parameters cubic2 p))))
-             (combine (p)
-               (let ((r1 (ribbon1 p))
-                     (r2 (ribbon2 p))
-                     (m1 (funcall (mean-kato domain 2) p))
-                     (m2 (funcall (mean-kato domain 3) p)))
-                 (v+ (v* r1 m1) (v* r2 m2)))))
-      (write-stl (eval3d-on-concave-domain domain #'combine)
-                 "/tmp/proba.stl" :ascii t))))
-
-
-;;; Mirroring
-
-#+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
-       (bilinears (mirror-concave-corner ribbons 5 1 1)))
-  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
-  (let ((*resolution* 40)
-        (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-        (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
-        (linear '(((3 2) (3 3)) ((2 2) (2 3))))
-        (cubic3d (elt ribbons 5))
-        (linear3d (elt bilinears 1)))
-    (flet ((ribbon (p)
-             (if (<= (second p) 3)      ; works only on this domain...
-                 (bezier-surface linear3d (reverse-bilinear-parameters linear p))
-                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
-      (write-stl (eval3d-on-concave-domain domain #'ribbon)
-                 "/tmp/proba.stl" :ascii t))))
-
-#+nil
-(let* ((ribbons (load-ribbons (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp")))
-       (bilinears (mirror-concave-corner ribbons 5 1 1)))
-  (write-bezier-ribbon-control-points (append bilinears ribbons) "/tmp/pontok.obj")
-  (let ((*resolution* 40)
-        (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-        (cubic '(((6 3) (5 3) (4 3) (3 3)) ((6 2) (5 2) (4 2) (3 2))))
-        (linear '(((3 3) (2 3)) ((3 2) (2 2))))
-        (cubic3d (elt ribbons 4))
-        (linear3d (elt bilinears 0)))
-    (flet ((ribbon (p)
-             (if (and (<= (second p) 3) (>= (first p) 3)) ; works only on this domain...
-                 (bezier-surface cubic3d (reverse-cubic-parameters cubic p))
-                 (bezier-surface linear3d (reverse-bilinear-parameters linear p)))))
-      (write-stl (eval3d-on-concave-domain domain #'ribbon)
-                 "/tmp/proba.stl" :ascii t))))
-
-
-;;; Only parameterization
-
-#+nil
-(let ((*resolution* 40)
-      (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-      (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
-      (linear '(((3 2) (3 3)) ((2 2) (2 3)))))
-  (flet ((param (sd)
-           (lambda (p)
-             (if (< (second p) 3)       ; works only on this domain...
-                 (elt (reverse-bilinear-parameters linear p) sd)
-                 (elt (reverse-cubic-parameters cubic p) sd)))))
-    (write-stl (eval-on-concave-domain domain (param 0))
-               "/tmp/proba.stl" :ascii t)))
-
-
-;;; Testing 3D ribbons
-
-#+nil
-(let ((*resolution* 40)
-      (domain '((0 6) (3 6) (3 3) (6 3) (6 0) (0 0)))
-      (cubic '(((3 3) (3 4) (3 5) (3 6)) ((2 3) (2 4) (2 5) (2 6))))
-      (linear '(((3 2) (3 3)) ((2 2) (2 3))))
-      (cubic3d '(((0 0 0) (10 5 4) (20 5 8) (30 0 0))
-                 ((0 20 0) (8 18 5) (21 15 5) (30 20 0))))
-      (linear3d '(((-10 -5 -4) (0 0 0))
-                  ((-8 22 -5) (0 20 0))))
-      ;; (cubic3d '(((0 0 0) (10 0 5) (20 0 5) (30 0 0))
-      ;;            ((0 20 0) (10 20 10) (20 20 10) (30 20 0))))
-      ;; (linear3d '(((-10 0 -5) (0 0 0))
-      ;;             ((-10 20 -10) (0 20 0))))
-      ;; (cubic3d '(((0 0 0) (10 0 0) (20 0 0) (30 0 0))
-      ;;            ((0 20 0) (10 20 0) (20 20 00) (30 20 0))))
-      ;; (linear3d '(((-10 0 0) (0 0 0))
-      ;;             ((-10 20 0) (0 20 0))))
-      )
-  (flet ((ribbon (p)
-           (if (<= (second p) 3)       ; works only on this domain...
-               (bezier-surface linear3d (reverse-bilinear-parameters linear p))
-               (bezier-surface cubic3d (reverse-cubic-parameters cubic p)))))
-    (write-stl (eval3d-on-concave-domain domain #'ribbon)
-               "/tmp/proba.stl" :ascii t)))
+(let* ((*resolution* 15)
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest3_Cubic.gbp"))
+       (ribbons (load-ribbons gbp)))
+  (extend-ribbons ribbons 5)
+  (concave-patch-test ribbons *domain* "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
