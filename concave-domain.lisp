@@ -514,3 +514,48 @@ if it is to the left of LINE1, returns START, and if it is to the right of LINE2
                            (collect (list (elt row (1+ j))
                                           (elt last-row (1+ j))
                                           (elt last-row j))))))))
+
+
+;;; Another idea: connect an outer and an inner domain
+
+#+nil
+(let ((*resolution* 50)
+      (domain '((0 0) (3 0) (3 3) (2 3) (2 2) (1 2) (1 3) (0 3)))
+      (outer-cp '(((0 0 0) (3 0 0))
+                  ((0 3 0) (3 3 0))))
+      (inner-cp '(((1 2 1) (2 2 1))
+                  ((1 2.5 0) (2 2.5 0))
+                  ((1 3 0) (2 3 0)))))
+  (labels ((outer-domain (p) (v* p 1/3))
+           (inner-domain (p) (v- p '(1 2)))
+           (foo (x alpha) (/ (* alpha x x) (+ (* alpha x x) (* (- 1 x) (- 1 x)))))
+           (eval-patch (p)
+             (let ((outer-p (bezier-surface outer-cp (outer-domain p)))
+                   (inner-p (bezier-surface inner-cp (inner-domain p)))
+                   (mean (mean-value-coordinates domain p)))
+               (affine-combine outer-p
+                               (foo (reduce #'+ (mapcar #'* mean '(0 0 0 1 1 1 1 0))) 1/2)
+                               inner-p))))
+    (write-stl (eval3d-on-concave-domain domain #'eval-patch)
+               "/tmp/proba.stl" :ascii t)))
+
+#+nil
+(let ((*resolution* 50)
+      (domain '((0 0) (3 0) (3 3) (1 3) (1 2) (0 2)))
+      (outer-cp '(((0 0 0) (3 0 0))
+                  ((0 3 0) (3 3 0))))
+      (inner-cp '(((0 2 0) (0.5 2 0) (1 2 0.5))
+                  ((0 2.5 0) (0.5 2.5 0) (1 2.5 0))
+                  ((0 3 0) (0.5 3 0) (1 3 0)))))
+  (labels ((outer-domain (p) (v* p 1/3))
+           (inner-domain (p) (v- p '(0 2)))
+           (foo (x alpha) (/ (* alpha x x) (+ (* alpha x x) (* (- 1 x) (- 1 x)))))
+           (eval-patch (p)
+             (let ((outer-p (bezier-surface outer-cp (outer-domain p)))
+                   (inner-p (bezier-surface inner-cp (inner-domain p)))
+                   (mean (mean-value-coordinates domain p)))
+               (affine-combine outer-p
+                               (foo (reduce #'+ (mapcar #'* mean '(0 0 0 1 1 1 1 0))) 1/2)
+                               inner-p))))
+    (write-stl (eval3d-on-concave-domain domain #'eval-patch)
+               "/tmp/proba.stl" :ascii t)))
