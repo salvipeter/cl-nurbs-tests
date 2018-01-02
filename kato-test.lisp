@@ -1941,7 +1941,7 @@ The result is an unordered list of segments."
               (ac (slice (elt tri 0) (elt tri 2)))
               (bc (slice (elt tri 1) (elt tri 2))))
           (let ((lst (remove-if-not #'identity (list ab ac bc))))
-            (when lst
+            (when (eq (length lst) 2)
               (push lst segments))))))
     segments))
 
@@ -1999,3 +1999,71 @@ The result is an unordered list of segments."
       (*wachspressp* t))
   (sliced-distance-function-test points '(nil sd nil nil nil)
                                  "/tmp/proba.ps" :distance-type 'mean-bilinear :color nil))
+
+(defparameter *power-coordinate-type* 'wachspress)
+
+(defun power-coordinates (points p)
+  (let* ((n (length points))
+         (l (iter (for i from 0 below n)
+                  (for vi in points)
+                  (for li = (point-distance vi p))
+                  (when (< li *epsilon*)
+                    (return-from power-coordinates
+                      (let ((result (make-list n :initial-element 0)))
+                        (setf (elt result i) 1)
+                        result)))
+                  (collect li)))
+         (d (ecase *power-coordinate-type*
+              (wachspress (iter (for li in l) (collect (/ li))))
+              (meanvalue (make-list n :initial-element 1))
+              (harmonic (iter (for li in l) (collect (/ li 2))))))
+         (normals (iter (for vi in points)
+                        (for ni = (v- vi p))
+                        (collect (list (second ni) (- (first ni))))))
+         (q (iter (for vi in points)
+                  (for di in d)
+                  (collect (v+ p (v* (vnormalize (v- vi p)) di)))))
+         (r (iter (for i from 0 below n)
+                  (for i+1 = (mod (1+ i) n))
+                  (for line1 = (list (elt q i) (v+ (elt q i) (elt normals i))))
+                  (for line2 = (list (elt q i+1) (v+ (elt q i+1) (elt normals i+1))))
+                  (when (parallelp line1 line2)
+                    (return-from power-coordinates
+                      (let ((result (make-list n :initial-element 0))
+                            (alpha (/ (point-distance p (elt points i))
+                                      (point-distance (elt points i) (elt points i+1)))))
+                        (setf (elt result i) (- 1 alpha)
+                              (elt result i+1) alpha)
+                        result)))
+                  (collect (line-line-intersection line1 line2))))
+         (f (iter (for i from 0 below n)
+                  (for i-1 = (mod (1- i) n))
+                  (collect (point-distance (elt r i) (elt r i-1)))))
+         (h (iter (for fi in f)
+                  (for li in l)
+                  (collect (/ fi li))))
+         (hsum (reduce #'+ h)))
+    (mapcar (lambda (hi) (/ hi hsum)) h)))
+
+(defmethod compute-distance ((type (eql 'wachspress-coordinate)) points segments p dir)
+  "Just to test the coordinate itself, so s/d does not have any effect."
+  (let ((l (barycentric-coordinates points p))
+        (i (position (third segments) points :test #'equal)))
+    (if (eq dir 's)
+        (elt l i)
+        (elt l i))))
+
+(defmethod compute-distance ((type (eql 'power-coordinate)) points segments p dir)
+  "Just to test the coordinate itself, so s/d does not have any effect."
+  (let ((l (power-coordinates points p))
+        (i (position (third segments) points :test #'equal)))
+    (if (eq dir 's)
+        (elt l i)
+        (elt l i))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80)))
+      (*power-coordinate-type* 'wachspress))
+  (sliced-distance-function-test points '(s s s nil nil) "/tmp/proba.ps"
+                                 :resolution 30 :density 0.1
+                                 :distance-type 'power-coordinate :color t))
