@@ -2067,3 +2067,23 @@ The result is an unordered list of segments."
   (sliced-distance-function-test points '(s s s nil nil) "/tmp/proba.ps"
                                  :resolution 30 :density 0.1
                                  :distance-type 'power-coordinate :color t))
+
+(defvar *harmonic-map*)
+(defmethod compute-distance ((type (eql 'harmonic)) points segments p dir)
+  "For efficiency reasons, this requires that the harmonic map is already computed
+in *HARMONIC-MAP*."
+  (let ((l (harmonic:harmonic-coordinates *harmonic-map* p))
+        (i (position (third segments) points :test #'equal)))
+    (when (member nil l)                ; kutykurutty
+      (let ((*barycentric-type* 'meanvalue))
+        (setf l (barycentric-coordinates points p))))
+    (if (eq dir 's)
+        (barycentric-s l i)
+        (barycentric-d l i))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (harmonic:with-harmonic-coordinates (*harmonic-map* points)
+    (sliced-distance-function-test points '(nil nil nil nil sd) "/tmp/proba.ps"
+                                   :resolution 30 :density 0.1
+                                   :distance-type 'harmonic :color nil)))

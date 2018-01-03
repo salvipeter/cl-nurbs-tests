@@ -115,10 +115,19 @@
 
 #+nil
 (let ((*resolution* 20)
-        (points '((2 5) (3 3) (5 3) (6 5) (8 3) (7 0) (1 0) (0 3))))
+      (points '((2 5) (3 3) (5 3) (6 5) (8 3) (7 0) (1 0) (0 3))))
   (flet ((fn (p)
            (mean-value points (cons 1 (make-list (1- (length points)) :initial-element 0)) p)))
     (write-stl (eval-on-concave-domain points #'fn) "/tmp/proba.stl" :ascii t)))
+
+#+nil
+(let ((*resolution* 30)
+      (points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2)))))
+  (harmonic:with-harmonic-coordinates (h points)
+    (harmonic::harmonic-write-ppm (first h) "/tmp/proba.ppm")
+    (flet ((fn (p) (or (first (harmonic:harmonic-coordinates h p))
+                       -1)))
+      (write-stl (eval-on-concave-domain points #'fn) "/tmp/proba.stl" :ascii t))))
 
 (defun mean-value-coordinates (points p)
   (let* ((vectors (mapcar (lambda (x) (v- p x)) points))
