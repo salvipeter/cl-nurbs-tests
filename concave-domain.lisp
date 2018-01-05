@@ -124,9 +124,12 @@
 (let ((*resolution* 30)
       (points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2)))))
   (harmonic:with-harmonic-coordinates (h points)
-    (harmonic::harmonic-write-ppm (first h) "/tmp/proba.ppm")
-    (flet ((fn (p) (or (first (harmonic:harmonic-coordinates h p))
-                       -1)))
+    (flet ((fn (p)
+             (let ((l (harmonic:harmonic-coordinates h p)))
+               (when (member nil l)     ; kutykurutty
+                 (let ((*barycentric-type* 'meanvalue))
+                   (setf l (barycentric-coordinates points p))))
+               (barycentric-d l 0))))
       (write-stl (eval-on-concave-domain points #'fn) "/tmp/proba.stl" :ascii t))))
 
 (defun mean-value-coordinates (points p)

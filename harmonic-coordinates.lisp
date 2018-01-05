@@ -53,7 +53,7 @@
       (foreign-free result)
       (foreign-free p-arr))))
 
-(defmacro with-harmonic-coordinates ((var points &key (levels 7) (epsilon 1d-5)) &body body)
+(defmacro with-harmonic-coordinates ((var points &key (levels 9) (epsilon 1d-5)) &body body)
   `(let ((,var (make-harmonic-coordinates ,points ,levels ,epsilon)))
      (unwind-protect (progn ,@body)
        (free-harmonic-coordinates ,var))))
