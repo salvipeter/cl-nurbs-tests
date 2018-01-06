@@ -120,18 +120,6 @@
            (mean-value points (cons 1 (make-list (1- (length points)) :initial-element 0)) p)))
     (write-stl (eval-on-concave-domain points #'fn) "/tmp/proba.stl" :ascii t)))
 
-#+nil
-(let ((*resolution* 30)
-      (points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2)))))
-  (harmonic:with-harmonic-coordinates (h points)
-    (flet ((fn (p)
-             (let ((l (harmonic:harmonic-coordinates h p)))
-               (when (member nil l)     ; kutykurutty
-                 (let ((*barycentric-type* 'meanvalue))
-                   (setf l (barycentric-coordinates points p))))
-               (barycentric-d l 0))))
-      (write-stl (eval-on-concave-domain points #'fn) "/tmp/proba.stl" :ascii t))))
-
 (defun mean-value-coordinates (points p)
   (let* ((vectors (mapcar (lambda (x) (v- p x)) points))
          (lengths (mapcar #'vlength vectors))
@@ -571,3 +559,90 @@ if it is to the left of LINE1, returns START, and if it is to the right of LINE2
                                inner-p))))
     (write-stl (eval3d-on-concave-domain domain #'eval-patch)
                "/tmp/proba.stl" :ascii t)))
+
+(defun slice-concave-mesh (triangles density)
+  "Given a mesh by `TRIANGLES', finds the contours
+where the first coordinate is a multiple of `DENSITY'.
+The result is an unordered list of segments."
+  (let ((segments '()))
+    (flet ((slice (i j)
+             (let ((x (car i))
+                   (y (car j)))
+               (when (> y x)
+                 (rotatef x y)
+                 (rotatef i j))
+               (let ((q1 (floor x density))
+                     (q2 (floor y density)))
+                 (when (= (- q1 q2) 1)
+                   (affine-combine j
+                                   (/ (- (* density q1) y) (- x y))
+                                   i))))))
+      (dolist (tri triangles)
+        (let ((ab (slice (elt tri 0) (elt tri 1)))
+              (ac (slice (elt tri 0) (elt tri 2)))
+              (bc (slice (elt tri 1) (elt tri 2))))
+          (let ((lst (remove-if-not #'identity (list ab ac bc))))
+            (when (eq (length lst) 2)
+              (push lst segments))))))
+    segments))
+
+(defun sliced-concave-distance-function-test (points fn filename &key (resolution 30) (density 0.1))
+  "FN gives a value between 0 and 1 for a given point."
+  (flet ((map-point (p)
+	   (list (+ (* (+ (first p) 1.0d0) 250) 50)
+		 (+ (* (+ (second p) 1.0d0) 250) 50))))
+    (let* ((n (length points)) 
+	   (lines (lines-from-points points))
+           (*resolution* resolution))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+	(format s "%!PS-Adobe-2.0~%")
+        (format s "%%BoundingBox: 0 0 600 600~%")
+	(iter (for i from 0 below n)
+	      (for line in lines)
+	      (format s "% Segment: ~a~%" i)
+	      (format s "2 setlinewidth~%~
+                         newpath~%~
+                         ~{~f ~}moveto~%~
+                         ~{~f ~}lineto~%~
+                         stroke~%~
+                         1 setlinewidth~%"
+		      (map-point (first line))
+		      (map-point (second line))))
+        (let* ((mesh (eval-on-concave-domain points fn))
+               (segments (slice-concave-mesh mesh density)))
+          (iter (for segment in segments)
+                (format s "newpath~%~
+                                     ~{~f ~}moveto~%~
+                                     ~{~f ~}lineto~%~
+                                     stroke~%"
+                        (map-point (cdr (first segment)))
+                        (map-point (cdr (second segment)))))
+          (format s "showpage~%"))))))
+
+(defun scale-to-unit (points)
+  "Scale POINTS that it fits in [-1,1]x[-1x1]."
+  (let* ((min (list (reduce #'min points :key #'first)
+                    (reduce #'min points :key #'second)))
+         (max (list (reduce #'max points :key #'first)
+                    (reduce #'max points :key #'second)))
+         (len (reduce #'max (v- max min))))
+    (mapcar (lambda (p)
+              (v- (v* (v- p min) (/ 2 len)) '(1 1)))
+            points)))
+
+#+nil
+(let ((*resolution* 30)
+      #+nil(points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2))))
+      (points (reverse '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0))))
+      #+nil(points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))))
+  (let ((points (scale-to-unit points)))
+    (harmonic:with-harmonic-coordinates (h points)
+      (flet ((fn (p)
+               (let ((l (harmonic:harmonic-coordinates h p)))
+                 (when (member nil l)   ; kutykurutty
+                   (let ((*barycentric-type* 'meanvalue))
+                     (setf l (barycentric-coordinates points p))))
+                 (barycentric-d l 1)
+                 #+nil(elt l 4))))
+        (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
+                                               :resolution 50 :density 0.1d0)))))
