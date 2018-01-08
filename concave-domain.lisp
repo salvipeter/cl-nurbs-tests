@@ -430,10 +430,40 @@ if it is to the left of LINE1, returns START, and if it is to the right of LINE2
                      (mapcar (lambda (row) (car (last row))) domain-ribbon)
                      p))
 
+(defun write-domain-ribbons (domain ribbons filename)
+  (let* ((n (length domain))
+         (points-and-ribbons
+          (scale-to-unit
+           (append domain (reduce #'append (reduce #'append ribbons)))))
+         (points (subseq points-and-ribbons 0 n))
+         (ribbons (subseq points-and-ribbons n))
+         (lines (lines-from-points points)))
+    (flet ((map-point (p)
+             (list (+ (* (+ (first p) 1.0d0) 250) 50)
+                   (+ (* (+ (second p) 1.0d0) 250) 50))))
+      (with-open-file (s filename :direction :output :if-exists :supersede)
+        (format s "%!PS-Adobe-2.0~%")
+        (format s "%%BoundingBox: 0 0 600 600~%")
+        (iter (for i from 0 below n)
+              (for line in lines)
+              (for ribbon in ribbons)
+              (format s "% Segment: ~a~%" i)
+              (format s "2 setlinewidth~%~
+                         newpath~%~
+                         ~{~f ~}moveto~%~
+                         ~{~f ~}lineto~%~
+                         stroke~%~
+                         1 setlinewidth~%"
+                      (map-point (first line))
+                      (map-point (second line))))
+        (iter (for point in ribbons)
+              (format s "~{~f ~}3 0 360 arc fill~%" (map-point point)))
+        (format s "showpage~%")))))
+
 (defun concave-patch-test (ribbons points-file ribbons-file patch-file)
   (let* ((domain (domain-from-curves-angular-concave (mapcar #'first ribbons)))
          (domain-ribbons (generate-domain-ribbons domain)))
-    ;; (format t "~a~%" domain)
+    (write-domain-ribbons domain domain-ribbons "/tmp/domain.ps")
     (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
     (labels ((eval-ribbon (i)
                (lambda (p)
