@@ -442,20 +442,27 @@ if it is to the left of LINE1, returns START, and if it is to the right of LINE2
                         (extension (ribbon-extension-test domain-ribbon p))
                         (h (- (point-line-distance p (first domain-ribbon) t)))
                         u surf3d surf2d)
-                   (ecase extension
-                     (start (setf surf3d (list (subseq (elt ribbon 0) 0 2)
-                                               (subseq (elt ribbon 1) 0 2))
-                                  surf2d (list (subseq (elt domain-ribbon 0) 0 2)
-                                               (subseq (elt domain-ribbon 1) 0 2))
+                   (macrolet ((s2d (i j) `(elt (elt surf2d ,j) ,i)))
+                     (ecase extension
+                       (start (setf surf3d (list (subseq (elt ribbon 0) 0 2)
+                                                 (subseq (elt ribbon 1) 0 2))
+                                    surf2d (list (subseq (elt domain-ribbon 0) 0 2)
+                                                 (subseq (elt domain-ribbon 1) 0 2))
+                                  (s2d 1 1) (v+ (s2d 0 0) ; paralelogramize
+                                                (v- (s2d 1 0) (s2d 0 0))
+                                                (v- (s2d 0 1) (s2d 0 0)))
+                                    u (first (reverse-bilinear-parameters surf2d p))))
+                       (end (setf surf3d (list (subseq (elt ribbon 0) 2)
+                                               (subseq (elt ribbon 1) 2))
+                                  surf2d (list (subseq (elt domain-ribbon 0) 2)
+                                               (subseq (elt domain-ribbon 1) 2))
+                                    (s2d 0 1) (v+ (s2d 1 0) ; paralelogramize
+                                                  (v- (s2d 1 1) (s2d 1 0))
+                                                  (v- (s2d 0 0) (s2d 1 0)))
                                   u (first (reverse-bilinear-parameters surf2d p))))
-                     (end (setf surf3d (list (subseq (elt ribbon 0) 2)
-                                             (subseq (elt ribbon 1) 2))
-                                surf2d (list (subseq (elt domain-ribbon 0) 2)
-                                             (subseq (elt domain-ribbon 1) 2))
-                                u (first (reverse-bilinear-parameters surf2d p))))
-                     ((nil) (setf surf3d ribbon
-                                  surf2d domain-ribbon
-                                  u (first (reverse-cubic-parameters domain-ribbon p)))))
+                       ((nil) (setf surf3d ribbon
+                                    surf2d domain-ribbon
+                                    u (first (reverse-cubic-parameters domain-ribbon p))))))
                    (let* ((q1 (bezier (first surf3d) u))
                           (q2 (bezier (second surf3d) u))
                           (cross (vnormalize (v- q2 q1)))
@@ -633,8 +640,8 @@ The result is an unordered list of segments."
 #+nil
 (let ((*resolution* 30)
       #+nil(points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2))))
-      (points (reverse '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0))))
-      #+nil(points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))))
+      #+nil(points (reverse '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0)))) ; H
+      (points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6)))) ; U
   (let ((points (scale-to-unit points)))
     (harmonic:with-harmonic-coordinates (h points)
       (flet ((fn (p)
@@ -642,7 +649,8 @@ The result is an unordered list of segments."
                  (when (member nil l)   ; kutykurutty
                    (let ((*barycentric-type* 'meanvalue))
                      (setf l (barycentric-coordinates points p))))
-                 (barycentric-d l 1)
+                 #+nil(barycentric-d l 0)
+                 (- 1 (elt l 3) (elt l 4) (elt l 5) (elt l 6)) ;; composite
                  #+nil(elt l 4))))
         (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
                                                :resolution 50 :density 0.1d0)))))
