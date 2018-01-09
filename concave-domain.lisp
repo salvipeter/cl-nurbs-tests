@@ -374,12 +374,12 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                        (* (elt d1 1) (elt d2 0)))
                     0)
                  result
-                 (- result)))))
+                 (- result))))
+         (flip (a) (- pi a)))
     (let* ((angles (mapcar #'angle curves (append (rest curves) (list (first curves)))))
-	   (angle-multiplier (/ (- (* (- (length curves) 2) pi)
-                                   (* 2 pi (count 0 angles :test #'>)))
-                                (reduce #'+ angles)))
-	   (normalized-angles (mapcar (lambda (x) (* x angle-multiplier)) angles))
+	   (angle-multiplier (/ (* (- (length curves) 2) pi)
+                                (reduce #'+ (mapcar (lambda (x) (flip x)) angles))))
+	   (normalized-angles (mapcar (lambda (x) (flip (* (flip x) angle-multiplier))) angles))
 	   (lengths (mapcar #'bezier-arc-length curves))
 	   (length-sum (reduce #'+ lengths))
 	   (vertices (iter (for prev first '(0 0) then next)
@@ -389,8 +389,7 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
 			   (for next = (v+ prev (v* (list (cos dir) (sin dir)) length)))
 			   (collect next)))
 	   (difference (v* (car (last vertices)) -1)))
-      ;; (format t "~d~%" (mapcar (lambda (x) (round (* x (/ 180 pi)))) angles))
-      ;; (format t "~d~%" (mapcar (lambda (x) (round (* x (/ 180 pi)))) normalized-angles))
+      ;; (write-domain-ribbons (cons '(0 0) vertices) nil "/tmp/domain-open.ps")
       (append (iter (for length in (butlast lengths))
                     (for accumulated first length then (+ accumulated length))
                     (for vertex in vertices)
@@ -457,7 +456,6 @@ if it is to the left of LINE1, returns START, and if it is to the right of LINE2
         (format s "%%BoundingBox: 0 0 600 600~%")
         (iter (for i from 0 below n)
               (for line in lines)
-              (for ribbon in ribbons)
               (format s "% Segment: ~a~%" i)
               (format s "2 setlinewidth~%~
                          newpath~%~
@@ -529,13 +527,21 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
         (write-stl (eval3d-on-concave-domain domain #'eval-patch)
                    (format nil "~a.stl" patch-file) :ascii t)))))
 
+(defun reverse-ribbons (ribbons)
+  "Reverses the ribbon order. Ribbons should be directed so that 'matter' is on the left."
+  (reverse (mapcar (lambda (r) (mapcar #'reverse r)) ribbons)))
+
 (defvar *dropbox* "/home/salvi/Dropbox")
 
 #+nil
 (let* ((*resolution* 40)
-       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest61_Cubic.gbp"))
-       (ribbons (load-ribbons gbp)))
-  (extend-ribbons ribbons 5)
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
+       (ribbons (reverse-ribbons (load-ribbons gbp))))
+  (mirror-concave-corner ribbons 5)
+  (mirror-concave-corner ribbons 6)
+  ;; (extend-ribbons ribbons 3)
   (concave-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
 
 (defun bezier-surface-to-bspline (surface)
