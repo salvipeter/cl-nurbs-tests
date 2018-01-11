@@ -362,8 +362,20 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
       (setp  i  0 1 (v+ (p  i  1 1) (v- (p  i  0 0) (p  i  1 0)))))))
 
 (defun write-bezier-ribbon-control-points (ribbons filename)
-  (with-open-file (s filename :direction :output :if-exists :supersede)
-    (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)))
+  "Assumes that all ribbons are of the same degrees."
+  (let ((n (1- (length (first (first ribbons)))))
+        (m (1- (length (first ribbons)))))
+    (with-open-file (s filename :direction :output :if-exists :supersede)
+      (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)
+      (iter (repeat (length ribbons))
+            (for i first 1 then (+ i (* (1+ n) (1+ m))))
+            (iter (for j from 0 below n)
+                  (iter (for k from 0 below m)
+                        (format s "f ~a ~a ~a ~a~%"
+                                (+ i j (* k (1+ n)))
+                                (+ i (1+ j) (* k (1+ n)))
+                                (+ i (1+ j) (* (1+ k) (1+ n)))
+                                (+ i j (* (1+ k) (1+ n))))))))))
 
 (defun domain-from-curves-angular-concave (curves)
   (flet ((angle (c1 c2)
@@ -546,14 +558,14 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
 #+nil
 (let* ((*resolution* 40)
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
-       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
-       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
-       ;; (ribbons (reverse-ribbons (load-ribbons gbp)))
-       (ribbons (load-ribbons gbp))
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
+       (ribbons (reverse-ribbons (load-ribbons gbp)))
+       ;; (ribbons (load-ribbons gbp))
        )
-  ;; (mirror-concave-corner ribbons 5)
-  ;; (mirror-concave-corner ribbons 6)
-  (extend-ribbons ribbons 5)
+  (mirror-concave-corner ribbons 5)
+  (mirror-concave-corner ribbons 6)
+  ;; (extend-ribbons ribbons 5)
   (concave-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
 
 (defun bezier-surface-to-bspline (surface)
@@ -716,3 +728,85 @@ The result is an unordered list of segments."
                  #+nil(elt l 4))))
         (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
                                                :resolution 50 :density 0.1d0)))))
+
+
+;;; Grid-parameterized concave patches
+
+(defun n-sided-ribbon-grid-eval-fn (domain-edge ribbon)
+  "Returns a function that evaluates the given ribbon for a domain point.
+RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
+  (lambda (p)
+    (let* ((dir (v- (second domain-edge) (first domain-edge)))
+           (s (/ (scalar-product (v- p (first domain-edge)) dir) (vlength2 dir)))
+           (extension (cond ((< s 0) 'start) ((> s 1) 'end) (t nil)))
+           (h (- (point-line-distance p domain-edge t)))
+           u surf3d)
+      (ecase extension
+        (start (setf surf3d (list (subseq (elt ribbon 0) 0 2)
+                                  (subseq (elt ribbon 1) 0 2))
+                     u (* 3 s)))
+        (end (setf surf3d (list (subseq (elt ribbon 0) 2)
+                                (subseq (elt ribbon 1) 2))
+                   u (1+ (* 3 (1- s)))))
+        ((nil) (setf surf3d ribbon
+                     u s)))
+      (let* ((q1 (bezier (first surf3d) u))
+             (q2 (bezier (second surf3d) u))
+             (cross (vnormalize (v- q2 q1)))
+             (len3d (bezier-arc-length (first ribbon)))
+             (len2d (vlength dir)))
+        (v+ q1 (v* cross (/ h len2d) len3d))))))
+
+(defun ribbon-force-perpendicular (ribbon)
+  "Destructively changes the second control point row such that the cross-derivatives
+are perpendicular to the tangent."
+  (let ((n (1- (length ribbon))))
+    (iter (for i from 0 to n)
+          (for u = (/ i n))
+          (for d = (vnormalize (bezier (first ribbon) u 1)))
+          (for p = (elt (first ribbon) i))
+          (for q = (elt (second ribbon) i))
+          (setf (elt (second ribbon) i)
+                ;; Project Q in the plane defined by P and D
+                (v+ q (v* d (scalar-product (v- p q) d)))))))
+
+(defun concave-grid-patch-test (ribbons points-file ribbons-file patch-file)
+  (let ((n (length ribbons))
+        (domain (domain-from-curves-angular-concave (mapcar #'first ribbons))))
+    (write-domain-ribbons domain '() "/tmp/domain.ps")
+    (mapc #'ribbon-force-perpendicular ribbons)
+    (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
+    (dotimes (i n)
+      (format t "Writing ribbon ~a...~%" i)
+      (let ((eval-fn (n-sided-ribbon-grid-eval-fn
+                      (list (elt domain (mod (1- i) n)) (elt domain i)) (elt ribbons i))))
+        (write-stl (eval3d-on-concave-domain domain eval-fn)
+                   (format nil "~a-~d.stl" ribbons-file i) :ascii t)))
+    (format t "Writing the combined patch...~%")
+    (harmonic:with-harmonic-coordinates (harmonic-map domain)
+      (flet ((eval-patch (p)
+               (let ((result '(0 0 0)))
+                 (dotimes (i n)
+                   (let* ((eval-fn (n-sided-ribbon-grid-eval-fn
+                                    (list (elt domain (mod (1- i) n)) (elt domain i))
+                                    (elt ribbons i)))
+                          (point (funcall eval-fn p))
+                          (weight (funcall (harmonic-kato harmonic-map domain i) p)))
+                     (setf result (v+ result (v* point weight)))))
+                 result)))
+        (write-stl (eval3d-on-concave-domain domain #'eval-patch)
+                   (format nil "~a.stl" patch-file) :ascii t)))))
+
+#+nil
+(let* ((*resolution* 40)
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
+       (ribbons (reverse-ribbons (load-ribbons gbp)))
+       ;; (ribbons (load-ribbons gbp))
+       )
+  (mirror-concave-corner ribbons 5)
+  (mirror-concave-corner ribbons 6)
+  ;; (extend-ribbons ribbons 5)
+  ;; (extend-ribbons ribbons 6)
+  (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
