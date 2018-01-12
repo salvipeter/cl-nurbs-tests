@@ -748,7 +748,7 @@ RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
              (cross (vnormalize (v- q2 q1)))
              (len3d (bezier-arc-length (first ribbon)))
              (len2d (vlength dir)))
-        (v+ q1 (v* cross (/ h len2d) len3d *ribbon-multiplier*))))))
+        (v+ q1 (v* cross len3d (gamma (* (/ h len2d) *ribbon-multiplier*))))))))
 
 (defun ribbon-force-perpendicular (ribbon)
   "Destructively changes the second control point row such that the cross-derivatives
@@ -792,13 +792,14 @@ are perpendicular to the tangent."
 
 #+nil
 (let* ((*resolution* 40)
-       (*ribbon-multiplier* 1)
-       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
+       (*ribbon-multiplier* 1/2)
+       (*use-gamma* nil)
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
-       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
        (ribbons (load-ribbons gbp)))
-  (mirror-concave-corner ribbons 2)
-  (mirror-concave-corner ribbons 3)
+  ;; (mirror-concave-corner ribbons 2)
+  ;; (mirror-concave-corner ribbons 3)
   ;; (extend-ribbons ribbons 2)
   ;; (extend-ribbons ribbons 3)
   (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
