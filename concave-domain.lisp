@@ -377,22 +377,21 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                                 (+ i (1+ j) (* (1+ k) (1+ n)))
                                 (+ i j (* (1+ k) (1+ n))))))))))
 
-(defun domain-from-curves-angular-concave (curves)
-  (flet ((angle (c1 c2)
-           (let* ((d1 (vnormalize (bezier c1 1 1)))
-                  (d2 (vnormalize (bezier c2 0 1)))
+(defun domain-from-ribbons-angular-concave (ribbons)
+  (flet ((angle (r1 r2)
+           (let* ((d1 (vnormalize (bezier (first r1) 1 1)))
+                  (d2 (vnormalize (bezier (first r2) 0 1)))
                   (result (acos (scalar-product d1 d2))))
-             (if (> (- (* (elt d1 0) (elt d2 1))
-                       (* (elt d1 1) (elt d2 0)))
+             (if (< (scalar-product d1 (v- (elt (second r2) 0) (elt (first r2) 0)))
                     0)
                  result
                  (- result))))
          (flip (a) (if (< a 0) (- (+ pi a)) (- pi a))))
-    (let* ((angles (mapcar #'angle curves (append (rest curves) (list (first curves)))))
-	   (angle-multiplier (/ (* (- (length curves) 2 (* 2 (count 0 angles :test #'>))) pi)
+    (let* ((angles (mapcar #'angle ribbons (append (rest ribbons) (list (first ribbons)))))
+	   (angle-multiplier (/ (* (- (length ribbons) 2 (* 2 (count 0 angles :test #'>))) pi)
                                 (reduce #'+ (mapcar (lambda (x) (flip x)) angles))))
 	   (normalized-angles (mapcar (lambda (x) (flip (* (flip x) angle-multiplier))) angles))
-	   (lengths (mapcar #'bezier-arc-length curves))
+	   (lengths (mapcar #'bezier-arc-length (mapcar #'first ribbons)))
 	   (length-sum (reduce #'+ lengths))
 	   (vertices (iter (for prev first '(0 0) then next)
 			   (for length in lengths)
@@ -527,7 +526,7 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
         (v+ q1 (v* cross (/ h len2d) len3d))))))
 
 (defun concave-patch-test (ribbons points-file ribbons-file patch-file)
-  (let* ((domain (domain-from-curves-angular-concave (mapcar #'first ribbons)))
+  (let* ((domain (domain-from-ribbons-angular-concave ribbons))
          (domain-ribbons (generate-domain-ribbons domain)))
     (write-domain-ribbons domain domain-ribbons "/tmp/domain.ps")
     (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
@@ -549,10 +548,6 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
         (write-stl (eval3d-on-concave-domain domain #'eval-patch)
                    (format nil "~a.stl" patch-file) :ascii t)))))
 
-(defun reverse-ribbons (ribbons)
-  "Reverses the ribbon order. Ribbons should be directed so that 'matter' is on the left."
-  (reverse (mapcar (lambda (r) (mapcar #'reverse r)) ribbons)))
-
 (defvar *dropbox* "/home/salvi/Dropbox")
 
 #+nil
@@ -560,12 +555,10 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
        (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
-       (ribbons (reverse-ribbons (load-ribbons gbp)))
-       ;; (ribbons (load-ribbons gbp))
+       (ribbons (load-ribbons gbp))
        )
-  (mirror-concave-corner ribbons 5)
-  (mirror-concave-corner ribbons 6)
-  ;; (extend-ribbons ribbons 5)
+  (mirror-concave-corner ribbons 2)
+  (mirror-concave-corner ribbons 3)
   (concave-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
 
 (defun bezier-surface-to-bspline (surface)
@@ -755,7 +748,7 @@ RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
              (cross (vnormalize (v- q2 q1)))
              (len3d (bezier-arc-length (first ribbon)))
              (len2d (vlength dir)))
-        (v+ q1 (v* cross (/ h len2d) len3d))))))
+        (v+ q1 (v* cross (/ h len2d) len3d *ribbon-multiplier*))))))
 
 (defun ribbon-force-perpendicular (ribbon)
   "Destructively changes the second control point row such that the cross-derivatives
@@ -772,7 +765,7 @@ are perpendicular to the tangent."
 
 (defun concave-grid-patch-test (ribbons points-file ribbons-file patch-file)
   (let ((n (length ribbons))
-        (domain (domain-from-curves-angular-concave (mapcar #'first ribbons))))
+        (domain (domain-from-ribbons-angular-concave ribbons)))
     (write-domain-ribbons domain '() "/tmp/domain.ps")
     (mapc #'ribbon-force-perpendicular ribbons)
     (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
@@ -799,14 +792,13 @@ are perpendicular to the tangent."
 
 #+nil
 (let* ((*resolution* 40)
+       (*ribbon-multiplier* 1)
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
        (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
-       (ribbons (reverse-ribbons (load-ribbons gbp)))
-       ;; (ribbons (load-ribbons gbp))
-       )
-  (mirror-concave-corner ribbons 5)
-  (mirror-concave-corner ribbons 6)
-  ;; (extend-ribbons ribbons 5)
-  ;; (extend-ribbons ribbons 6)
+       (ribbons (load-ribbons gbp)))
+  (mirror-concave-corner ribbons 2)
+  (mirror-concave-corner ribbons 3)
+  ;; (extend-ribbons ribbons 2)
+  ;; (extend-ribbons ribbons 3)
   (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
