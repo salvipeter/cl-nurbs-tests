@@ -94,6 +94,17 @@
         (setf points (snip-triangle points i))))
 
 #+nil
+(defun mesh-concave (points)
+  "Just for testing convex(!) domains."
+  (let ((vertices (vertices points))
+        (triangles (triangles (length points))))
+    (mapcar (lambda (tri)
+              (mapcar (lambda (i)
+                        (elt vertices i))
+                      tri))
+            triangles)))
+
+#+nil
 (labels ((to3d-pt (p) (append p '(0)))
          (to3d-tri (tri) (mapcar #'to3d-pt tri))
          (to3d (tris) (mapcar #'to3d-tri tris)))
@@ -727,47 +738,63 @@ The result is an unordered list of segments."
 
 (defun n-sided-ribbon-grid-eval-fn (domain-edge ribbon)
   "Returns a function that evaluates the given ribbon for a domain point.
-RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
+RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31)).
+Assumes that the ribbon has cross-derivatives as set in RIBBON-UNIFORM-LENGTH."
   (lambda (p)
     (let* ((dir (v- (second domain-edge) (first domain-edge)))
            (s (/ (scalar-product (v- p (first domain-edge)) dir) (vlength2 dir)))
            (extension (cond ((< s 0) 'start) ((> s 1) 'end) (t nil)))
-           (h (- (point-line-distance p domain-edge t)))
-           u surf3d)
-      (ecase extension
-        (start (setf surf3d (list (subseq (elt ribbon 0) 0 2)
-                                  (subseq (elt ribbon 1) 0 2))
-                     u (* 3 s)))
-        (end (setf surf3d (list (subseq (elt ribbon 0) 2)
-                                (subseq (elt ribbon 1) 2))
-                   u (1+ (* 3 (1- s)))))
-        ((nil) (setf surf3d ribbon
-                     u s)))
-      (let* ((q1 (bezier (first surf3d) u))
-             (q2 (bezier (second surf3d) u))
-             (cross (vnormalize (v- q2 q1)))
-             (len3d (bezier-arc-length (first ribbon)))
-             (len2d (vlength dir)))
-        (v+ q1 (v* cross len3d (gamma (* (/ h len2d) *ribbon-multiplier*))))))))
+           (h (- (point-line-distance p domain-edge t))) ; signed distance from base segment (2D)
+           (len2d (vlength dir))                         ; length of base segment (2D)
+           (len3d (bezier-arc-length (first ribbon)))    ; length of base curve (3D)
+           (surf3d (case extension
+                     (start (list (subseq (first ribbon) 0 2)
+                                  (subseq (second ribbon) 0 2)))
+                     (end (list (subseq (first ribbon) 2)
+                                (subseq (second ribbon) 2)))
+                     ((nil) ribbon)))
+           (u1 (case extension (start 0) (end 1) ((nil) s)))
+           (len (* (point-distance (bezier domain-edge u1) p) ; signed length on sweepline (2D)
+                   (if (< h 0) -1 1)))
+           (q1 (bezier (first surf3d) u1))
+           (u2 (case extension
+                 (start (/ (* s len2d) h))
+                 (end (1+ (/ (* (1- s) len2d) h)))
+                 ((nil) u1)))
+           (q2 (bezier (second surf3d) u2))
+           (sweep (vnormalize (v- q2 q1))))                  ; normalized sweep direction (3D)
+      (v+ q1 (v* sweep len (/ len3d len2d) *ribbon-multiplier*)))))
 
 (defun ribbon-force-perpendicular (ribbon)
   "Destructively changes the second control point row such that the cross-derivatives
 are perpendicular to the tangent."
-  (let ((n (1- (length ribbon))))
-    (iter (for i from 0 to n)
-          (for u = (/ i n))
-          (for d = (vnormalize (bezier (first ribbon) u 1)))
-          (for p = (elt (first ribbon) i))
-          (for q = (elt (second ribbon) i))
-          (setf (elt (second ribbon) i)
-                ;; Project Q in the plane defined by P and D
-                (v+ q (v* d (scalar-product (v- p q) d)))))))
+  (iter (with n = (1- (length (first ribbon))))
+        (for i from 0 to n)
+        (for u = (/ i n))
+        (for d = (vnormalize (bezier (first ribbon) u 1)))
+        (for p = (elt (first ribbon) i))
+        (for q = (elt (second ribbon) i))
+        (setf (elt (second ribbon) i)
+              ;; Project Q into the plane defined by P and D
+              (v+ q (v* d (scalar-product (v- p q) d))))))
+
+(defun ribbon-uniform-length (ribbon)
+  "Destructively changes the second control point row such that the cross-derivatives
+are of equal length (arc length of the base divided by the degree)."
+  (iter (with n = (1- (length (first ribbon))))
+        (with len = (/ (bezier-arc-length (first ribbon)) n))
+        (for i from 0 to n)
+        (for p = (elt (first ribbon) i))
+        (for q = (elt (second ribbon) i))
+        (setf (elt (second ribbon) i)
+              (v+ p (v* (vnormalize (v- q p)) len)))))
 
 (defun concave-grid-patch-test (ribbons points-file ribbons-file patch-file)
   (let ((n (length ribbons))
         (domain (domain-from-ribbons-angular-concave ribbons)))
     (write-domain-ribbons domain '() "/tmp/domain.ps")
     (mapc #'ribbon-force-perpendicular ribbons)
+    (mapc #'ribbon-uniform-length ribbons)
     (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
     (dotimes (i n)
       (format t "Writing ribbon ~a...~%" i)
@@ -793,10 +820,10 @@ are perpendicular to the tangent."
 #+nil
 (let* ((*resolution* 40)
        (*ribbon-multiplier* 1/2)
-       (*use-gamma* nil)
-       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
+       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
+       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/6sided.gbp"))
        (ribbons (load-ribbons gbp)))
   ;; (mirror-concave-corner ribbons 2)
   ;; (mirror-concave-corner ribbons 3)
