@@ -736,6 +736,9 @@ The result is an unordered list of segments."
 
 ;;; Grid-parameterized concave patches
 
+(defvar *extension-degree*)
+(defvar *extension-shrinking*)
+
 (defun n-sided-ribbon-grid-eval-fn (domain-edge ribbon)
   "Returns a function that evaluates the given ribbon for a domain point.
 RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31)).
@@ -748,20 +751,19 @@ Assumes that the ribbon has cross-derivatives as set in RIBBON-UNIFORM-LENGTH."
            (len2d (vlength dir))                         ; length of base segment (2D)
            (len3d (bezier-arc-length (first ribbon)))    ; length of base curve (3D)
            (surf3d (case extension
-                     (start (list (subseq (first ribbon) 0 2)
-                                  (subseq (second ribbon) 0 2)))
-                     (end (list (subseq (first ribbon) 2)
-                                (subseq (second ribbon) 2)))
+                     (start (list (subseq (first ribbon) 0 (1+ *extension-degree*))
+                                  (subseq (second ribbon) 0 (1+ *extension-degree*))))
+                     (end (list (subseq (first ribbon) (- 3 *extension-degree*))
+                                (subseq (second ribbon) (- 3 *extension-degree*))))
                      ((nil) ribbon)))
-           (u1 (case extension (start 0) (end 1) ((nil) s)))
-           (len (* (point-distance (bezier domain-edge u1) p) ; signed length on sweepline (2D)
+           (u (case extension
+                (start (* s (/ 3 *extension-degree* *extension-shrinking*)))
+                (end (1+ (* (1- s) (/ 3 *extension-degree* *extension-shrinking*))))
+                ((nil) s)))
+           (len (* (point-distance (bezier domain-edge u) p) ; signed length on sweepline (2D)
                    (if (< h 0) -1 1)))
-           (q1 (bezier (first surf3d) u1))
-           (u2 (case extension
-                 (start (/ (* s len2d) h))
-                 (end (1+ (/ (* (1- s) len2d) h)))
-                 ((nil) u1)))
-           (q2 (bezier (second surf3d) u2))
+           (q1 (bezier (first surf3d) u))
+           (q2 (bezier (second surf3d) u))
            (sweep (vnormalize (v- q2 q1))))                  ; normalized sweep direction (3D)
       (v+ q1 (v* sweep len (/ len3d len2d) *ribbon-multiplier*)))))
 
@@ -819,6 +821,8 @@ are of equal length (arc length of the base divided by the degree)."
 
 #+nil
 (let* ((*resolution* 40)
+       (*extension-degree* 2)
+       (*extension-shrinking* 3)
        (*ribbon-multiplier* 1/2)
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
@@ -826,7 +830,7 @@ are of equal length (arc length of the base divided by the degree)."
        (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/6sided.gbp"))
        (ribbons (load-ribbons gbp)))
   ;; (mirror-concave-corner ribbons 2)
-  ;; (mirror-concave-corner ribbons 3)
+  ;; (mirror-concave-corner ribbons 5)
   ;; (extend-ribbons ribbons 2)
   ;; (extend-ribbons ribbons 3)
   (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/ribbon" "/tmp/felulet"))
