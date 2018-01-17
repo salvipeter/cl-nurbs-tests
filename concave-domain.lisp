@@ -124,6 +124,9 @@
   (let ((mesh (mesh-concave points)))
     (mapcar (lambda (tri) (mapcar fn tri)) mesh)))
 
+(defun eval-over-domain (points fn)
+  (map 'vector (lambda (p) (cons (funcall fn p) p)) points))
+
 #+nil
 (let ((*resolution* 20)
       (points '((2 5) (3 3) (5 3) (6 5) (8 3) (7 0) (1 0) (0 3))))
@@ -539,25 +542,27 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
 (defun concave-patch-test (ribbons points-file ribbons-file patch-file)
   (let* ((domain (domain-from-ribbons-angular-concave ribbons))
          (domain-ribbons (generate-domain-ribbons domain)))
-    (write-domain-ribbons domain domain-ribbons "/tmp/domain.ps")
-    (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
-    (dotimes (i (length ribbons))
-      (format t "Writing ribbon ~a...~%" i)
-      (let ((eval-fn (n-sided-ribbon-eval-fn (elt domain-ribbons i) (elt ribbons i))))
-        (write-stl (eval3d-on-concave-domain domain eval-fn)
-                   (format nil "~a-~d.stl" ribbons-file i) :ascii t)))
-    (format t "Writing the combined patch...~%")
-    (harmonic:with-harmonic-coordinates (harmonic-map domain)
-      (flet ((eval-patch (p)
-               (let ((result '(0 0 0)))
-                 (dotimes (i (length ribbons))
-                   (let* ((eval-fn (n-sided-ribbon-eval-fn (elt domain-ribbons i) (elt ribbons i)))
-                          (point (funcall eval-fn p))
-                          (weight (funcall (harmonic-kato harmonic-map domain i) p)))
-                     (setf result (v+ result (v* point weight)))))
-                 result)))
-        (write-stl (eval3d-on-concave-domain domain #'eval-patch)
-                   (format nil "~a.stl" patch-file) :ascii t)))))
+    (destructuring-bind (vertices triangles)
+        (shewchuk-triangle:mesh domain *resolution*)
+      (write-domain-ribbons domain domain-ribbons "/tmp/domain.ps")
+      (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
+      (dotimes (i (length ribbons))
+        (format t "Writing ribbon ~a...~%" i)
+        (let ((eval-fn (n-sided-ribbon-eval-fn (elt domain-ribbons i) (elt ribbons i))))
+          (write-obj-indexed-mesh (map 'vector eval-fn vertices) triangles
+                                  (format nil "~a-~d.obj" ribbons-file i))))
+      (format t "Writing the combined patch...~%")
+      (harmonic:with-harmonic-coordinates (harmonic-map domain)
+        (flet ((eval-patch (p)
+                 (let ((result '(0 0 0)))
+                   (dotimes (i (length ribbons))
+                     (let* ((eval-fn (n-sided-ribbon-eval-fn (elt domain-ribbons i) (elt ribbons i)))
+                            (point (funcall eval-fn p))
+                            (weight (funcall (harmonic-kato harmonic-map domain i) p)))
+                       (setf result (v+ result (v* point weight)))))
+                   result)))
+          (write-obj-indexed-mesh (map 'vector #'eval-patch vertices) triangles
+                                  (format nil "~a.obj" patch-file)))))))
 
 (defvar *dropbox* "/home/salvi/Dropbox")
 
@@ -645,40 +650,14 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
     (write-stl (eval3d-on-concave-domain domain #'eval-patch)
                "/tmp/proba.stl" :ascii t)))
 
-(defun slice-concave-mesh (triangles density)
-  "Given a mesh by `TRIANGLES', finds the contours
-where the first coordinate is a multiple of `DENSITY'.
-The result is an unordered list of segments."
-  (let ((segments '()))
-    (flet ((slice (i j)
-             (let ((x (car i))
-                   (y (car j)))
-               (when (> y x)
-                 (rotatef x y)
-                 (rotatef i j))
-               (let ((q1 (floor x density))
-                     (q2 (floor y density)))
-                 (when (= (- q1 q2) 1)
-                   (affine-combine j
-                                   (/ (- (* density q1) y) (- x y))
-                                   i))))))
-      (dolist (tri triangles)
-        (let ((ab (slice (elt tri 0) (elt tri 1)))
-              (ac (slice (elt tri 0) (elt tri 2)))
-              (bc (slice (elt tri 1) (elt tri 2))))
-          (let ((lst (remove-if-not #'identity (list ab ac bc))))
-            (when (eq (length lst) 2)
-              (push lst segments))))))
-    segments))
-
-(defun sliced-concave-distance-function-test (points fn filename &key (resolution 30) (density 0.1))
+(defun sliced-concave-distance-function-test (points fn filename
+                                              &key (resolution 0.001) (density 0.1))
   "FN gives a value between 0 and 1 for a given point."
   (flet ((map-point (p)
 	   (list (+ (* (+ (first p) 1.0d0) 250) 50)
 		 (+ (* (+ (second p) 1.0d0) 250) 50))))
     (let* ((n (length points)) 
-	   (lines (lines-from-points points))
-           (*resolution* resolution))
+	   (lines (lines-from-points points)))
       (with-open-file (s filename :direction :output :if-exists :supersede)
 	(format s "%!PS-Adobe-2.0~%")
         (format s "%%BoundingBox: 0 0 600 600~%")
@@ -693,16 +672,18 @@ The result is an unordered list of segments."
                          1 setlinewidth~%"
 		      (map-point (first line))
 		      (map-point (second line))))
-        (let* ((mesh (eval-on-concave-domain points fn))
-               (segments (slice-concave-mesh mesh density)))
-          (iter (for segment in segments)
-                (format s "newpath~%~
+        (destructuring-bind (vertices triangles)
+            (shewchuk-triangle:mesh points resolution)
+          (let* ((vertices (eval-over-domain vertices fn))
+                 (segments (slice-mesh vertices triangles density)))
+            (iter (for segment in segments)
+                  (format s "newpath~%~
                                      ~{~f ~}moveto~%~
                                      ~{~f ~}lineto~%~
                                      stroke~%"
-                        (map-point (cdr (first segment)))
-                        (map-point (cdr (second segment)))))
-          (format s "showpage~%"))))))
+                          (map-point (cdr (first segment)))
+                          (map-point (cdr (second segment)))))
+            (format s "showpage~%")))))))
 
 (defun scale-to-unit (points)
   "Scale POINTS that it fits in [-1,1]x[-1x1]."
@@ -717,8 +698,8 @@ The result is an unordered list of segments."
 
 #+nil
 (let ((*resolution* 30)
-      #+nil(points (reverse '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2))))
-      #+nil(points (reverse '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0)))) ; H
+      #+nil(points '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2)))
+      #+nil(points '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0))) ; H
       (points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6)))) ; U
   (let ((points (scale-to-unit points)))
     (harmonic:with-harmonic-coordinates (h points)
@@ -731,7 +712,7 @@ The result is an unordered list of segments."
                  (- 1 (elt l 3) (elt l 4) (elt l 5) (elt l 6)) ;; composite
                  #+nil(elt l 4))))
         (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
-                                               :resolution 50 :density 0.1d0)))))
+                                               :resolution 0.001 :density 0.1d0)))))
 
 
 ;;; Grid-parameterized concave patches
@@ -797,34 +778,36 @@ are of equal length (arc length of the base divided by the degree)."
 (defun concave-grid-patch-test (ribbons points-file patch-file &optional ribbons-file)
   (let ((n (length ribbons))
         (domain (domain-from-ribbons-angular-concave ribbons)))
-    (write-domain-ribbons domain '() "/tmp/domain.ps")
-    (mapc #'ribbon-force-perpendicular ribbons)
-    (mapc #'ribbon-uniform-length ribbons)
-    (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
-    (when ribbons-file
-      (dotimes (i n)
-        (format t "Writing ribbon ~a...~%" i)
-        (let ((eval-fn (n-sided-ribbon-grid-eval-fn
-                        (list (elt domain (mod (1- i) n)) (elt domain i)) (elt ribbons i))))
-          (write-stl (eval3d-on-concave-domain domain eval-fn)
-                     (format nil "~a-~d.stl" ribbons-file i) :ascii t))))
-    (format t "Writing the combined patch...~%")
-    (harmonic:with-harmonic-coordinates (harmonic-map domain)
-      (flet ((eval-patch (p)
-               (let ((result '(0 0 0)))
-                 (dotimes (i n)
-                   (let* ((eval-fn (n-sided-ribbon-grid-eval-fn
-                                    (list (elt domain (mod (1- i) n)) (elt domain i))
-                                    (elt ribbons i)))
-                          (point (funcall eval-fn p))
-                          (weight (funcall (harmonic-kato harmonic-map domain i) p)))
-                     (setf result (v+ result (v* point weight)))))
-                 result)))
-        (write-stl (eval3d-on-concave-domain domain #'eval-patch)
-                   (format nil "~a.stl" patch-file) :ascii t)))))
+    (destructuring-bind (vertices triangles)
+        (shewchuk-triangle:mesh domain *resolution*)
+      (write-domain-ribbons domain '() "/tmp/domain.ps")
+      (mapc #'ribbon-force-perpendicular ribbons)
+      (mapc #'ribbon-uniform-length ribbons)
+      (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
+      (when ribbons-file
+        (dotimes (i n)
+          (format t "Writing ribbon ~a...~%" i)
+          (let ((eval-fn (n-sided-ribbon-grid-eval-fn
+                          (list (elt domain (mod (1- i) n)) (elt domain i)) (elt ribbons i))))
+            (write-obj-indexed-mesh (map 'vector eval-fn vertices) triangles
+                                    (format nil "~a-~d.obj" ribbons-file i)))))
+      (format t "Writing the combined patch...~%")
+      (harmonic:with-harmonic-coordinates (harmonic-map domain)
+        (flet ((eval-patch (p)
+                 (let ((result '(0 0 0)))
+                   (dotimes (i n)
+                     (let* ((eval-fn (n-sided-ribbon-grid-eval-fn
+                                      (list (elt domain (mod (1- i) n)) (elt domain i))
+                                      (elt ribbons i)))
+                            (point (funcall eval-fn p))
+                            (weight (funcall (harmonic-kato harmonic-map domain i) p)))
+                       (setf result (v+ result (v* point weight)))))
+                   result)))
+          (write-obj-indexed-mesh (map 'vector #'eval-patch vertices) triangles
+                                  (format nil "~a.obj" patch-file)))))))
 
 #+nil
-(let* ((*resolution* 40)
+(let* ((*resolution* 2)
        (*extension-degree* 2)
        (*extension-shrinking* 3)
        (*ribbon-multiplier* 1/2)

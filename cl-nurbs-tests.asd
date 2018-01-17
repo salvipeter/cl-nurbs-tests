@@ -11,7 +11,7 @@
   :author "Peter Salvi"
   :licence "Private"
   :description "Research test environment based on CL-NURBS."
-  :depends-on (:iterate :cffi :cl-nurbs :ieee-floats :gsll :antik)
+  :depends-on (:iterate :cffi :cl-nurbs :ieee-floats :gsll :antik :cl-fad :external-program)
   :components ((:file "package")
 	       (:file "matrix")
 	       (:file "lu" :depends-on ("matrix"))
@@ -44,6 +44,7 @@
                (:file "n-sided-paper" :depends-on ("package"))
                (:file "blends" :depends-on ("n-sided-paper"))
                (:file "harmonic-coordinates")
+               (:file "shewchuk-triangle")
                (:file "kato-test" :depends-on ("blends" "harmonic-coordinates"))
                (:file "ribbons" :depends-on ("kato-test"))
                (:file "patches" :depends-on ("ribbons"))

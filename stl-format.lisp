@@ -185,7 +185,7 @@ the first is a list of points, the second is a list of index tuples."
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (dotimes (i (length points))
       (format s "v~{ ~f~}~%" (elt points i)))
-    (dolist (p polygons) (format s "f~{ ~d~}~%" (mapcar #'1+ p)))))
+    (map nil (lambda (p) (format s "f~{ ~d~}~%" (mapcar #'1+ p))) polygons)))
 
 (defun write-ps-indexed-mesh-projection (points triangles stream
                                          &key (transform #'identity) (axis 0) (lines 0.1))
