@@ -717,6 +717,11 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
 
 ;;; Grid-parameterized concave patches
 
+(defun sigmoid-gamma (x)
+  (if *use-gamma*
+      (- (/ 2 (1+ (exp (- x)))) 1)
+      x))
+
 (defvar *extension-degree*)
 (defvar *extension-shrinking*)
 
@@ -749,7 +754,7 @@ RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
              (q1 (bezier (first surf3d) u))
              (q2 (bezier (second surf3d) u))
              (sweep (vnormalize (v- q2 q1))))              ; normalized sweep direction (3D)
-        (v+ q1 (v* sweep (gamma (/ len len2d)) len3d *ribbon-multiplier*))))))
+        (v+ q1 (v* sweep (sigmoid-gamma (/ len len2d)) len3d *ribbon-multiplier*))))))
 
 (defun ribbon-force-perpendicular (ribbon)
   "Destructively changes the second control point row such that the cross-derivatives
@@ -810,8 +815,8 @@ are of equal length (arc length of the base divided by the degree)."
 (let* ((*resolution* 2)
        (*extension-degree* 2)
        (*extension-shrinking* 0)
-       (*ribbon-multiplier* 1/2)
-       (*use-gamma* nil)
+       (*ribbon-multiplier* 1)
+       (*use-gamma* t)
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
        (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
        ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
