@@ -205,11 +205,8 @@ thus containing point I-1 (NOT point I)."
 
 (defparameter *use-gamma* nil)
 (defun gamma (d)
-  "C1-continuous at 0."
   (if *use-gamma*
-      (if (< d 0)
-          (/ d (- 1 (* 2 d)))
-          (/ d (+ 1 (* 2 d))))
+      (/ d (+ 1 (* 2 (abs d))))
       d))
 
 (defun coons-ribbon-evaluate (patch i s d)

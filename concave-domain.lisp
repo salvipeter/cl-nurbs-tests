@@ -718,8 +718,22 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
 ;;; Grid-parameterized concave patches
 
 (defun sigmoid-gamma (x)
+  "Variations (1/5, 1/4, 1/3, 1/2, 1, 2, infty):
+  x / (1 + 2 * |x|)              => 0.143, 0.167, 0.200, 0.250, 0.333, 0.400, 0.5 (w/discontinuity)
+  tanh(x) / 2                    => 0.099, 0.122, 0.161, 0.231, 0.381, 0.482, 0.5 %
+  x / 2 sqrt(1 + x^2)            => 0.098, 0.121, 0.158, 0.224, 0.354, 0.447, 0.5 %
+  1 / (1 + e^(-4x)) - 1/2        => 0.190, 0.231, 0.291, 0.381, 0.482, 0.499, 0.5
+  x / sqrt(1 + 9x^2)             => 0.171, 0.200, 0.236, 0.277, 0.316, 0.329, 0.333
+  tanh(x/2) = 2 / (1 + e^-x) - 1 => 0.098, 0.124, 0.165, 0.245, 0.462, 0.762, 1 %
+  x / sqrt(4 + x^2)              => 0.100, 0.124, 0.164, 0.243, 0.447, 0.707, 1 %
+Those marked with `%' have a derivative other than 1 at 0."
   (if *use-gamma*
-      (- (/ 2 (1+ (exp (- x)))) 1)
+      #+nil(/ (tanh x) 2)
+      #+nil(/ x 2 (sqrt (+ 1 (* x x))))
+      #+nil(- (/ 1 (1+ (exp (* -4 x)))) 1/2)
+      (/ x (sqrt (1+ (* 9 x x))))
+      #+nil(tanh (/ x 2))
+      #+nil(/ x (sqrt (+ 4 (* x x))))
       x))
 
 (defvar *extension-degree*)
