@@ -831,13 +831,14 @@ are of equal length (arc length of the base divided by the degree)."
        (*extension-shrinking* 0)
        (*ribbon-multiplier* 1)
        (*use-gamma* t)
-       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBConvex1.gbp"))
-       (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBTest4_Cubic.gbp"))
-       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/GBUTest2_Cubic.gbp"))
-       ;; (gbp (format nil "~a~a" *dropbox* "/Shares/GrafGeo/Polar/bezier-ribbon/6sided.gbp"))
+       (tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBConvex1.gbp"))         ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBTest4_Cubic.gbp"))     ; 5
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBUTest2_Cubic.gbp"))    ; 2 3
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "6sided.gbp"))            ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Plane.gbp")) ; 4 5
+       (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Cylinder.gbp")) ; 4 5
        (ribbons (load-ribbons gbp)))
-  ;; (mirror-concave-corner ribbons 2)
+  (mirror-concave-corner ribbons 4)
   (mirror-concave-corner ribbons 5)
-  ;; (extend-ribbons ribbons 2)
-  ;; (extend-ribbons ribbons 3)
   (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/felulet" #+nil"/tmp/ribbon"))
