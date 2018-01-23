@@ -232,6 +232,18 @@
       (write-stl (eval-on-concave-domain points (mean-bernstein points 1 j k))
                  (format nil "/tmp/b~a~a.stl" j k) :ascii t))))
 
+#+nil
+(let* ((points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))) ; U
+       (points (scale-to-unit points)))
+  (destructuring-bind (vertices triangles)
+      (shewchuk-triangle:mesh points 0.0001)
+    (harmonic:with-harmonic-coordinates (h points :levels 10)
+      (flet ((foo (p)
+               (+ (funcall (harmonic-kato h points 1) p)
+                  (funcall (harmonic-kato h points 2) p))))
+        (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
+                                triangles "/tmp/proba.obj")))))
+
 ;;; Maxima computation:
 ;;; B(n,k,u) := binomial(n,k)*u^k*(1-u)^(n-k);
 ;;; surf : sum(sum(C(i,j,coord)*B(3,i,s)*B(1,j,d),j,0,1),i,0,3)$
@@ -793,6 +805,14 @@ are of equal length (arc length of the base divided by the degree)."
         (for q = (elt (second ribbon) i))
         (setf (elt (second ribbon) i)
               (v+ p (v* (vnormalize (v- q p)) len)))))
+
+(defun harmonic-hermite (map points i)
+  (lambda (p)
+    (let ((i-1 (mod (1- i) (length points)))
+          (l (harmonic:harmonic-coordinates map p)))
+      (when (member nil l)              ; kutykurutty
+        (setf l (mean-value-coordinates points p)))
+      (/ (hermite-blend-function 'point 'start (- 1 (elt l i-1) (elt l i))) 2))))
 
 (defun concave-grid-patch-test (ribbons points-file patch-file &optional ribbons-file)
   (let ((n (length ribbons))
