@@ -663,7 +663,7 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
                "/tmp/proba.stl" :ascii t)))
 
 (defun sliced-concave-distance-function-test (points fn filename
-                                              &key (resolution 0.001) (density 0.1))
+                                              &key (resolution 0.001) (density 0.1) elements)
   "FN gives a value between 0 and 1 for a given point."
   (flet ((map-point (p)
 	   (list (+ (* (+ (first p) 1.0d0) 250) 50)
@@ -684,6 +684,22 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
                          1 setlinewidth~%"
 		      (map-point (first line))
 		      (map-point (second line))))
+        (iter (for element in elements)
+              (if (atom (first element))
+                  (format s "% Point~%~
+                             newpath~%~
+                             ~{~f ~}3 0 360 arc closepath~%~
+                             fill~%"
+                          (map-point element))
+                  (format s "% Line~%~
+                             2 setlinewidth~%~
+                             newpath~%~
+                             ~{~f ~}moveto~%~
+                             ~{~f ~}lineto~%~
+                             stroke~%~
+                             1 setlinewidth~%"
+                          (map-point (first element))
+                          (map-point (second element)))))
         (destructuring-bind (vertices triangles)
             (shewchuk-triangle:mesh points resolution)
           (let* ((vertices (eval-over-domain vertices fn))
