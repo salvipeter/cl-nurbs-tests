@@ -862,3 +862,120 @@ are of equal length (arc length of the base divided by the degree)."
   (mirror-concave-corner ribbons 4)
   (mirror-concave-corner ribbons 5)
   (concave-grid-patch-test ribbons "/tmp/pontok" "/tmp/felulet" #+nil"/tmp/ribbon"))
+
+
+;;; Concave Gregory patches
+
+(defun parallel-parameter (domain i side p)
+  "A side-parameter based on side I, parallel with one of the neighboring sides.
+SIDE can be 'LEFT or 'RIGHT (referring to the previous and next sides, respectively)."
+  (let* ((n (length domain))
+         (p1 (elt domain i))
+         (p2 (elt domain (mod (1+ i) n)))
+         (dir (ecase side
+                (left (v- p1 (elt domain (mod (1- i) n))))
+                (right (v- p2 (elt domain (mod (+ i 2) n))))))
+         (q (line-line-intersection (list p1 p2) (list p (v+ p dir)))))
+    (* (/ (point-distance q p1) (point-distance p2 p1))
+       (if (< (scalar-product (v- q p1) (v- p2 p1)) 0) -1 1))))
+
+(defun concave-side-ribbon (ribbon s d)
+  "RIBBON is given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
+  (flet ((blend (x)
+           (if (>= x 1)
+               (1+ *extension-shrinking*)
+               (+ 1 (* *extension-shrinking* (hermite-blend-function 'point 'end x))))))
+    (let* ((extension (cond ((< s 0) 'start) ((> s 1) 'end) (t nil)))
+           (surf3d (case extension
+                     (start (list (subseq (first ribbon) 0 (1+ *extension-degree*))
+                                  (subseq (second ribbon) 0 (1+ *extension-degree*))))
+                     (end (list (subseq (first ribbon) (- 3 *extension-degree*))
+                                (subseq (second ribbon) (- 3 *extension-degree*))))
+                     ((nil) ribbon)))
+           (u (case extension
+                (start (* s (/ 3 *extension-degree* (blend (- s)))))
+                (end (1+ (* (1- s) (/ 3 *extension-degree* (blend (1- s))))))
+                ((nil) s)))
+           (q1 (bezier (first surf3d) u))
+           (q2 (bezier (second surf3d) u))
+           (sweep (v- q2 q1)))
+      (v+ q1 (v* sweep (sigmoid-gamma d) *ribbon-multiplier*)))))
+
+(defun concave-correction-patch (ribbons i si-1 si)
+  (let* ((n (length ribbons))
+         (i-1 (mod (1- i) n))
+         (corner (elt (first (elt ribbons i)) 0))
+         (prev (elt (first (elt ribbons i-1)) 2))
+         (next (elt (first (elt ribbons i)) 1))
+         (di-1 (v* (v- prev corner) 3))
+         (di (v* (v- next corner) 3))
+         (twist-cp (v* (v+ (v* (elt (second (elt ribbons i-1)) 2) si)
+                           (v* (elt (second (elt ribbons i)) 1) si-1))
+                       (handler-case (/ (+ si-1 si))
+                         (division-by-zero () 0))))
+         (twist (v* (v- (v+ corner twist-cp) (v+ prev next)) 9)))
+    (v+ corner
+        (v* di-1 (sigmoid-gamma si-1))
+        (v* di (sigmoid-gamma si))
+        (v* twist (sigmoid-gamma si-1) (sigmoid-gamma si)))))
+
+(defun concave-corner-ribbon (domain ribbons i p)
+  "RIBBONS is unfortunately indexed in a different system, where edge I is bounded by
+vertices I-1 and I, but here we use vertices I and I+1..."
+  (let* ((n (length domain))
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (s1 (- 1 (parallel-parameter domain i-1 'right p)))
+         (s2 (parallel-parameter domain i 'left p)))
+    (concave-side-ribbon (elt ribbons i) (- 1 s1) s2)
+    #+nil(concave-side-ribbon (elt ribbons i+1) s2 s1)
+    #+nil(concave-correction-patch ribbons i+1 s1 s2)
+    #+nil(v- (v+ (concave-side-ribbon (elt ribbons i) (- 1 s1) s2)
+                 (concave-side-ribbon (elt ribbons i+1) s2 s1))
+             (concave-correction-patch ribbons i+1 s1 s2))))
+
+(defun concave-gregory-test (ribbons points-file patch-file &optional ribbons-file)
+  (let ((n (length ribbons))
+        (domain (domain-from-ribbons-angular-concave ribbons)))
+    (destructuring-bind (vertices triangles)
+        (shewchuk-triangle:mesh domain *resolution*)
+      (write-domain-ribbons domain '() "/tmp/domain.ps")
+      (mapc #'ribbon-force-perpendicular ribbons)
+      (mapc #'ribbon-uniform-length ribbons)
+      (write-bezier-ribbon-control-points ribbons (format nil "~a.obj" points-file))
+      (when ribbons-file
+        (dotimes (i n)
+          (format t "Writing ribbon ~a...~%" i)
+          (flet ((eval-fn (p) (concave-corner-ribbon domain ribbons i p)))
+            (write-obj-indexed-mesh (map 'vector #'eval-fn vertices) triangles
+                                    (format nil "~a-~d.obj" ribbons-file i)))))
+      (format t "Writing the combined patch...~%")
+      (harmonic:with-harmonic-coordinates (harmonic-map domain)
+        (flet ((eval-patch (p)
+                 (let ((result '(0 0 0)))
+                   (dotimes (i n)
+                     (flet ((eval-fn (p) (concave-corner-ribbon domain ribbons i p)))
+                       (let ((point (eval-fn p))
+                             (weight (funcall (harmonic-hermite harmonic-map domain i) p)))
+                         (setf result (v+ result (v* point weight))))))
+                   result)))
+          (write-obj-indexed-mesh (map 'vector #'eval-patch vertices) triangles
+                                  (format nil "~a.obj" patch-file)))))))
+
+#+nil
+(let* ((*resolution* 2)
+       (*extension-degree* 2)
+       (*extension-shrinking* 0)
+       (*ribbon-multiplier* 1)
+       (*use-gamma* nil)
+       (tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBConvex1.gbp"))            ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBTest4_Cubic.gbp"))        ; 5
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBUTest2_Cubic.gbp"))       ; 2 3
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "6sided.gbp"))               ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Plane.gbp"))    ; 4 5
+       (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Cylinder.gbp")) ; 4 5
+       (ribbons (load-ribbons gbp)))
+  (mirror-concave-corner ribbons 4)
+  (mirror-concave-corner ribbons 5)
+  (concave-gregory-test ribbons "/tmp/pontok" "/tmp/felulet" "/tmp/ribbon"))
