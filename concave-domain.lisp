@@ -919,7 +919,7 @@ SIDE can be 'LEFT or 'RIGHT (referring to the previous and next sides, respectiv
         (v* di (sigmoid-gamma si))
         (v* twist (sigmoid-gamma si-1) (sigmoid-gamma si)))))
 
-(defun concave-corner-ribbon (domain ribbons i p)
+(defun concave-corner-ribbon-parallel (domain ribbons i p)
   "RIBBONS is unfortunately indexed in a different system, where edge I is bounded by
 vertices I-1 and I, but here we use vertices I and I+1..."
   (let* ((n (length domain))
@@ -927,12 +927,34 @@ vertices I-1 and I, but here we use vertices I and I+1..."
          (i+1 (mod (1+ i) n))
          (s1 (- 1 (parallel-parameter domain i-1 'right p)))
          (s2 (parallel-parameter domain i 'left p)))
-    (concave-side-ribbon (elt ribbons i) (- 1 s1) s2)
-    #+nil(concave-side-ribbon (elt ribbons i+1) s2 s1)
-    #+nil(concave-correction-patch ribbons i+1 s1 s2)
-    #+nil(v- (v+ (concave-side-ribbon (elt ribbons i) (- 1 s1) s2)
-                 (concave-side-ribbon (elt ribbons i+1) s2 s1))
-             (concave-correction-patch ribbons i+1 s1 s2))))
+    (v- (v+ (concave-side-ribbon (elt ribbons i) (- 1 s1) s2)
+            (concave-side-ribbon (elt ribbons i+1) s2 s1))
+        (concave-correction-patch ribbons i+1 s1 s2))))
+
+(defun concave-corner-ribbon (domain ribbons i p)
+  (let* ((n (length domain))
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (edge-i (list (elt domain i-1) (elt domain i)))
+         (edge-i+1 (list (elt domain i) (elt domain i+1)))
+         (ri (n-sided-ribbon-grid-eval-fn edge-i (elt ribbons i)))
+         (ri+1 (n-sided-ribbon-grid-eval-fn edge-i+1 (elt ribbons i+1)))
+         (di (point-line-distance p edge-i))
+         (di+1 (point-line-distance p edge-i+1))
+         (alpha (safe-/ (* di di) (+ (* di di) (* di+1 di+1)))))
+    (v+ (v* (funcall ri p) (- 1 alpha))
+        (v* (funcall ri+1 p) alpha))))
+
+(defun harmonic-corner-blend (map points i)
+  (lambda (p)
+    (let ((l (harmonic:harmonic-coordinates map p)))
+      (when (member nil l)              ; kutykurutty
+        (setf l (mean-value-coordinates points p)))
+      (let ((d (iter (with n = (length l))
+                     (for i from 0 below n)
+                     (for i-1 = (mod (1- i) n))
+                     (collect (- 1 (elt l i-1) (elt l i))))))
+        (corner-blend d i)))))
 
 (defun concave-gregory-test (ribbons points-file patch-file &optional ribbons-file)
   (let ((n (length ribbons))
@@ -956,7 +978,7 @@ vertices I-1 and I, but here we use vertices I and I+1..."
                    (dotimes (i n)
                      (flet ((eval-fn (p) (concave-corner-ribbon domain ribbons i p)))
                        (let ((point (eval-fn p))
-                             (weight (funcall (harmonic-hermite harmonic-map domain i) p)))
+                             (weight (funcall (harmonic-corner-blend harmonic-map domain i) p)))
                          (setf result (v+ result (v* point weight))))))
                    result)))
           (write-obj-indexed-mesh (map 'vector #'eval-patch vertices) triangles
