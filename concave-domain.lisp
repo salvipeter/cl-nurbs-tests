@@ -1054,39 +1054,40 @@ vertices I-1 and I, but here we use vertices I and I+1..."
     l))
 
 (defun concave-generalized-bernstein (map points p side degree col row &key (use-d t))
-  (let* ((n (length points))
-         (l (harmonic-coordinates map points p))
-         (i side)
-         (i-1 (mod (1- i) n))
-         (i+1 (mod (1+ i) n))
-         (si (barycentric-s l i))
-         (si-1 (barycentric-s l i-1))
-         (si+1 (barycentric-s l i+1))
-         (di (barycentric-d l i))
-         (di-1 (barycentric-d l i-1))
-         (di+1 (barycentric-d l i+1))
-         (alpha (if use-d
-                    (if (< (+ di-1 di) *epsilon*)
-                        0.5
-                        (/ di-1 (+ di-1 di)))
-                    (if (< (+ si (- 1 si-1)) *epsilon*)
-                        0.5
-                        (/ si (+ si (- 1 si-1))))))
-         (beta (if use-d
-                   (if (< (+ di+1 di) *epsilon*)
-                       0.5
-                       (/ di+1 (+ di+1 di)))
-                   (if (< (+ (- 1 si) si+1) *epsilon*)
-                       0.5
-                       (/ (- 1 si) (+ (- 1 si) si+1)))))
-         (blend (* (bernstein degree row di)
-                   (bernstein degree col si)))
-         (mu (cond ((and (< row 2) (< col 2)) alpha)
-                   ((and (< row 2) (> col (- degree 2))) beta)
-                   ((or (< col row) (> col (- degree row))) 0)
-                   ((or (= col row) (= col (- degree row))) 1/2)
-                   (t 1))))
-    (* blend mu)))
+  (flet ((sqr (x) (* x x)))
+    (let* ((n (length points))
+           (l (harmonic-coordinates map points p))
+           (i side)
+           (i-1 (mod (1- i) n))
+           (i+1 (mod (1+ i) n))
+           (si (barycentric-s l i))
+           (si-1 (barycentric-s l i-1))
+           (si+1 (barycentric-s l i+1))
+           (di (barycentric-d l i))
+           (di-1 (barycentric-d l i-1))
+           (di+1 (barycentric-d l i+1))
+           (alpha (if use-d
+                      (if (< (+ (sqr di-1) (sqr di)) *epsilon*)
+                          0.5
+                          (/ (sqr di-1) (+ (sqr di-1) (sqr di))))
+                      (if (< (+ (sqr si) (sqr (- 1 si-1))) *epsilon*)
+                          0.5
+                          (/ (sqr si) (+ (sqr si) (sqr (- 1 si-1)))))))
+           (beta (if use-d
+                     (if (< (+ (sqr di+1) (sqr di)) *epsilon*)
+                         0.5
+                         (/ (sqr di+1) (+ (sqr di+1) (sqr di))))
+                     (if (< (+ (sqr (- 1 si)) (sqr si+1)) *epsilon*)
+                         0.5
+                         (/ (sqr (- 1 si)) (+ (sqr (- 1 si)) (sqr si+1))))))
+           (blend (* (bernstein degree row di)
+                     (bernstein degree col si)))
+           (mu (cond ((and (< row 2) (< col 2)) alpha)
+                     ((and (< row 2) (> col (- degree 2))) beta)
+                     ((or (< col row) (> col (- degree row))) 0)
+                     ((or (= col row) (= col (- degree row))) 1/2)
+                     (t 1))))
+      (* blend mu))))
 
 (defun concave-bezier-deficiency (map points p degree &key (use-d t))
   (- 1 (iter (for side from 0 below (length points))
@@ -1095,47 +1096,18 @@ vertices I-1 and I, but here we use vertices I and I+1..."
                                    (sum (concave-generalized-bernstein
                                          map points p side degree col row :use-d use-d)))))))))
 
-(defun write-concave-bernstein-blend-image (map points i fname degree
-                                            &key (use-d t) (resolution 0.001) (density 0.1))
-  (labels ((transform (p) (list (+ (* (first p) 250) 250) (- 500 (* (second p) 250))))
-           (write-poly (stream points msg)
-             (format stream "~{~f ~}moveto~%~{~{~f ~}lineto~%~}closepath stroke~%"
-                     (transform (first points)) (mapcar #'transform (rest points)))
-             (format stream "10 790 moveto (~a, interval between lines: ~a) show showpage~%"
-                     msg density)))
-    (setf points (append (subseq points i) (subseq points 0 i)))
-    (with-open-file (s fname :direction :output :if-exists :supersede)
-      (format s "%!PS~%/Times-Roman findfont 15 scalefont setfont~%")
-      (iter (for row from 0 below (ceiling degree 2))
-            (iter (for col from 0 to degree)
-                  (for cp-str = (format nil "Blend of control point (~a, ~a)" col row))
-                  (flet ((foo (p)
-                           (let ((b (concave-generalized-bernstein
-                                     map points p 1 degree col row :use-d use-d))
-                                 (bp (concave-generalized-bernstein
-                                      map points p 0 degree (- degree row) col :use-d use-d))
-                                 (bn (concave-generalized-bernstein
-                                      map points p 2 degree row (- degree col) :use-d use-d)))
-                             (+ b bp bn))))
-                    (sliced-concave-distance-function-test points #'foo s
-                                                           :resolution resolution :density density))
-                  (write-poly s points cp-str)))
-      (let ((cp-str "Blend of central control point"))
-        (flet ((foo (p)
-                 (let ((d (concave-bezier-deficiency map points p degree :use-d use-d)))
-                   (if (< (abs d) *epsilon*) 0 d))))
-          (sliced-concave-distance-function-test points #'foo s
-                                                 :resolution resolution :density density))
-        (write-poly s points cp-str)))))
-
-(defun write-concave-bernstein-blend-mesh (map points path degree &key (use-d t) (scaling 1))
+(defun write-concave-bernstein-blend-mesh (map points path degree concave
+                                           &key (use-d t) (scaling 1))
+  "CONCAVE is a list of concave vertex indices.
+Blending functions near these vertices are computed separately."
   (destructuring-bind (vertices triangles)
       (shewchuk-triangle:mesh points *resolution*)
     (iter (with n = (length points))
+          (with half = (ceiling degree 2))
           (for side from 0 below n)
           (for side-1 = (mod (1- side) n))
           (for side+1 = (mod (1+ side) n))
-          (iter (for row from 0 below (ceiling degree 2))
+          (iter (for row from 0 below half)
                 (iter (for col from 0 to degree)
                       (for fname = (format nil "~a-deg~a-c~a~a~a.obj" path degree side col row))
                       (flet ((foo (p)
@@ -1147,7 +1119,10 @@ vertices I-1 and I, but here we use vertices I and I+1..."
                                      (bn (concave-generalized-bernstein
                                           map points p side+1 degree row (- degree col)
                                           :use-d use-d)))
-                                 (* (+ b bp bn) scaling))))
+                                 (if (or (and (< col half) (member side concave))
+                                         (and (>= col half) (member side+1 concave)))
+                                     (* b scaling)
+                                     (* (+ b bp bn) scaling)))))
                         (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
                                                 triangles fname)))))
     (let ((fname (format nil "~a-deg~a-center.obj" path degree)))
@@ -1189,21 +1164,105 @@ vertices I-1 and I, but here we use vertices I and I+1..."
       (setf result (v+ result (elt (second r) 1) (elt (second r) 2))))
     (v* result (/ (* 2 (length ribbons))))))
 
+(defun write-ribbon-surfaces (ribbons path)
+  (iter (for r in ribbons)
+        (for i upfrom 0)
+        (for filename = (format nil "~a/ribbon-~a.stl" path i))
+        (write-stl (sample-bezier-surface r *resolution* '(0 0) '(1 1)) filename)))
+
 (defun concave-generalized-bezier-test (input-file concave output-file)
   "CONCAVE is a list of concave vertex indices."
   (let ((ribbons (load-ribbons input-file)))
     (dolist (i concave)
-      (mirror-concave-corner ribbons i)
-      (unify-concave-corner ribbons i))
+      (mirror-concave-corner ribbons i))
     (let ((domain (domain-from-ribbons-angular-concave ribbons))
           (center (generalized-bezier-generate-center ribbons)))
       (write-bezier-ribbon-control-points ribbons "/tmp/ribbons.obj" :center center)
+      (let ((*resolution* 30))
+        (write-ribbon-surfaces ribbons "/tmp"))
       (write-domain-ribbons domain '() "/tmp/domain.ps")
-      (harmonic:with-harmonic-coordinates (map domain)
+      (harmonic:with-harmonic-coordinates (hmap domain :levels 9)
         (destructuring-bind (vertices triangles)
             (shewchuk-triangle:mesh domain *resolution*)
-          (flet ((foo (p) (concave-generalized-bezier-eval map domain p 3 ribbons center)))
+          (flet ((foo (p) (concave-generalized-bezier-eval hmap domain p 3 ribbons center)))
             (write-obj-indexed-mesh (map 'vector #'foo vertices) triangles output-file)))))))
+
+(defun concave-gb-normal-test (input-file concave &key pos-tolerance angle-tolerance step)
+  "CONCAVE is a list of concave vertex indices.
+Assumes that matter is always on the left side of the edges in the domain."
+  (let ((ribbons (load-ribbons input-file)))
+    (dolist (i concave)
+      (mirror-concave-corner ribbons i))
+    (let ((domain (domain-from-ribbons-angular-concave ribbons))
+          (center (generalized-bezier-generate-center ribbons)))
+      (harmonic:with-harmonic-coordinates (hmap domain :levels 10)
+        (iter (with n = (length domain))
+              (for ribbon in ribbons)
+              (for i from 0 below n)
+              (for edge = (list (elt domain (mod (1- i) n)) (elt domain i)))
+              (for dir = (vnormalize (v- (second edge) (first edge))))
+              (for cross-dir = (list (- (second dir)) (first dir)))
+              (iter (for j from 0 to *resolution*)
+                    (for u = (/ j *resolution*))
+                    (for tangent = (bezier (first ribbon) u 1))
+                    (for cross = (v- (bezier (second ribbon) u)
+                                     (bezier (first ribbon) u)))
+                    (for normal = (vnormalize (cross-product tangent cross)))
+                    (for uv = (affine-combine (first edge) u (second edge)))
+                    (for uv2 = (v+ uv (v* cross-dir step)))
+                    (for p = (concave-generalized-bezier-eval hmap domain uv 3 ribbons center))
+                    (when (> (point-distance p (bezier (first ribbon) u)) pos-tolerance)
+                      (format t "Positional error: ~5f,	side: ~a,	u: ~5f~%~a~%vs~%~a~%"
+                              (point-distance p (bezier (first ribbon) u))
+                              i u p (bezier (first ribbon) u)))
+                    (for p2 = (concave-generalized-bezier-eval hmap domain uv2 3 ribbons center))
+                    (for approx-normal = (vnormalize (cross-product tangent (v- p2 p))))
+                    (for alpha = (* (acos (scalar-product normal approx-normal)) (/ 180 pi)))
+                    (when (> alpha angle-tolerance)
+                      (format t "Error: ~5f	side: ~a	u: ~5f~%" alpha i u))))))))
+
+(defvar *barycentric-dilation* 0)
+
+(defun barycentric-d-1minus (l i)
+  (let* ((n (length l))
+         (i-2 (mod (- i 2) n))
+         (i-1 (mod (- i 1) n))
+         (i+1 (mod (+ i 1) n)))
+    (* (- 1 (elt l i-1) (elt l i))
+       (- 1 (* (elt l i-2) (elt l i+1)
+               *barycentric-dilation*)))))
+
+#+nil
+(defun harmonic-coordinates (map points p)
+  "Mean value (!) coordinates - for testing."
+  (declare (ignore map))
+  (mean-value-coordinates points p))
+
+;;; Use mean value coordinates for this one (see above)
+#+nil
+(let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBConvex1.gbp"))            ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBTest4_Cubic.gbp"))        ; 5
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBUTest2_Cubic.gbp"))       ; 2 3
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "6sided.gbp"))               ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Plane.gbp"))    ; 4 5
+       (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Cylinder.gbp")) ; 4 5
+       (*resolution* 30))
+  (concave-gb-normal-test gbp '(4 5)
+                          :pos-tolerance 1.0d-8 :angle-tolerance 1.0d-4 :step 0.001))
+
+#+nil
+(let ((*resolution* 30)
+      #+nil(points '((1 2) (1 1) (2 1) (2 0) (0 0) (0 2)))
+      #+nil(points '((0 0) (0 7) (1 7) (1 4) (2 4) (2 7) (3 7) (3 0) (2 0) (2 3) (1 3) (1 0))) ; H
+      (points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6)))) ; U
+  (let ((points (scale-to-unit points))
+        (*barycentric-d-function* #'barycentric-d-1minus)
+        (*barycentric-dilation* 2))
+    (harmonic:with-harmonic-coordinates (h points :levels 10)
+      (flet ((fn (p) (barycentric-d (harmonic-coordinates h points p) 5)))
+        (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
+                                               :resolution 0.0001 :density 0.1d0)))))
 
 #+nil
 (let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
@@ -1216,12 +1275,10 @@ vertices I-1 and I, but here we use vertices I and I+1..."
        (ribbons (load-ribbons gbp)))
   (mirror-concave-corner ribbons 4)
   (mirror-concave-corner ribbons 5)
-  (let ((*resolution* 2)
+  (let ((*resolution* 1)
         (domain (domain-from-ribbons-angular-concave ribbons)))
     (harmonic:with-harmonic-coordinates (harmonic-map domain :levels 10)
-      #+nil(write-concave-bernstein-blend-image DO NOT USE - FREEZES THE SYSTEM
-            harmonic-map domain 0 "/tmp/proba.ps" 3 :resolution 0.0001 :density 0.1)
-      (write-concave-bernstein-blend-mesh harmonic-map domain "/tmp/U" 3 :scaling 100))))
+      (write-concave-bernstein-blend-mesh harmonic-map domain "/tmp/U" 3 '(4 5) :scaling 100))))
 
 #+nil
 (let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
