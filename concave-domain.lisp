@@ -387,12 +387,14 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
       (setp i-1 3 1 (v+ (p i-1 2 1) (v- (p i-1 3 0) (p i-1 2 0))))
       (setp  i  0 1 (v+ (p  i  1 1) (v- (p  i  0 0) (p  i  1 0)))))))
 
-(defun write-bezier-ribbon-control-points (ribbons filename)
+(defun write-bezier-ribbon-control-points (ribbons filename &key center)
   "Assumes that all ribbons are of the same degrees."
   (let ((n (1- (length (first (first ribbons)))))
         (m (1- (length (first ribbons)))))
     (with-open-file (s filename :direction :output :if-exists :supersede)
       (format s "~{~{~{v~{ ~f~}~%~}~}~}" ribbons)
+      (when center
+        (format s "v~{ ~f~}~%" center))
       (iter (repeat (length ribbons))
             (for i first 1 then (+ i (* (1+ n) (1+ m))))
             (iter (for j from 0 below n)
@@ -401,7 +403,9 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                                 (+ i j (* k (1+ n)))
                                 (+ i (1+ j) (* k (1+ n)))
                                 (+ i (1+ j) (* (1+ k) (1+ n)))
-                                (+ i j (* (1+ k) (1+ n))))))))))
+                                (+ i j (* (1+ k) (1+ n)))))))
+      (when center
+        (format s "p ~a~%" (1+ (* (length ribbons) (1+ n) (1+ m))))))))
 
 (defun domain-from-ribbons-angular-concave (ribbons)
   (flet ((angle (r1 r2)
@@ -662,56 +666,61 @@ DOMAIN-RIBBON and RIBBON are given as ((P00 P10 P20 P30) (P01 P11 P21 P31))."
     (write-stl (eval3d-on-concave-domain domain #'eval-patch)
                "/tmp/proba.stl" :ascii t)))
 
-(defun sliced-concave-distance-function-test (points fn filename
+(defun sliced-concave-distance-function-test (points fn file-or-stream
                                               &key (resolution 0.001) (density 0.1) elements)
-  "FN gives a value between 0 and 1 for a given point."
-  (flet ((map-point (p)
-	   (list (+ (* (+ (first p) 1.0d0) 250) 50)
-		 (+ (* (+ (second p) 1.0d0) 250) 50))))
-    (let* ((n (length points)) 
-	   (lines (lines-from-points points)))
-      (with-open-file (s filename :direction :output :if-exists :supersede)
-	(format s "%!PS-Adobe-2.0~%")
-        (format s "%%BoundingBox: 0 0 600 600~%")
-	(iter (for i from 0 below n)
-	      (for line in lines)
-	      (format s "% Segment: ~a~%" i)
-	      (format s "2 setlinewidth~%~
-                         newpath~%~
-                         ~{~f ~}moveto~%~
-                         ~{~f ~}lineto~%~
-                         stroke~%~
-                         1 setlinewidth~%"
-		      (map-point (first line))
-		      (map-point (second line))))
-        (iter (for element in elements)
-              (if (atom (first element))
-                  (format s "% Point~%~
-                             newpath~%~
-                             ~{~f ~}3 0 360 arc closepath~%~
-                             fill~%"
-                          (map-point element))
-                  (format s "% Line~%~
-                             2 setlinewidth~%~
-                             newpath~%~
-                             ~{~f ~}moveto~%~
-                             ~{~f ~}lineto~%~
-                             stroke~%~
-                             1 setlinewidth~%"
-                          (map-point (first element))
-                          (map-point (second element)))))
-        (destructuring-bind (vertices triangles)
-            (shewchuk-triangle:mesh points resolution)
-          (let* ((vertices (eval-over-domain vertices fn))
-                 (segments (slice-mesh vertices triangles density)))
-            (iter (for segment in segments)
-                  (format s "newpath~%~
+  "FN gives a value between 0 and 1 for a given point.
+When FILE-OR-STREAM is a stream, no header / showpage is written."
+  (let* ((n (length points)) 
+         (lines (lines-from-points points)))
+    (labels ((map-point (p)
+               (list (+ (* (+ (first p) 1.0d0) 250) 50)
+                     (+ (* (+ (second p) 1.0d0) 250) 50)))
+             (writer (s)
+               (iter (for i from 0 below n)
+                     (for line in lines)
+                     (format s "% Segment: ~a~%" i)
+                     (format s "2 setlinewidth~%~
+                                newpath~%~
+                                ~{~f ~}moveto~%~
+                                ~{~f ~}lineto~%~
+                                stroke~%~
+                                1 setlinewidth~%"
+                             (map-point (first line))
+                             (map-point (second line))))
+               (iter (for element in elements)
+                     (if (atom (first element))
+                         (format s "% Point~%~
+                                    newpath~%~
+                                    ~{~f ~}3 0 360 arc closepath~%~
+                                    fill~%"
+                                 (map-point element))
+                         (format s "% Line~%~
+                                    2 setlinewidth~%~
+                                    newpath~%~
+                                    ~{~f ~}moveto~%~
+                                    ~{~f ~}lineto~%~
+                                    stroke~%~
+                                    1 setlinewidth~%"
+                                 (map-point (first element))
+                                 (map-point (second element)))))
+               (destructuring-bind (vertices triangles)
+                   (shewchuk-triangle:mesh points resolution)
+                 (let* ((vertices (eval-over-domain vertices fn))
+                        (segments (slice-mesh vertices triangles density)))
+                   (iter (for segment in segments)
+                         (format s "newpath~%~
                                      ~{~f ~}moveto~%~
                                      ~{~f ~}lineto~%~
                                      stroke~%"
-                          (map-point (cdr (first segment)))
-                          (map-point (cdr (second segment)))))
-            (format s "showpage~%")))))))
+                                 (map-point (cdr (first segment)))
+                                 (map-point (cdr (second segment)))))))))
+      (if (streamp file-or-stream)
+          (writer file-or-stream)
+          (with-open-file (s file-or-stream :direction :output :if-exists :supersede)
+            (format s "%!PS-Adobe-2.0~%")
+            (format s "%%BoundingBox: 0 0 600 600~%")
+            (writer s)
+            (format s "showpage~%"))))))
 
 (defun scale-to-unit (points)
   "Scale POINTS that it fits in [-1,1]x[-1x1]."
@@ -1034,3 +1043,193 @@ vertices I-1 and I, but here we use vertices I and I+1..."
   ;; (mirror-concave-corner ribbons 4)
   ;; (mirror-concave-corner ribbons 5)
   (concave-gregory-test ribbons "/tmp/pontok" "/tmp/felulet" "/tmp/ribbon"))
+
+
+;;; Concave Generalized Bezier patch
+
+(defun harmonic-coordinates (map points p)
+  (let ((l (harmonic:harmonic-coordinates map p)))
+    (when (member nil l)                ; kutykurutty
+      (setf l (mean-value-coordinates points p)))
+    l))
+
+(defun concave-generalized-bernstein (map points p side degree col row &key (use-d t))
+  (let* ((n (length points))
+         (l (harmonic-coordinates map points p))
+         (i side)
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (si (barycentric-s l i))
+         (si-1 (barycentric-s l i-1))
+         (si+1 (barycentric-s l i+1))
+         (di (barycentric-d l i))
+         (di-1 (barycentric-d l i-1))
+         (di+1 (barycentric-d l i+1))
+         (alpha (if use-d
+                    (if (< (+ di-1 di) *epsilon*)
+                        0.5
+                        (/ di-1 (+ di-1 di)))
+                    (if (< (+ si (- 1 si-1)) *epsilon*)
+                        0.5
+                        (/ si (+ si (- 1 si-1))))))
+         (beta (if use-d
+                   (if (< (+ di+1 di) *epsilon*)
+                       0.5
+                       (/ di+1 (+ di+1 di)))
+                   (if (< (+ (- 1 si) si+1) *epsilon*)
+                       0.5
+                       (/ (- 1 si) (+ (- 1 si) si+1)))))
+         (blend (* (bernstein degree row di)
+                   (bernstein degree col si)))
+         (mu (cond ((and (< row 2) (< col 2)) alpha)
+                   ((and (< row 2) (> col (- degree 2))) beta)
+                   ((or (< col row) (> col (- degree row))) 0)
+                   ((or (= col row) (= col (- degree row))) 1/2)
+                   (t 1))))
+    (* blend mu)))
+
+(defun concave-bezier-deficiency (map points p degree &key (use-d t))
+  (- 1 (iter (for side from 0 below (length points))
+             (sum (iter (for row from 0 below (ceiling degree 2))
+                        (sum (iter (for col from 0 to degree)
+                                   (sum (concave-generalized-bernstein
+                                         map points p side degree col row :use-d use-d)))))))))
+
+(defun write-concave-bernstein-blend-image (map points i fname degree
+                                            &key (use-d t) (resolution 0.001) (density 0.1))
+  (labels ((transform (p) (list (+ (* (first p) 250) 250) (- 500 (* (second p) 250))))
+           (write-poly (stream points msg)
+             (format stream "~{~f ~}moveto~%~{~{~f ~}lineto~%~}closepath stroke~%"
+                     (transform (first points)) (mapcar #'transform (rest points)))
+             (format stream "10 790 moveto (~a, interval between lines: ~a) show showpage~%"
+                     msg density)))
+    (setf points (append (subseq points i) (subseq points 0 i)))
+    (with-open-file (s fname :direction :output :if-exists :supersede)
+      (format s "%!PS~%/Times-Roman findfont 15 scalefont setfont~%")
+      (iter (for row from 0 below (ceiling degree 2))
+            (iter (for col from 0 to degree)
+                  (for cp-str = (format nil "Blend of control point (~a, ~a)" col row))
+                  (flet ((foo (p)
+                           (let ((b (concave-generalized-bernstein
+                                     map points p 1 degree col row :use-d use-d))
+                                 (bp (concave-generalized-bernstein
+                                      map points p 0 degree (- degree row) col :use-d use-d))
+                                 (bn (concave-generalized-bernstein
+                                      map points p 2 degree row (- degree col) :use-d use-d)))
+                             (+ b bp bn))))
+                    (sliced-concave-distance-function-test points #'foo s
+                                                           :resolution resolution :density density))
+                  (write-poly s points cp-str)))
+      (let ((cp-str "Blend of central control point"))
+        (flet ((foo (p)
+                 (let ((d (concave-bezier-deficiency map points p degree :use-d use-d)))
+                   (if (< (abs d) *epsilon*) 0 d))))
+          (sliced-concave-distance-function-test points #'foo s
+                                                 :resolution resolution :density density))
+        (write-poly s points cp-str)))))
+
+(defun write-concave-bernstein-blend-mesh (map points path degree &key (use-d t) (scaling 1))
+  (destructuring-bind (vertices triangles)
+      (shewchuk-triangle:mesh points *resolution*)
+    (iter (with n = (length points))
+          (for side from 0 below n)
+          (for side-1 = (mod (1- side) n))
+          (for side+1 = (mod (1+ side) n))
+          (iter (for row from 0 below (ceiling degree 2))
+                (iter (for col from 0 to degree)
+                      (for fname = (format nil "~a-deg~a-c~a~a~a.obj" path degree side col row))
+                      (flet ((foo (p)
+                               (let ((b (concave-generalized-bernstein
+                                         map points p side degree col row :use-d use-d))
+                                     (bp (concave-generalized-bernstein
+                                          map points p side-1 degree (- degree row) col
+                                          :use-d use-d))
+                                     (bn (concave-generalized-bernstein
+                                          map points p side+1 degree row (- degree col)
+                                          :use-d use-d)))
+                                 (* (+ b bp bn) scaling))))
+                        (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
+                                                triangles fname)))))
+    (let ((fname (format nil "~a-deg~a-center.obj" path degree)))
+      (with-open-file (s fname :direction :output :if-exists :supersede)
+        (flet ((foo (p)
+                 (let ((d (concave-bezier-deficiency map points p degree :use-d use-d)))
+                   (* (if (< (abs d) *epsilon*) 0 d) scaling))))
+          (write-obj-indexed-mesh (eval-over-domain vertices #'foo) triangles fname))))))
+
+(defun concave-generalized-bezier-eval (map points p degree ribbons center &key (use-d t))
+  (let ((n (length points))
+        (result '(0 0 0)))
+    (iter (for side from 0 below n)
+          (iter (for row from 0 below (ceiling degree 2))
+                (iter (for col from 0 to degree)
+                      (setf result
+                            (v+ result
+                                (v* (elt (elt (elt ribbons side) row) col)
+                                    (concave-generalized-bernstein
+                                     map points p side degree col row :use-d use-d)))))))
+    (v+ result
+        (v* center
+            (concave-bezier-deficiency map points p degree :use-d use-d)))))
+
+(defun unify-concave-corner (ribbons i)
+  "Destructively modifies RIBBONS."
+  (let* ((n (length ribbons))
+         (i-1 (mod (1- i) n)))
+    (macrolet ((p (i j k) `(elt (elt (elt ribbons ,i) ,k) ,j)))
+      (let* ((q1 (v+ (p i-1 3 1) (v- (p i-1 3 1) (p i-1 2 1))))
+             (q2 (v+ (p i 0 1) (v- (p i 0 1) (p i 1 1))))
+             (q (affine-combine q1 1/2 q2)))
+        (setf (p i-1 3 1) q
+              (p i 0 1) q)))))
+
+(defun generalized-bezier-generate-center (ribbons)
+  (let ((result '(0 0 0)))
+    (dolist (r ribbons)
+      (setf result (v+ result (elt (second r) 1) (elt (second r) 2))))
+    (v* result (/ (* 2 (length ribbons))))))
+
+(defun concave-generalized-bezier-test (input-file concave output-file)
+  "CONCAVE is a list of concave vertex indices."
+  (let ((ribbons (load-ribbons input-file)))
+    (dolist (i concave)
+      (mirror-concave-corner ribbons i)
+      (unify-concave-corner ribbons i))
+    (let ((domain (domain-from-ribbons-angular-concave ribbons))
+          (center (generalized-bezier-generate-center ribbons)))
+      (write-bezier-ribbon-control-points ribbons "/tmp/ribbons.obj" :center center)
+      (write-domain-ribbons domain '() "/tmp/domain.ps")
+      (harmonic:with-harmonic-coordinates (map domain)
+        (destructuring-bind (vertices triangles)
+            (shewchuk-triangle:mesh domain *resolution*)
+          (flet ((foo (p) (concave-generalized-bezier-eval map domain p 3 ribbons center)))
+            (write-obj-indexed-mesh (map 'vector #'foo vertices) triangles output-file)))))))
+
+#+nil
+(let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBConvex1.gbp"))            ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBTest4_Cubic.gbp"))        ; 5
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBUTest2_Cubic.gbp"))       ; 2 3
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "6sided.gbp"))               ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Plane.gbp"))    ; 4 5
+       (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Cylinder.gbp")) ; 4 5
+       (ribbons (load-ribbons gbp)))
+  (mirror-concave-corner ribbons 4)
+  (mirror-concave-corner ribbons 5)
+  (let ((*resolution* 2)
+        (domain (domain-from-ribbons-angular-concave ribbons)))
+    (harmonic:with-harmonic-coordinates (harmonic-map domain :levels 10)
+      #+nil(write-concave-bernstein-blend-image DO NOT USE - FREEZES THE SYSTEM
+            harmonic-map domain 0 "/tmp/proba.ps" 3 :resolution 0.0001 :density 0.1)
+      (write-concave-bernstein-blend-mesh harmonic-map domain "/tmp/U" 3 :scaling 100))))
+
+#+nil
+(let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBConvex1.gbp"))            ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBTest4_Cubic.gbp"))        ; 5
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "GBUTest2_Cubic.gbp"))       ; 2 3
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "6sided.gbp"))               ; -
+       ;; (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Plane.gbp"))    ; 4 5
+       (gbp (format nil "~a~a~a" *dropbox* tests "ConcaveTest_Cylinder.gbp")) ; 4 5
+       (*resolution* 2))
+  (concave-generalized-bezier-test gbp '(4 5) "/tmp/felulet.obj"))
