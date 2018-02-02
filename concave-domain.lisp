@@ -1222,17 +1222,6 @@ Assumes that matter is always on the left side of the edges in the domain."
                     (when (> alpha angle-tolerance)
                       (format t "Error: ~5f	side: ~a	u: ~5f~%" alpha i u))))))))
 
-(defvar *barycentric-dilation* 0)
-
-(defun barycentric-d-1minus (l i)
-  (let* ((n (length l))
-         (i-2 (mod (- i 2) n))
-         (i-1 (mod (- i 1) n))
-         (i+1 (mod (+ i 1) n)))
-    (* (- 1 (elt l i-1) (elt l i))
-       (- 1 (* (elt l i-2) (elt l i+1)
-               *barycentric-dilation*)))))
-
 #+nil
 (defun harmonic-coordinates (map points p)
   "Mean value (!) coordinates - for testing."
