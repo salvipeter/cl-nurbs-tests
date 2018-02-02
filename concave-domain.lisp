@@ -1179,8 +1179,9 @@ Blending functions near these vertices are computed separately."
     (let ((domain (domain-from-ribbons-angular-concave ribbons))
           (center (generalized-bezier-generate-center ribbons)))
       (write-bezier-ribbon-control-points ribbons "/tmp/ribbons.obj" :center center)
-      (let ((*resolution* 30))
-        (write-ribbon-surfaces ribbons "/tmp"))
+      (export-cgb-ribbons ribbons center "/tmp/ribbons.cgb")
+      ;; (let ((*resolution* 30))
+      ;;   (write-ribbon-surfaces ribbons "/tmp"))
       (write-domain-ribbons domain '() "/tmp/domain.ps")
       (harmonic:with-harmonic-coordinates (hmap domain :levels 9)
         (destructuring-bind (vertices triangles)
@@ -1221,6 +1222,14 @@ Assumes that matter is always on the left side of the edges in the domain."
                     (for alpha = (* (acos (scalar-product normal approx-normal)) (/ 180 pi)))
                     (when (> alpha angle-tolerance)
                       (format t "Error: ~5f	side: ~a	u: ~5f~%" alpha i u))))))))
+
+(defun export-cgb-ribbons (ribbons center filename)
+  (with-open-file (s filename :direction :output :if-exists :supersede)
+    (format s "~a~%~{~f~^ ~}~%~{~{~a ~a~%~{~{~{~f~^ ~}~%~}~}~}~}"
+            (length ribbons) center
+            (mapcar (lambda (r)
+                      (list (1- (length (first r))) (length r) r))
+                    ribbons))))
 
 #+nil
 (defun harmonic-coordinates (map points p)
