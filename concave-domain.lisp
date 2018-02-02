@@ -1133,19 +1133,20 @@ Blending functions near these vertices are computed separately."
           (write-obj-indexed-mesh (eval-over-domain vertices #'foo) triangles fname))))))
 
 (defun concave-generalized-bezier-eval (map points p degree ribbons center &key (use-d t))
+  (declare (ignore center))
   (let ((n (length points))
-        (result '(0 0 0)))
+        (result '(0 0 0))
+        (wsum 0))
     (iter (for side from 0 below n)
           (iter (for row from 0 below (ceiling degree 2))
                 (iter (for col from 0 to degree)
-                      (setf result
-                            (v+ result
-                                (v* (elt (elt (elt ribbons side) row) col)
-                                    (concave-generalized-bernstein
-                                     map points p side degree col row :use-d use-d)))))))
-    (v+ result
-        (v* center
-            (concave-bezier-deficiency map points p degree :use-d use-d)))))
+                      (for weight = (concave-generalized-bernstein
+                                     map points p side degree col row :use-d use-d))
+                      (setf wsum (+ wsum weight)
+                            result (v+ result
+                                       (v* (elt (elt (elt ribbons side) row) col) weight))))))
+    (v* result (/ wsum))
+    #+nil(v+ result (v* center (- 1 wsum)))))
 
 (defun unify-concave-corner (ribbons i)
   "Destructively modifies RIBBONS."
