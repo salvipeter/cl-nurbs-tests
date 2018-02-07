@@ -472,11 +472,11 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
               ;; Parallel
               (cond ((and (< (scalar-product v1 v2) 0) (>= (scalar-product v1 d) 0))
                      (vlength d))
-                    ((and (> (scalar-product v1 v2) 0) (< (scalar-product v1 (v+ d v1)) 0))
+                    ((and (> (scalar-product v1 v2) 0) (<= (scalar-product v1 (v+ d v1)) 0))
                      (vlength (v+ d v1)))
                     ((and (> (scalar-product v1 v2) 0) (>= (scalar-product v1 (v- d v2)) 0))
                      (vlength (v- d v2)))
-                    ((and (< (scalar-product v1 v2) 0) (< (scalar-product v1 (v+ d (v- v1 v2))) 0))
+                    ((and (< (scalar-product v1 v2) 0) (<= (scalar-product v1 (v+ d (v- v1 v2))) 0))
                      (vlength (v+ d (v- v1 v2))))
                     (t (abs (scalar-product (normal v1) d))))
               ;; Not parallel
