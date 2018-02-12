@@ -1391,6 +1391,29 @@ Assumes that matter is always on the left side of the edges in the domain."
         (write-bezier-ribbon-control-points ribbons (format nil "~a~a" path ".obj") :center center)
         (export-cgb-ribbons ribbons center (format nil "~a~a" path ".cgb"))))))
 
+(defun read-cgb-ribbons (filename)
+  "Returns (RIBBONS CENTER)."
+  (with-open-file (s filename)
+    (read s)
+    (read s)
+    (read s)
+    (flet ((read-point (s)
+             (let* ((x (read s))
+                    (y (read s))
+                    (z (read s)))
+               (list x y z))))
+      (let* ((n (read s))
+             (center (read-point s)))
+        (list (iter (for i from 0 below n)
+                    (for d = (read s))
+                    (for l = (read s))
+                    (collect
+                        (iter (for k from 0 below l)
+                              (collect
+                                  (iter (for j from 0 to d)
+                                        (collect (read-point s)))))))
+              center)))))
+
 #+nil
 (defun harmonic-coordinates (map points p)
   "Mean value (!) coordinates - for testing."
