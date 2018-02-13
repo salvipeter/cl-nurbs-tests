@@ -1236,44 +1236,47 @@ vertices I-1 and I, but here we use vertices I and I+1..."
                                    (sum (concave-generalized-bernstein
                                          map points p side degree col row :use-d use-d)))))))))
 
-(defun write-concave-bernstein-blend-mesh (map points path degree concave
-                                           &key (use-d t) (scaling 1))
-  "CONCAVE is a list of concave vertex indices.
-Blending functions near these vertices are computed separately."
+(defun write-concave-bernstein-blend-mesh (map points path degree
+                                           &key (use-d t) (scaling 1) only-center)
   (destructuring-bind (vertices triangles)
       (shewchuk-triangle:mesh points *resolution*)
-    (iter (with n = (length points))
-          (with half = (ceiling degree 2))
-          (for side from 0 below n)
-          (for side-1 = (mod (1- side) n))
-          (for side+1 = (mod (1+ side) n))
-          (iter (for row from 0 below half)
-                (iter (for col from 0 to degree)
-                      (for fname = (format nil "~a-deg~a-c~a~a~a.obj" path degree side col row))
-                      (flet ((foo (p)
-                               (let ((b (concave-generalized-bernstein
-                                         map points p side degree col row :use-d use-d))
-                                     (bp (concave-generalized-bernstein
-                                          map points p side-1 degree (- degree row) col
-                                          :use-d use-d))
-                                     (bn (concave-generalized-bernstein
-                                          map points p side+1 degree row (- degree col)
-                                          :use-d use-d)))
-                                 (if (or (and (< col half) (member side concave))
-                                         (and (>= col half) (member side+1 concave)))
-                                     (* b scaling)
-                                     (* (+ b bp bn) scaling)))))
-                        (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
-                                                triangles fname)))))
-    (let ((fname (format nil "~a-deg~a-center.obj" path degree)))
-      (with-open-file (s fname :direction :output :if-exists :supersede)
-        (flet ((foo (p)
-                 (let ((d (concave-bezier-deficiency map points p degree :use-d use-d)))
-                   (* (if (< (abs d) *epsilon*) 0 d) scaling))))
-          (write-obj-indexed-mesh (eval-over-domain vertices #'foo) triangles fname))))))
+    (let* ((n (length points))
+           (ribbons (iter (repeat n)
+                          (collect (list (list (list 0) (list 0) (list 0) (list 0))
+                                         (list (list 0) (list 0) (list 0) (list 0)))))))
+      (unless only-center
+        (iter (with half = (ceiling degree 2))
+              (for side from 0 below n)
+              (iter (for row from 0 below half)
+                    (iter (for col from 0 to degree)
+                          (for fname = (format nil "~a-deg~a-c~a~a~a.obj" path degree side col row))
+                          (setf (elt (elt (elt (elt ribbons side) row) col) 0) 1)
+                          (flet ((foo (p)
+                                   (* (first (concave-generalized-bezier-eval
+                                              map points p 3 ribbons '(0) :use-d use-d))
+                                      scaling)))
+                            (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
+                                                    triangles fname))
+                          (setf (elt (elt (elt (elt ribbons side) row) col) 0) 0)))))
+      (let ((fname (format nil "~a-deg~a-center.obj" path degree)))
+        (with-open-file (s fname :direction :output :if-exists :supersede)
+          (flet ((foo (p)
+                   (* (first (concave-generalized-bezier-eval
+                              map points p 3 ribbons '(1) :use-d use-d))
+                      scaling)))
+            (write-obj-indexed-mesh (eval-over-domain vertices #'foo) triangles fname)))))))
+
+(defun gb-center-blend (map points p)
+  (let ((n (length points))
+        (l (harmonic-coordinates map points p))
+        (result 1))
+    (iter (for i from 0 below n)
+          (for d = (barycentric-d l i))
+          (setf result (* result d d)))
+    (* result n)))
 
 (defun concave-generalized-bezier-eval (map points p degree ribbons center &key (use-d t))
-  (declare (ignore center))
+  #+nil(declare (ignore center))
   (let ((n (length points))
         (result '(0 0 0))
         (wsum 0))
@@ -1285,7 +1288,10 @@ Blending functions near these vertices are computed separately."
                       (setf wsum (+ wsum weight)
                             result (v+ result
                                        (v* (elt (elt (elt ribbons side) row) col) weight))))))
-    (v* result (/ wsum))
+    (let ((center-blend (gb-center-blend map points p)))
+      (setf result (v+ result (v* center center-blend)))
+      (v* result (/ (+ wsum center-blend))))
+    #+nil(v* result (/ wsum))
     #+nil(v+ result (v* center (- 1 wsum)))))
 
 (defun unify-concave-corner (ribbons i)
@@ -1457,10 +1463,10 @@ Assumes that matter is always on the left side of the edges in the domain."
        (ribbons (load-ribbons gbp)))
   (mirror-concave-corner ribbons 4)
   (mirror-concave-corner ribbons 5)
-  (let ((*resolution* 1)
+  (let ((*resolution* 0.001)
         (domain (domain-from-ribbons-angular-concave ribbons)))
     (harmonic:with-harmonic-coordinates (harmonic-map domain :levels 10)
-      (write-concave-bernstein-blend-mesh harmonic-map domain "/tmp/U" 3 '(4 5) :scaling 100))))
+      (write-concave-bernstein-blend-mesh harmonic-map domain "/tmp/U" 3 :only-center nil))))
 
 #+nil
 (let* ((tests "/Shares/GrafGeo/Polar/bezier-ribbon/")
