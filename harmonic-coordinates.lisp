@@ -14,7 +14,7 @@
 (load-foreign-library 'harmonic-lib)
 
 (defcfun harmonic-init :pointer
-  (size :unsigned-int) (points :pointer) (levels :unsigned-int) (epsilon :double))
+  (size :unsigned-int) (points :pointer) (levels :unsigned-int) (epsilon :double) (biharmonic :int))
 (defcfun harmonic-free :void
   (map :pointer))
 (defcfun harmonic-write-ppm :void
@@ -25,15 +25,16 @@
 (defun list->double-array (lst)
   (foreign-alloc :double :initial-contents (mapcar (lambda (x) (float x 1d0)) lst)))
 
-(defun make-harmonic-coordinates (points levels epsilon)
+(defun make-harmonic-coordinates (points levels epsilon biharmonicp)
   "Returns a list of harmonic maps, one for each vertex."
   (let ((n (length points))
-        (arr (list->double-array (loop for p in points appending (append p '(0d0))))))
+        (arr (list->double-array (loop for p in points appending (append p '(0d0)))))
+        (bh (if biharmonicp 1 0)))
     (unwind-protect
          (loop for i from 0 below n collect
               (prog2
                   (setf (mem-aref arr :double (+ (* 3 i) 2)) 1d0)
-                  (harmonic-init n arr levels epsilon)
+                  (harmonic-init n arr levels epsilon bh)
                 (setf (mem-aref arr :double (+ (* 3 i) 2)) 0d0)))
       (foreign-free arr))))
 
@@ -53,8 +54,9 @@
       (foreign-free result)
       (foreign-free p-arr))))
 
-(defmacro with-harmonic-coordinates ((var points &key (levels 9) (epsilon 1d-5)) &body body)
-  `(let ((,var (make-harmonic-coordinates ,points ,levels ,epsilon)))
+(defmacro with-harmonic-coordinates ((var points &key (levels 9) (epsilon 1d-5) biharmonicp)
+                                     &body body)
+  `(let ((,var (make-harmonic-coordinates ,points ,levels ,epsilon ,biharmonicp)))
      (unwind-protect (progn ,@body)
        (free-harmonic-coordinates ,var))))
 
