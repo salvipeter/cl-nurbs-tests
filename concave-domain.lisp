@@ -1533,3 +1533,14 @@ Assumes that matter is always on the left side of the edges in the domain."
       (dolist (method '(equal original new))
         (write-domain-ribbons (domain-from-ribbons-angular-concave r method) '()
                               (format nil "/tmp/~a-~(~a~).ps" name method))))))
+
+;;; Nice artwork "Abyss"
+#+nil
+(let ((points (points-from-angles (uniform-angles 5)))
+      (*barycentric-type* 'wachspress))
+  (flet ((fn (p)
+           (let ((l (barycentric-coordinates points p)))
+             (barycentric-s l 0))))
+    (sliced-concave-distance-function-test '((-4 -4) (-4 4) (4 4) (4 -4))
+                                           #'fn "/tmp/proba.ps"
+                                           :resolution 0.0005 :density 0.1d0)))
