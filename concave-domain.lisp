@@ -428,6 +428,13 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
            (angle-multiplier (/ target sum)))
       (mapcar (lambda (x) (flip (* (flip x) angle-multiplier))) angles))))
 
+(defun normalize-angles-equally (angles)
+  (flet ((flip (a) (- pi a)))
+    (let* ((target (* (- (length angles) 2) pi))
+           (sum (reduce #'+ (mapcar (lambda (x) (flip x)) angles)))
+           (delta (/ (- target sum) (length angles))))
+      (mapcar (lambda (x) (flip (+ (flip x) delta))) angles))))
+
 (defun normalize-domain (points)
   (let* ((min (reduce (lambda (a b) (mapcar #'min a b)) points))
          (max (reduce (lambda (a b) (mapcar #'max a b)) points))
@@ -555,7 +562,7 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
 ;;; (segment-segment-distance-test 100 100 1 nil)
 ;;; (segment-segment-distance-test 100 100 1 t)
 
-(defun domain-valid-p (points &optional (minimum-distance 0.3))
+(defun domain-valid-p (points &optional (minimum-distance 0.2))
   (let ((n (length points))
         (lines (lines-from-points points)))
     (iter (for i from 0 below (- n 2))
@@ -566,7 +573,7 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                   (return-from domain-valid-p nil))))
     t))
 
-(defun domain-from-ribbons-angular-concave (ribbons)
+(defun domain-from-ribbons-angular-concave (ribbons &optional method)
   (flet ((angle (r1 r2)
            (let* ((d1 (vnormalize (bezier (first r1) 1 1)))
                   (d2 (vnormalize (bezier (first r2) 0 1)))
@@ -577,8 +584,12 @@ ALPHA is used in the U direction of ribbon I-1, BETA in the -U direction of ribb
                  (- result)))))
     (let ((ribbon-angles (mapcar #'angle ribbons (append (rest ribbons) (list (first ribbons)))))
           (lengths (mapcar #'bezier-arc-length (mapcar #'first ribbons))))
-      (iter (for angles first (or (normalize-smaller-angles ribbon-angles)
-                                  (normalize-inner-angles ribbon-angles))
+      (iter (for angles first (ecase method
+                                ((nil) (or (normalize-smaller-angles ribbon-angles)
+                                           (normalize-inner-angles ribbon-angles)))
+                                (equal (normalize-angles-equally ribbon-angles))
+                                (original (normalize-inner-angles ribbon-angles))
+                                (new (normalize-smaller-angles ribbon-angles)))
                  then (enlarge-domain-angles angles))
             (for domain = (generate-angle-length-domain angles lengths))
             (while (not (domain-valid-p domain)))
@@ -1227,10 +1238,8 @@ vertices I-1 and I, but here we use vertices I and I+1..."
                          (/ (sqr (- 1 si)) (+ (sqr (- 1 si)) (sqr si+1))))))
            (blend (* (bernstein degree row di)
                      (bernstein degree col si)))
-           (mu (cond ((and (< row 2) (< col 2)) alpha)
-                     ((and (< row 2) (> col (- degree 2))) beta)
-                     ((or (< col row) (> col (- degree row))) 0)
-                     ((or (= col row) (= col (- degree row))) 1/2)
+           (mu (cond ((< col 2) alpha)
+                     ((> col (- degree 2)) beta)
                      (t 1))))
       (* blend mu))))
 
@@ -1476,9 +1485,9 @@ Assumes that matter is always on the left side of the edges in the domain."
       (points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6)))) ; U
   (let ((points (scale-to-unit points))
         (*barycentric-d-function* #'barycentric-d-1minus)
-        (*barycentric-dilation* 2))
-    (harmonic:with-harmonic-coordinates (h points :levels 10)
-      (flet ((fn (p) (barycentric-d (harmonic-coordinates h points p) 5)))
+        (*barycentric-dilation* 0))
+    (harmonic:with-harmonic-coordinates (h points :levels 10 :biharmonicp t)
+      (flet ((fn (p) (barycentric-d (harmonic-coordinates h points p) 4)))
         (sliced-concave-distance-function-test points #'fn "/tmp/proba.ps"
                                                :resolution 0.0001 :density 0.1d0)))))
 
@@ -1516,3 +1525,11 @@ Assumes that matter is always on the left side of the edges in the domain."
 ;; (convert-gbp-to-cgb '("GBTest4_Cubic" 5))
 ;; (convert-gbp-to-cgb '("ConcaveFromSquare_V31" 1 4))
 ;; (convert-gbp-to-cgb '("ConcaveFromSquare_V11" 1 6)
+
+#+nil
+(let ((dir "/home/salvi/Downloads"))
+  (dolist (name '("Nyakkendo_V1"))
+    (let ((r (first (read-cgb-ribbons (format nil "~a/~a.cgb" dir name)))))
+      (dolist (method '(equal original new))
+        (write-domain-ribbons (domain-from-ribbons-angular-concave r method) '()
+                              (format nil "/tmp/~a-~(~a~).ps" name method))))))
