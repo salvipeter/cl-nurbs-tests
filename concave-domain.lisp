@@ -1459,6 +1459,35 @@ Assumes that matter is always on the left side of the edges in the domain."
                                         (collect (read-point s)))))))
               center)))))
 
+(defun cgb-to-eps (filename)
+  (let ((ribbons (first (read-cgb-ribbons (format nil "~a.cgb" filename))))
+        (outfile (format nil "~a.eps" filename)))
+    (with-open-file (s outfile :direction :output :if-exists :supersede)
+      (flet ((scale (p) (v+ (v* p 2.5) '(300 300))))
+        (format s "%!PS-Adobe-2.0~%")
+        (format s "%%BoundingBox: 0 0 600 600~%")
+        (dolist (ribbon ribbons)
+          (let ((n (length (first ribbon)))
+                (m (length ribbon)))
+            (dotimes (i n)
+              (dotimes (j m)
+                (unless (zerop i)
+                  (format s "newpath~%~{~f ~}moveto~%~{~f ~}lineto~%stroke~%"
+                          (scale (elt (elt ribbon j) i))
+                          (scale (elt (elt ribbon j) (1- i)))))
+                (unless (zerop j)
+                  (format s "newpath~%~{~f ~}moveto~%~{~f ~}lineto~%stroke~%"
+                          (scale (elt (elt ribbon j) i))
+                          (scale (elt (elt ribbon (1- j)) i))))))))
+        (dolist (ribbon ribbons)
+          (dolist (row ribbon)
+            (dolist (p row)
+              (format s "~{~f ~}3 0 360 arc fill~%" (scale p)))))
+        (format s "showpage~%")))))
+
+#+nil
+(cgb-to-eps "/home/salvi/Dropbox/Shares/GrafGeo/spatch/LU-2d/3/Upatch_V2")
+
 #+nil
 (defun harmonic-coordinates (map points p)
   "Mean value (!) coordinates - for testing."
