@@ -1580,3 +1580,54 @@ Assumes that matter is always on the left side of the edges in the domain."
     (sliced-concave-distance-function-test '((-4 -4) (-4 4) (4 4) (4 -4))
                                            #'fn "/tmp/proba.ps"
                                            :resolution 0.0005 :density 0.1d0)))
+
+
+
+(defun simpler-blend (d i)
+  (let* ((n (length d))
+         (i-1 (mod (1- i) n))
+         (i+1 (mod (1+ i) n))
+         (m (* (expt (elt d i-1) 2) (expt (elt d i+1) 2))))
+    (* (hermite-blend-function 'point 'start (elt d i))
+       (/ m (+ m (expt (elt d i) 2))))))
+
+(defun simpler-ribbon-blend (d i)
+  (cond ((notany (lambda (x) (< (abs x) *tiny*)) d) (simpler-blend d i))
+	((< (elt d i) *tiny*)
+	 (if (= (length (remove-if-not (lambda (di) (< di *tiny*)) d)) 1)
+	     1.0d0
+	     0.5d0))
+	(t 0.0d0)))
+
+(defun harmonic-simpler (map points i)
+  (lambda (p)
+    (let ((l (harmonic:harmonic-coordinates map p)))
+      (when (member nil l)              ; kutykurutty
+        (setf l (mean-value-coordinates points p)))
+      (let ((d (iter (with n = (length l))
+                     (for i from 0 below n)
+                     (for i-1 = (mod (1- i) n))
+                     (collect (- 1 (elt l i-1) (elt l i))))))
+        (simpler-ribbon-blend d i)))))
+
+#+nil
+(let* ((points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))) ; U
+       (points (scale-to-unit points)))
+  (destructuring-bind (vertices triangles)
+      (shewchuk-triangle:mesh points 0.0001)
+    (harmonic:with-harmonic-coordinates (h points :levels 10)
+      (flet ((foo (p) (+ (funcall (harmonic-simpler h points 1) p)
+                         (funcall (harmonic-simpler h points 2) p))))
+        (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
+                                triangles "/tmp/proba.obj")))))
+
+#+nil
+(let* ((points '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))) ; U
+       (points (scale-to-unit points)))
+  (destructuring-bind (vertices triangles)
+      (shewchuk-triangle:mesh points 0.0001)
+    (harmonic:with-harmonic-coordinates (h points :levels 10)
+      (flet ((foo (p) (+ (funcall (harmonic-kato h points 1) p)
+                         (funcall (harmonic-kato h points 2) p))))
+        (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
+                                triangles "/tmp/proba2.obj")))))
