@@ -3,9 +3,12 @@
 (defpackage :harmonic
   (:use :common-lisp :cffi)
   (:export :make-harmonic-coordinates
+           :make-harmonic-sd-coordinates
            :free-harmonic-coordinates
            :with-harmonic-coordinates
-           :harmonic-coordinates))
+           :with-harmonic-sd-coordinates
+           :harmonic-coordinates
+           :harmonic-sd-coordinates))
 
 (in-package :harmonic)
 
@@ -13,8 +16,14 @@
   (t "/home/salvi/project/rust/harmonic/target/libharmonic.so"))
 (load-foreign-library 'harmonic-lib)
 
-(defcfun harmonic-init :pointer
-  (size :unsigned-int) (points :pointer) (levels :unsigned-int) (epsilon :double) (biharmonic :int))
+(defcfun harmonic-create :pointer
+  (min :pointer) (max :pointer) (levels :unsigned-int))
+(defcfun harmonic-add-point :void
+  (map :pointer) (point :pointer))
+(defcfun harmonic-add-line :void
+  (map :pointer) (from :pointer) (to :pointer))
+(defcfun harmonic-solve :void
+  (map :pointer) (epsilon :double) (biharmonic :int))
 (defcfun harmonic-free :void
   (map :pointer))
 (defcfun harmonic-write-ppm :void
@@ -25,18 +34,72 @@
 (defun list->double-array (lst)
   (foreign-alloc :double :initial-contents (mapcar (lambda (x) (float x 1d0)) lst)))
 
+(defun bounding-box (points)
+  (list (reduce (lambda (p q) (mapcar #'min p q)) points)
+        (reduce (lambda (p q) (mapcar #'max p q)) points)))
+
+(defun make-harmonic (points levels)
+  (let ((bbox (mapcar #'list->double-array (bounding-box points))))
+    (unwind-protect
+         (harmonic-create (first bbox) (second bbox) levels)
+      (mapcar #'foreign-free bbox))))
+
 (defun make-harmonic-coordinates (points levels epsilon biharmonicp)
   "Returns a list of harmonic maps, one for each vertex."
-  (let ((n (length points))
-        (arr (list->double-array (loop for p in points appending (append p '(0d0)))))
-        (bh (if biharmonicp 1 0)))
-    (unwind-protect
-         (loop for i from 0 below n collect
-              (prog2
-                  (setf (mem-aref arr :double (+ (* 3 i) 2)) 1d0)
-                  (harmonic-init n arr levels epsilon bh)
-                (setf (mem-aref arr :double (+ (* 3 i) 2)) 0d0)))
-      (foreign-free arr))))
+  (let* ((n (length points))
+         (bh (if biharmonicp 1 0)))
+    (loop for i from 0 below n collect
+         (let ((m (make-harmonic points levels)))
+           (dotimes (j n)
+             (let* ((j+1 (mod (1+ j) n))
+                    (from (list->double-array (append (elt points j) (if (= j i) '(1) '(0)))))
+                    (to (list->double-array (append (elt points j+1) (if (= j+1 i) '(1) '(0))))))
+               (unwind-protect
+                    (harmonic-add-line m from to)
+                 (foreign-free from)
+                 (foreign-free to))))
+           (harmonic-solve m epsilon bh)
+           m))))
+
+(defun make-harmonic-sd-coordinates (points levels epsilon biharmonicp)
+  "Returns a list of harmonic maps, one for each vertex."
+  (let* ((n (length points))
+         (bh (if biharmonicp 1 0)))
+    (loop for i from 0 below n append
+         (list
+          (let* ((m (make-harmonic points levels))
+                 (i-2 (mod (- i 2) n))
+                 (i-1 (mod (1- i) n))
+                 (i+1 (mod (1+ i) n))
+                 (p-2 (list->double-array (append (elt points i-2) '(0))))
+                 (p-1 (list->double-array (append (elt points i-1) '(0))))
+                 (p   (list->double-array (append (elt points i  ) '(1))))
+                 (p+1 (list->double-array (append (elt points i+1) '(1)))))
+            (unwind-protect
+                 (progn
+                   (harmonic-add-line m p-2 p-1)
+                   (harmonic-add-line m p-1 p  )
+                   (harmonic-add-line m p   p+1))
+              (foreign-free p-2)
+              (foreign-free p-1)
+              (foreign-free p  )
+              (foreign-free p+1))
+            (harmonic-solve m epsilon bh)
+            m)
+          (let ((m (make-harmonic points levels))
+                (i-1 (mod (1- i) n)))
+            (dotimes (j n)
+              (let* ((j+1 (mod (1+ j) n))
+                     (from (list->double-array (append (elt points j)
+                                                       (if (or (= j i-1) (= j i)) '(0) '(1)))))
+                     (to (list->double-array (append (elt points j+1)
+                                                     (if (or (= j+1 i-1) (= j+1 i)) '(0) '(1))))))
+                (unwind-protect
+                     (harmonic-add-line m from to)
+                  (foreign-free from)
+                  (foreign-free to))))
+            (harmonic-solve m epsilon bh)
+            m)))))
 
 (defun free-harmonic-coordinates (maps)
   (when maps
@@ -54,9 +117,20 @@
       (foreign-free result)
       (foreign-free p-arr))))
 
+(defun harmonic-sd-coordinates (maps p)
+  (let ((h (harmonic-coordinates maps p)))
+    (loop for i from 0 below (length h) by 2 collect
+         (list (elt h i) (elt h (1+ i))))))
+
 (defmacro with-harmonic-coordinates ((var points &key (levels 9) (epsilon 1d-5) biharmonicp)
                                      &body body)
   `(let ((,var (make-harmonic-coordinates ,points ,levels ,epsilon ,biharmonicp)))
+     (unwind-protect (progn ,@body)
+       (free-harmonic-coordinates ,var))))
+
+(defmacro with-harmonic-sd-coordinates ((var points &key (levels 9) (epsilon 1d-5) biharmonicp)
+                                        &body body)
+  `(let ((,var (make-harmonic-sd-coordinates ,points ,levels ,epsilon ,biharmonicp)))
      (unwind-protect (progn ,@body)
        (free-harmonic-coordinates ,var))))
 
