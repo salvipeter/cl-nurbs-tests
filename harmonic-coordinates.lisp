@@ -8,7 +8,8 @@
            :with-harmonic-coordinates
            :with-harmonic-sd-coordinates
            :harmonic-coordinates
-           :harmonic-sd-coordinates))
+           :harmonic-sd-coordinates
+           :*linear-constraint*))
 
 (in-package :harmonic)
 
@@ -31,6 +32,8 @@
 (defcfun harmonic-eval :int
   (map :pointer) (point :pointer) (value :pointer))
 
+(defvar *linear-constraint* t)
+
 (defun list->double-array (lst)
   (foreign-alloc :double :initial-contents (mapcar (lambda (x) (float x 1d0)) lst)))
 
@@ -50,14 +53,20 @@
          (bh (if biharmonicp 1 0)))
     (loop for i from 0 below n collect
          (let ((m (make-harmonic points levels)))
-           (dotimes (j n)
-             (let* ((j+1 (mod (1+ j) n))
-                    (from (list->double-array (append (elt points j) (if (= j i) '(1) '(0)))))
-                    (to (list->double-array (append (elt points j+1) (if (= j+1 i) '(1) '(0))))))
+           (unless *linear-constraint*
+             (let ((p (list->double-array (append (elt points i) '(1)))))
                (unwind-protect
-                    (harmonic-add-line m from to)
-                 (foreign-free from)
-                 (foreign-free to))))
+                    (harmonic-add-point m p)
+                 (foreign-free p))))
+           (dotimes (j n)
+             (let ((j+1 (mod (1+ j) n)))
+               (unless (and (not *linear-constraint*) (or (= j i) (= j+1 i)))
+                 (let ((from (list->double-array (append (elt points j) (if (= j i) '(1) '(0)))))
+                       (to (list->double-array (append (elt points j+1) (if (= j+1 i) '(1) '(0))))))
+                   (unwind-protect
+                        (harmonic-add-line m from to)
+                     (foreign-free from)
+                     (foreign-free to))))))
            (harmonic-solve m epsilon bh)
            m))))
 
@@ -89,15 +98,16 @@
           (let ((m (make-harmonic points levels))
                 (i-1 (mod (1- i) n)))
             (dotimes (j n)
-              (let* ((j+1 (mod (1+ j) n))
-                     (from (list->double-array (append (elt points j)
-                                                       (if (or (= j i-1) (= j i)) '(0) '(1)))))
-                     (to (list->double-array (append (elt points j+1)
-                                                     (if (or (= j+1 i-1) (= j+1 i)) '(0) '(1))))))
-                (unwind-protect
-                     (harmonic-add-line m from to)
-                  (foreign-free from)
-                  (foreign-free to))))
+              (let ((j+1 (mod (1+ j) n)))
+                (unless (and (not *linear-constraint*) (or (= j+1 i-1) (= j i)))
+                  (let ((from (list->double-array
+                               (append (elt points j) (if (or (= j i-1) (= j i)) '(0) '(1)))))
+                        (to (list->double-array
+                             (append (elt points j+1) (if (or (= j+1 i-1) (= j+1 i)) '(0) '(1))))))
+                    (unwind-protect
+                         (harmonic-add-line m from to)
+                      (foreign-free from)
+                      (foreign-free to))))))
             (harmonic-solve m epsilon bh)
             m)))))
 
