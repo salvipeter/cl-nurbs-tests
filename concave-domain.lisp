@@ -1631,3 +1631,19 @@ Assumes that matter is always on the left side of the edges in the domain."
                          (funcall (harmonic-kato h points 2) p))))
         (write-obj-indexed-mesh (eval-over-domain vertices #'foo)
                                 triangles "/tmp/proba2.obj")))))
+
+#+nil
+(let ((points (normalize-domain '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))))
+      (*prior-edge-fn* 'kato))
+  (flet ((generate (sd i)
+           (flet ((fn (p)
+                    (let ((l (prior-distribution-coordinates points p)))
+                      (if (eq sh 's)
+                          (barycentric-s l i)
+                          (barycentric-d l i)))))
+             (let ((filename (format nil "/tmp/~a~a.ps" sd i)))
+               (sliced-concave-distance-function-test points #'fn filename
+                                                      :resolution 0.0001 :density 0.1d0)))))
+    (dolist (sh '(s h))
+      (dotimes (i 8)
+        (generate sd i)))))
