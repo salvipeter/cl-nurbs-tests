@@ -103,3 +103,28 @@
   (vectorized-distance-function-test
    points '(s d s nil nil nil nil) "/tmp/proba.ps"
    :resolution 0.001d0 :density 20 :distance-type 'bary-constr :color t))
+
+(defparameter *prior-edge-fn* 'kato)    ; kato / angle
+(defun prior-distribution-coordinates (points p)
+  (let ((n (length points)))
+    (labels ((pi (i) (elt points (mod i n)))
+             (edge-fn (i)
+               (ecase *prior-edge-fn*
+                 (kato (- (+ (point-distance p (pi i)) (point-distance p (pi (1- i))))
+                          (point-distance (pi i) (pi (1- i)))))
+                 (angle (+ (* (point-distance p (pi i)) (point-distance p (pi (1- i))))
+                           (scalar-product (v- p (pi i)) (v- p (pi (1- i)))))))))
+      (let* ((ds (iter (for i from 0 below n) (collect (edge-fn i))))
+             (ps (iter (for i from 0 below n)
+                       (collect (iter (for j from 0 below n)
+                                      (for dj in ds)
+                                      (unless (or (= j i) (= j (mod (1+ i) n)))
+                                        (multiply dj))))))
+             (sum (reduce #'+ ps)))
+        (if (> sum *epsilon*)
+            (mapcar (lambda (x) (/ x sum)) ps)
+            (iter (for i from 0 below n)
+                  (if (and (< (elt ds i) *epsilon*)
+                           (< (elt ds (mod (1+ i) n)) *epsilon*))
+                      (collect 1)
+                      (collect 0))))))))

@@ -1893,6 +1893,13 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
         (barycentric-s l i)
         (barycentric-d l i))))
 
+(defmethod compute-distance ((type (eql 'prior-distribution)) points segments p dir)
+  (let ((l (prior-distribution-coordinates points p))
+        (i (position (third segments) points :test #'equal)))
+    (if (eq dir 's)
+        (barycentric-s l i)
+        (barycentric-d l i))))
+
 (defparameter *alyn-perpendicular-exponent* 2)
 
 (defmethod compute-distance ((type (eql 'alyn)) points segments p dir)
