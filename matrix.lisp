@@ -4,7 +4,7 @@
 
 (defpackage :matrix
   (:use :common-lisp :iterate)
-  (:export :m+ :transpose :multiplication :from-vector :to-vector
+  (:export :m+ :m* :transpose :multiplication :from-vector :to-vector
 	   :inverse-2x2 :inverse-3x3 :determinant-2x2 :determinant-3x3 :mtrace))
 
 (in-package :matrix)
@@ -17,6 +17,15 @@
       (dotimes (j (second n))
         (setf (aref result i j)
               (+ (aref m1 i j) (aref m2 i j)))))
+    result))
+
+(defun m* (m x)
+  (let* ((n (array-dimensions m))
+         (result (make-array n)))
+    (dotimes (i (first n))
+      (dotimes (j (second n))
+        (setf (aref result i j)
+              (* (aref m i j) x))))
     result))
 
 (defun transpose (m)

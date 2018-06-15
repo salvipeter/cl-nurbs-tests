@@ -1644,6 +1644,35 @@ Assumes that matter is always on the left side of the edges in the domain."
              (let ((filename (format nil "/tmp/~a~a.ps" sh i)))
                (sliced-concave-distance-function-test points #'fn filename
                                                       :resolution 0.0001 :density 0.1d0)))))
-    (dolist (sh '(s h))
+    (dolist (sh '(h s))
       (dotimes (i 8)
         (generate sh i)))))
+
+;;; New idea: multiply some of the harmonic weights (those near concave vertices) and normalize
+#+nil
+(let ((points (normalize-domain '((0 0) (6 0) (6 6) (4 6) (4 4) (2 4) (2 6) (0 6))))
+      (*barycentric-d-function* #'barycentric-d-1minus)
+      (*barycentric-dilation* 0))
+  (harmonic:with-harmonic-coordinates (h points :levels 10)
+    (flet ((generate (sh i)
+             (flet ((fn (p)
+                      (let ((l (harmonic:harmonic-coordinates h p))
+                            (js (list 4 5))
+                            (multiplier 2.0d0))
+                        (dolist (j js)
+                          (setf (elt l j) (* (elt l j) multiplier)))
+                        (let ((sum (reduce #'+ l)))
+                          (dotimes (k (length l))
+                            (setf (elt l k) (/ (elt l k) sum))))
+                        (if (eq sh 's)
+                            (barycentric-s l i)
+                            (barycentric-d l i)))))
+               (let ((filename (format nil "/tmp/~a~a.ps" sh i)))
+                 (sliced-concave-distance-function-test points #'fn filename
+                                                        :resolution 0.0001 :density 0.1d0)))))
+      (dolist (sh '(h s))
+        (dotimes (i 8)
+          (generate sh i))))))
+
+;;; in shell: (WARNING: deletes all .ps/.pdf files in the current directory)
+;;; for i in *.ps; do ps2pdf $i; done; pdf-append *.pdf > ~/proba.pdf; rm *.ps *.pdf

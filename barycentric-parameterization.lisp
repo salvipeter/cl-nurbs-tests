@@ -129,13 +129,14 @@
                       (collect 1)
                       (collect 0))))))))
 
+#+nil
 (defun maximum-entropy-coordinates (points p)
+  "BAD: exact Hessian is divergent, should use DFP (see below)."
   (let* ((n (length points))
          (dim (length (first points)))
          (prior (coerce (prior-distribution-coordinates points p) 'vector))
-         (vectors (mapcar (lambda (v) (v- v p)) points))
-         (l (make-list n :initial-element 0.0d0)))
-    (when (>= (count 0 prior :test #'=) (- n 2))
+         (vectors (mapcar (lambda (v) (v- v p)) points)))
+    (when (>= (count 0 prior :test #'=) (- n 2)) ; or maybe only at the vertices?
       (return-from maximum-entropy-coordinates prior))
     (assert (= dim 2) () "Matrix inversion now only works for 2 dimensions")
     (flet ((compute-gradients (l)
@@ -166,7 +167,8 @@
                                   (collect me)))
                     (sum (reduce #'+ coords)))
                (mapcar (lambda (x) (/ x sum)) coords))))
-      (iter (multiple-value-bind (g h)
+      (iter (with l = (make-list n :initial-element 0.0d0))
+            (multiple-value-bind (g h)
                 (compute-gradients l)
               (setf l (v- l (coerce
                              (matrix:to-vector
@@ -176,3 +178,84 @@
                              'list)))
               (while (> (vlength (coerce g 'list)) *epsilon*))
               (finally (return (compute-coords l))))))))
+
+(defun dfp-approximation (x x1 f f1 h)
+  (flet ((a- (u v) (map 'vector #'- u v)))
+    (matrix:m+
+     h
+     (matrix:m+
+      (matrix:m*
+       (matrix:multiplication
+        (matrix:from-vector (a- x1 x))
+        (matrix:transpose (matrix:from-vector (a- x1 x))))
+       (/ (aref (matrix:multiplication
+                 (matrix:transpose (matrix:from-vector (a- x1 x)))
+                 (matrix:from-vector (a- f1 f)))
+                0 0)))
+      (matrix:m*
+       (matrix:multiplication
+        (matrix:multiplication
+         h
+         (matrix:from-vector (a- f1 f)))
+        (matrix:transpose
+         (matrix:multiplication
+          h
+          (matrix:from-vector (a- f1 f)))))
+       (/ (- (aref (matrix:multiplication
+                    (matrix:multiplication
+                     (matrix:transpose (matrix:from-vector (a- f1 f)))
+                     h)
+                    (matrix:from-vector (a- f1 f)))
+                   0 0))))))))
+
+(defun maximum-entropy-coordinates (points p)
+  "With the David-Fletcher-Powell approximation of the Hessian."
+  (let* ((n (length points))
+         (prior (coerce (prior-distribution-coordinates points p) 'vector))
+         (vectors (mapcar (lambda (v) (v- v p)) points)))
+    (let ((zeros (count 0 prior :test #'=)))
+      (when (>= zeros (- n 2))
+        (return-from maximum-entropy-coordinates
+          (if (= zeros (1- n))
+              prior
+              (iter (for i from 0 below n)
+                    (if (> (elt prior i) 0)
+                        (let ((ip (mod (1+ i) n)))
+                          (if (> (elt prior ip) 0)
+                              (collect (/ (point-distance p (elt points ip))
+                                          (point-distance (elt points i) (elt points ip))))
+                              (let ((im (mod (1- i) n)))
+                                (collect (/ (point-distance p (elt points im))
+                                            (point-distance (elt points i) (elt points im)))))))
+                        (collect 0.0d0)))))))
+    (labels ((a- (u v) (map 'vector #'- u v))
+             (a* (u v) (reduce #'+ (map 'list #'* u v)))
+             (compute-gradient (l)
+               (let ((gradient (make-array 2 :element-type 'double-float :initial-element 0.0d0))
+                     (denom 0.0d0))
+                 (iter (for k from 0 below n)
+                       (for vk in vectors)
+                       (for me = (* (elt prior k) (exp (- (a* l vk)))))
+                       (incf denom me)
+                       (iter (for d from 0 below 2)
+                             (incf (elt gradient d) (* me (- (elt vk d))))))
+                 (iter (for d from 0 below 2)
+                       (setf (elt gradient d) (/ (elt gradient d) denom))) 
+                 gradient))
+             (compute-coords (l)
+               (let* ((coords (iter (for k from 0 below n)
+                                    (for vk in vectors)
+                                    (for me = (* (elt prior k) (exp (- (a* l vk)))))
+                                    (collect me)))
+                      (sum (reduce #'+ coords)))
+                 (mapcar (lambda (x) (/ x sum)) coords))))
+      (iter (with l = (make-array n :initial-element 0.0d0))
+            (with h = (make-array '(2 2) :element-type 'double-float
+                                  :initial-contents '((1.0d0 0.0d0) (0.0d0 1.0d0))))
+            (for prev-l = (copy-seq l))
+            (for g first (compute-gradient l) then next-g)
+            (setf l (a- l (matrix:to-vector (matrix:multiplication h (matrix:from-vector g)))))
+            (for next-g = (compute-gradient l))
+            (setf h (dfp-approximation prev-l l g next-g h))
+            (while (> (vlength (coerce g 'list)) *epsilon*))
+            (finally (return (compute-coords l)))))))
