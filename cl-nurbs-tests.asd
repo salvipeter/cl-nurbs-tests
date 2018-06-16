@@ -44,6 +44,7 @@
                (:file "n-sided-paper" :depends-on ("package"))
                (:file "blends" :depends-on ("n-sided-paper"))
                (:file "harmonic-coordinates")
+               (:file "maxent-coordinates")
                (:file "shewchuk-triangle")
                (:file "kato-test" :depends-on ("blends" "harmonic-coordinates"))
                (:file "ribbons" :depends-on ("kato-test"))
