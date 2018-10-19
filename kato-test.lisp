@@ -1910,21 +1910,23 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
       (let ((di (point-line-distance p (list (elt segments 1) (elt segments 2)))))
         (/ di
            (+ di
-              (expt (iter (with n = (length points))
-                          (with index = (position (elt segments 1) points))
-                          (with indexp = (mod (1+ index) n))
-                          (for i from 0 below n)
-                          (for ip = (mod (1+ i) n))
-                          (unless (or (= ip index) (= i index) (= i indexp))
-                            (let ((d (point-line-distance p (list (elt points i) (elt points ip)))))
-                              (sum (expt d *alyn-perpendicular-exponent*)))))
-                    (/ *alyn-perpendicular-exponent*)))))))
+              (let ((result 1.0))
+                (iter (with n = (length points))
+                      (with index = (position (elt segments 1) points))
+                      (with indexp = (mod (1+ index) n))
+                      (for i from 0 below n)
+                      (for ip = (mod (1+ i) n))
+                      (unless (or (= ip index) (= i index) (= i indexp))
+                        (let ((d (point-line-distance p (list (elt points i) (elt points ip)))))
+                          (setf result (* result (expt d *alyn-perpendicular-exponent*)))))
+                      (finally (return (expt result (/ *alyn-perpendicular-exponent*)))))))))))
 
 #+nil
 (let ((points (points-from-angles '(40 20 60 100 80)))
+      (*alyn-perpendicular-exponent* 1)
       (*wachspressp* nil))
   (sliced-distance-function-test
-   points '(nil sd nil nil nil) "/tmp/proba.ps" :distance-type 'alyn :color nil))
+   points '(nil sd nil nil nil) "/tmp/proba.ps" :distance-type 'alyn :color nil  :density 0.05))
 
 (defun slice-mesh (vertices triangles density)
   "Given a mesh by `VERTICES' and `TRIANGLES', finds the contours
