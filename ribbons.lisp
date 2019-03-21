@@ -121,13 +121,14 @@ Assumes that f(y) > 0 for y < x and f(y) < 0 for y > x."
 (defun line-point (line u)
   (affine-combine (first line) u (second line)))
 
-(defun insidep (lines p)
+(defun insidep (lines p &optional inside-or-on)
   "Determines if P is inside the polygon defined by LINES."
-  (let ((center (central-point (mapcar #'second lines) lines t)))
+  (let ((center (central-point (mapcar #'second lines) lines t))
+        (test (if inside-or-on #'>= #'>)))
     (every (lambda (line)
-	     (> (* (point-line-distance p line t)
-		   (point-line-distance center line t))
-		0))
+	     (funcall test (* (point-line-distance p line t)
+                              (point-line-distance center line t))
+                      0))
 	   lines)))
 
 (defun blend (d i)
