@@ -1910,21 +1910,23 @@ the d parameter lines do not start in the adjacent sides' sweep line direction."
       (let ((di (point-line-distance p (list (elt segments 1) (elt segments 2)))))
         (/ di
            (+ di
-              (expt (iter (with n = (length points))
-                          (with index = (position (elt segments 1) points))
-                          (with indexp = (mod (1+ index) n))
-                          (for i from 0 below n)
-                          (for ip = (mod (1+ i) n))
-                          (unless (or (= ip index) (= i index) (= i indexp))
-                            (let ((d (point-line-distance p (list (elt points i) (elt points ip)))))
-                              (sum (expt d *alyn-perpendicular-exponent*)))))
-                    (/ *alyn-perpendicular-exponent*)))))))
+              (let ((result 1.0))
+                (iter (with n = (length points))
+                      (with index = (position (elt segments 1) points))
+                      (with indexp = (mod (1+ index) n))
+                      (for i from 0 below n)
+                      (for ip = (mod (1+ i) n))
+                      (unless (or (= ip index) (= i index) (= i indexp))
+                        (let ((d (point-line-distance p (list (elt points i) (elt points ip)))))
+                          (setf result (* result (expt d *alyn-perpendicular-exponent*)))))
+                      (finally (return (expt result (/ *alyn-perpendicular-exponent*)))))))))))
 
 #+nil
 (let ((points (points-from-angles '(40 20 60 100 80)))
+      (*alyn-perpendicular-exponent* 1)
       (*wachspressp* nil))
   (sliced-distance-function-test
-   points '(nil sd nil nil nil) "/tmp/proba.ps" :distance-type 'alyn :color nil))
+   points '(nil sd nil nil nil) "/tmp/proba.ps" :distance-type 'alyn :color nil  :density 0.05))
 
 (defun slice-mesh (vertices triangles density)
   "Given a mesh by `VERTICES' and `TRIANGLES', finds the contours
@@ -2095,3 +2097,45 @@ in *HARMONIC-MAP*."
     (sliced-distance-function-test points '(nil nil nil nil sd) "/tmp/proba.ps"
                                    :resolution 30 :density 0.1
                                    :distance-type 'harmonic :color nil)))
+
+(defun find-triangle (points p &optional (c (central-point points (lines-from-points points) nil)))
+  "Returns an index such that the triangle p_{i-1} p_i c contains p."
+  (iter (with n = (length points))
+        (for i from 0 below n)
+        (for i-1 = (mod (1- i) n))
+        (for lines = (lines-from-points (list c (elt points i-1) (elt points i))))
+        (when (insidep lines p t)
+          (return-from find-triangle i)))
+  ;; return dummy
+  0)
+
+(defmethod compute-distance ((type (eql 'minmax-coordinate)) points segments p dir)
+  "Just to test the coordinate itself, so s/d does not have any effect."
+  (declare (ignore dir))
+  (labels ((heron (a b c)
+             (let ((s (/ (+ a b c) 2)))
+               (sqrt (max 0 (* s (- s a) (- s b) (- s c))))))
+           (area (a b c)
+             (heron (point-distance a b)
+                    (point-distance b c)
+                    (point-distance c a))))
+    (let* ((n (length points))
+           (c (v* (reduce #'v+ points) (/ n)))
+           (i (find-triangle points p c))
+           (i-1 (mod (1- i) n))
+           (vi-1 (elt points i-1))
+           (vi (elt points i))
+           (Ai-1 (area c vi-1 p))
+           (Ai (area c vi p))
+           (B (area p vi-1 vi))
+           (tri (area c vi-1 vi))
+           (k (position (third segments) points :test #'equal)))
+      (cond ((= k i-1) (/ (+ B (* n Ai))  (* n tri)))
+            ((= k i)   (/ (+ B (* n Ai-1)) (* n tri)))
+            (t         (/ B               (* n tri)))))))
+
+#+nil
+(let ((points (points-from-angles '(40 20 60 100 80))))
+  (sliced-distance-function-test points '(s nil nil nil nil) "/tmp/proba.ps"
+                                 :resolution 50 :density 0.05
+                                 :distance-type 'minmax-coordinate :color nil))
